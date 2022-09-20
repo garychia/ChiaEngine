@@ -1,28 +1,26 @@
 #ifndef STRING_HPP
 #define STRING_HPP
 
-#define STR(x) String((const wchar_t *)(L##x), (size_t)(sizeof(L##x) / sizeof(wchar_t)))
-#define CHAR wchar_t
+#define STR(x) String((const wchar_t *)(L##x), (size_t)(sizeof(L##x) / sizeof(wchar_t) - 1))
+#define CHAR char16_t
 
-#include <tchar.h>
-#include <utility>
-
+#include "Types/Types.hpp"
 #include "Str.hpp"
 
-class String : public Str<wchar_t>
+class String : public Str<CHAR>
 {
 public:
-    String() noexcept : Str<wchar_t>() {}
+    String() noexcept : Str<CHAR>() {}
 
-    String(const Str<wchar_t> &s) noexcept : Str<wchar_t>(s) {}
+    String(const Str<CHAR> &s) noexcept : Str<CHAR>(s) {}
 
-    String(Str<wchar_t> &&s) noexcept : Str<wchar_t>(std::forward<Str<wchar_t>>(s)) {}
-
-    template <class T>
-    String(const T &c, size_t length) noexcept : Str<wchar_t>(c, length) {}
+    String(Str<CHAR> &&s) noexcept : Str<CHAR>(Move(s)) {}
 
     template <class T>
-    String(const T *str, size_t length) noexcept : Str<wchar_t>(str, length) {}
+    String(const T &c, size_t length) noexcept : Str<CHAR>(c, length) {}
+
+    template <class T>
+    String(const T *str, size_t length) noexcept : Str<CHAR>(str, length) {}
 };
 
 class StringStream : StrStream<String::CharType>

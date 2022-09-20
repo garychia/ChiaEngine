@@ -1,6 +1,7 @@
 #ifndef STR_HPP
 #define STR_HPP
 
+#include "Types/Types.hpp"
 #include "List.hpp"
 
 template <class T>
@@ -14,30 +15,24 @@ private:
     void CopyPtr(const U *ptrToCopy, size_t len) noexcept
     {
         length = len;
-        if (length > 0)
-        {
-            ptr = new T[length];
-            for (size_t i = 0; i < length; i++)
-                ptr[i] = ptrToCopy[i];
-        }
-        else
-        {
-            ptr = 0;
-        }
+        ptr = new T[length + 1];
+        for (size_t i = 0; i < length; i++)
+            ptr[i] = ptrToCopy[i];
+        ptr[length] = '\0';
     }
 
 public:
     using CharType = T;
 
     template <class Int>
-    static Str<T> FromInt(const Int &i)
+    static Str<T> FromInt(const Int &i) noexcept
     {
         List<T> digits;
         Int n = i;
         bool negative = n < 0;
         do
         {
-            digits.Prepend('0' + -(n % 10));
+            digits.Prepend('0' + (negative ? -(n % 10) : n % 10));
             n /= 10;
         } while (n);
         if (negative)
@@ -49,7 +44,40 @@ public:
         return result;
     }
 
-    Str() noexcept {}
+    template <class FloatType>
+    static Str<T> FromFloat(const FloatType &f, size_t precision = 3)
+    {
+        List<T> digits;
+        bool negative = f < 0;
+        long long intPart = f;
+        FloatType decimalPart = f - intPart;
+        do
+        {
+            digits.Prepend('0' + (negative ? -(intPart % 10) : intPart % 10));
+            intPart /= 10;
+        } while (intPart);
+        if (negative)
+            digits.Prepend('-');
+        if (precision)
+            digits.Append('.');
+        while (precision > 0)
+        {
+            decimalPart *= 10;
+            const auto digit = negative ? -((long long)decimalPart % 10) : (long long)decimalPart % 10;
+            digits.Append('0' + digit);
+            precision--;
+        }
+        Str<T> result(' ', digits.Length());
+        size_t idx = 0;
+        for (auto current = &digits.First(); current; current = &current->GetNext())
+            result[idx++] = current->GetData();
+        return result;
+    }
+
+    Str() noexcept : length(0), ptr(new T[1])
+    {
+        ptr[0] = '\0';
+    }
 
     Str(const Str<T> &s) noexcept
     {
@@ -98,7 +126,7 @@ public:
     {
         if (length + 1 != N)
             return false;
-        for (size_t i = 0; N && i < N - 1; i++)
+        for (size_t i = 0; i < length; i++)
         {
             if ((*this)[i] != s[i])
                 return false;
@@ -115,16 +143,10 @@ public:
     Str(const T &c, size_t length = 1) noexcept
     {
         this->length = length;
-        if (length)
-        {
-            ptr = new T[length];
-            for (size_t i = 0; i < length; i++)
-                ptr[i] = (T)c;
-        }
-        else
-        {
-            ptr = 0;
-        }
+        ptr = new T[length + 1];
+        for (size_t i = 0; i < length; i++)
+            ptr[i] = (T)c;
+        ptr[length] = '\0';
     }
 
     template <class U>
@@ -135,12 +157,17 @@ public:
 
     size_t Length() const noexcept { return length; }
 
-    Str<T> SubStr(size_t start, long long end = -1) const noexcept
+    Str<T> SubStr(size_t start) const noexcept
     {
-        if (-1 == end)
-            end = length - 1;
+        return Str<T>(&ptr[start], length - start);
+    }
+
+    Str<T> SubStr(size_t start, size_t end) const noexcept
+    {
         if (start > end)
             return Str<T>();
+        if (end + 1 > length)
+            return SubStr(start);
         return Str<T>(&ptr[start], end - start + 1);
     }
 
@@ -151,6 +178,10 @@ public:
         length = newSize;
         return *this;
     }
+
+    T *CStr() noexcept { return ptr; }
+
+    const T *CStr() const noexcept { return ptr; }
 
     T &operator[](size_t index) noexcept
     {
@@ -205,13 +236,18 @@ public:
     template <class StrType>
     StrStream &operator<<(StrType &&str) noexcept
     {
-        strs.Append(std::forward<StrType>(str));
+        strs.Append(Forward<StrType>(str));
     }
 
-    template <class Int>
-    StrStream &operator<<(const Int &i) noexcept
+    template <class T>
+    StrStream &operator<<(const T &input) noexcept
     {
-        strs.Append(Str<T>::FromInt(i));
+        if (IsChar<T>::Value)
+            strs.Append(Str<T>(input));
+        else if (IsInteger<T>::Value)
+            strs.Append(Str<T>::FromInt(input));
+        else
+            strs.Append(Str<T>::FromFloat(input));
     }
 
     Str<T> ToString() const noexcept
