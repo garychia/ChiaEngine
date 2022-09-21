@@ -92,6 +92,24 @@ public:
         s.ptr = 0;
     }
 
+    Str(const T &c, size_t length = 1) noexcept
+    {
+        this->length = length;
+        ptr = new T[length + 1];
+        for (size_t i = 0; i < length; i++)
+            ptr[i] = (T)c;
+        ptr[length] = '\0';
+    }
+
+    template <class U>
+    Str(const U *str, size_t length) noexcept
+    {
+        CopyPtr<U>(str, length);
+    }
+
+    template <class Char, size_t N>
+    Str(Char (&s)[N]) noexcept : Str(s, N - 1) {}
+
     Str<T> &operator=(const Str<T> &s) noexcept
     {
         CopyPtr(&s[0], s.length);
@@ -138,21 +156,6 @@ public:
     bool operator!=(Char (&s)[N]) const noexcept
     {
         return !operator==(s);
-    }
-
-    Str(const T &c, size_t length = 1) noexcept
-    {
-        this->length = length;
-        ptr = new T[length + 1];
-        for (size_t i = 0; i < length; i++)
-            ptr[i] = (T)c;
-        ptr[length] = '\0';
-    }
-
-    template <class U>
-    Str(const U *str, size_t length) noexcept
-    {
-        CopyPtr<U>(str, length);
     }
 
     size_t Length() const noexcept { return length; }
@@ -237,6 +240,7 @@ public:
     StrStream &operator<<(StrType &&str) noexcept
     {
         strs.Append(Forward<StrType>(str));
+        return *this;
     }
 
     template <class T>
@@ -248,6 +252,7 @@ public:
             strs.Append(Str<T>::FromInt(input));
         else
             strs.Append(Str<T>::FromFloat(input));
+        return *this;
     }
 
     Str<T> ToString() const noexcept
