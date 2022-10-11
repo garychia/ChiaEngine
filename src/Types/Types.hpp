@@ -1,18 +1,18 @@
 #ifndef TYPES_HPP
 #define TYPES_HPP
 
-#define BOOL_TYPE_DECLARATION(name, value)   \
-    template <class T>                       \
-    struct name                              \
-    {                                        \
-        static constexpr bool Value = value; \
+namespace Types
+{
+#define BOOL_TYPE_DECLARATION(name, value)                                                                             \
+    template <class T> struct name                                                                                     \
+    {                                                                                                                  \
+        static constexpr bool Value = value;                                                                           \
     }
 
-#define BOOL_TYPE_SPECIALIZATION(type, name, value) \
-    template <>                                     \
-    struct name<type>                               \
-    {                                               \
-        static constexpr bool Value = value;        \
+#define BOOL_TYPE_SPECIALIZATION(type, name, value)                                                                    \
+    template <> struct name<type>                                                                                      \
+    {                                                                                                                  \
+        static constexpr bool Value = value;                                                                           \
     }
 
 BOOL_TYPE_DECLARATION(IsInteger, false);
@@ -46,40 +46,45 @@ BOOL_TYPE_DECLARATION(IsConst<const T>, true);
 BOOL_TYPE_DECLARATION(IsVolatile, false);
 BOOL_TYPE_DECLARATION(IsVolatile<volatile T>, true);
 
-template <class T>
-struct RemoveReference
+template <class T> struct RemoveConst
 {
     using Type = T;
 };
 
-template <class T>
-struct RemoveReference<T &>
+template <class T> struct RemoveConst<const T>
 {
     using Type = T;
 };
 
-template <class T>
-struct RemoveReference<T &&>
+template <class T> struct RemoveReference
 {
     using Type = T;
 };
 
-template <class T>
-constexpr typename RemoveReference<T>::Type &&Move(T &&arg) noexcept
+template <class T> struct RemoveReference<T &>
+{
+    using Type = T;
+};
+
+template <class T> struct RemoveReference<T &&>
+{
+    using Type = T;
+};
+
+template <class T> constexpr typename RemoveReference<T>::Type &&Move(T &&arg) noexcept
 {
     return static_cast<typename RemoveReference<T>::Type &&>(arg);
 }
 
-template <class T>
-constexpr T &&Forward(typename RemoveReference<T>::Type &arg) noexcept
+template <class T> constexpr T &&Forward(typename RemoveReference<T>::Type &arg) noexcept
 {
     return static_cast<T &&>(arg);
 }
 
-template <class T>
-constexpr T &&Forward(typename RemoveReference<T>::Type &&arg) noexcept
+template <class T> constexpr T &&Forward(typename RemoveReference<T>::Type &&arg) noexcept
 {
     return static_cast<T &&>(arg);
 }
+} // namespace Types
 
-#endif
+#endif // TYPES_HPP
