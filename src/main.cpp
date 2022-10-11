@@ -1,4 +1,8 @@
-int main(int argc, char *argv[])
+#include "App.hpp"
+#include "pch.hpp"
+
+int main()
 {
-    return 0;
+    App app;
+    return app.Execute();
 }
