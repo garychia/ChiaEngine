@@ -1,118 +1,222 @@
 #ifndef LIST_HPP
 #define LIST_HPP
 
-template <class T>
-class List
+template <class T> class List
 {
-public:
-    using ValueType = T;
-
-    class ListElement
+  private:
+    struct Element
     {
-    private:
         T data;
-        ListElement *next;
-        ListElement *prev;
         List<T> *owner;
+        Element *next;
+        Element *prev;
 
-        template <class Element>
-        ListElement(Element &&data, List<T> *owner, ListElement *prev = 0, ListElement *next = 0) : data(Forward<T>(data)), owner(owner), next(next), prev(prev) {}
-
-    public:
-        using ValueType = T;
-
-        ListElement(const ListElement &e) : data(e.data), next(e.next), prev(e.prev), owner(e.owner) {}
-
-        ListElement &operator=(const ListElement &e)
+        template <class DataType>
+        Element(DataType &&data, List<T> *owner, Element *prev = 0, Element *next = 0)
+            : data(Forward<decltype(data)>(data)), owner(owner), next(next), prev(prev)
         {
-            data = e.data;
+        }
+
+        Element(const Element &e) : data(e.data), owner(e.owner), next(e.next), prev(e.prev)
+        {
+        }
+
+        template <class ElementType> Element &operator=(ElementType &&e)
+        {
+            data = Forward<decltype(e)>(e.data);
             next = e.next;
             prev = e.prev;
             owner = e.owner;
         }
 
-        T &operator*() { return data; }
+        T &operator*()
+        {
+            return data;
+        }
 
-        const T &operator*() const { return data; }
+        const T &operator*() const
+        {
+            return data;
+        }
 
-        T *operator->() { return &data; }
+        T *operator->()
+        {
+            return &data;
+        }
 
-        const T *operator->() const { return &data; }
+        const T *operator->() const
+        {
+            return &data;
+        }
 
-        bool hasNext() const { return next != 0; }
+        friend class List<T>;
+        friend class List<T>::Iterator;
+    };
 
-        ListElement &GetNext() const { return *next; }
+  public:
+    using ValueType = T;
 
-        bool hasPrev() const { return prev != 0; }
+    class Iterator
+    {
+      private:
+        List<T> *owner;
+        Element *prev;
+        Element *current;
 
-        ListElement &GetPrev() const { return *prev; }
+      public:
+        Iterator(List<T> *pList = nullptr) : owner(pList), prev(nullptr), current(nullptr)
+        {
+            if (pList)
+                current = pList->head;
+        }
 
-        List<T> &GetOwner() { return *owner; }
+        Iterator(Element *pElement) : owner(nullptr), prev(nullptr), current(nullptr)
+        {
+            if (pElement)
+            {
+                owner = pElement->owner;
+                prev = pElement->prev;
+                current = pElement;
+            }
+        }
 
-        const List<T> &GetOwner() const { return *owner; }
+        Iterator(const Iterator &other) : owner(other.owner), current(other.current)
+        {
+        }
 
-        T &GetData() { return data; }
+        T &operator*()
+        {
+            return current->data;
+        }
 
-        const T &GetData() const { return data; }
+        T *operator->()
+        {
+            return &current->data;
+        }
+
+        Iterator &operator++()
+        {
+            if (current)
+            {
+                prev = current;
+                current = current->next;
+            }
+            return *this;
+        }
+
+        Iterator operator++(int)
+        {
+            if (current)
+            {
+                prev = current;
+                current = current->next;
+            }
+            return *this;
+        }
+
+        Iterator &operator--()
+        {
+            if (prev)
+            {
+                current = prev;
+                prev = prev->prev;
+            }
+            return *this;
+        }
+
+        Iterator operator--(int)
+        {
+            if (prev)
+            {
+                current = prev;
+                prev = prev->prev;
+            }
+            return *this;
+        }
+
+        bool operator==(const Element &other) const
+        {
+            return owner == other.owner && current == other.current;
+        }
+
+        bool operator!=(const Element &other) const
+        {
+            return owner != other.owner || current != other.current;
+        }
 
         friend class List<T>;
     };
 
-    List() {}
+    List()
+    {
+    }
 
     virtual ~List()
     {
         RemoveAll();
     }
 
-    bool IsEmpty() const { return length == 0; }
+    bool IsEmpty() const
+    {
+        return length == 0;
+    }
 
-    ListElement &First() const { return *head; }
+    Iterator First() const
+    {
+        return Iterator(this);
+    }
 
-    ListElement &Last() const { return *tail; }
+    Iterator Last() const
+    {
+        Iterator itr(this);
+        itr.prev = tail;
+        itr.current = nullptr;
+        return itr;
+    }
 
-    template <class Element>
-    void Append(Element &&e)
+    template <class DataType> void Append(DataType &&e)
     {
         if (IsEmpty())
         {
-            head = tail = new ListElement(Forward<T>(e), this);
+            head = tail = new Element(Forward<decltype(e)>(e), this);
         }
         else
         {
-            auto newElement = new ListElement(Forward<T>(e), this, tail);
+            auto newElement = new Element(Forward<decltype(e)>(e), this, tail);
             tail->next = newElement;
             tail = newElement;
         }
         length++;
     }
 
-    template <class Element>
-    void Prepend(Element &&e)
+    template <class Element> void Prepend(Element &&e)
     {
         if (IsEmpty())
         {
-            head = tail = new ListElement(Forward<T>(e), this);
+            head = tail = new Element(Forward<T>(e), this);
         }
         else
         {
-            auto newElement = new ListElement(Forward<T>(e), this, 0, head);
+            auto newElement = new Element(Forward<T>(e), this, 0, head);
             head->prev = newElement;
             head = newElement;
         }
         length++;
     }
 
-    template <class Element>
-    void Insert(Element &&e, const ListElement &nextElement)
+    template <class DataType> void Insert(DataType &&e, const Iterator &nextItr)
     {
         if (nextElement.owner != this)
             return;
-        auto prevElement = nextElement.prev;
-        auto newElement = new ListElement(Forward<T>(e), this, prevElement, &nextElement);
+        Element *nextElement = nextItr.current;
+        Element *prevElement = nextElement->prev;
+        auto newElement = new Element(Forward<decltype(e)>(e), this, prevElement, nextElement);
         if (prevElement)
             prevElement->next = newElement;
-        nextElement.prev = newElement;
+        if (nextElement)
+            nextElement->prev = newElement;
+        if (IsEmpty())
+            head = tail = newElement;
         length++;
     }
 
@@ -121,7 +225,7 @@ public:
         auto current = head;
         while (current)
         {
-            auto nextElement = current->next;
+            Element *nextElement = current->next;
             delete current;
             current = nextElement;
         }
@@ -129,13 +233,14 @@ public:
         length = 0;
     }
 
-    void Remove(const ListElement &element)
+    void Remove(const Iterator &itr)
     {
-        if (element.owner != this)
+        if (itr.owner != this || !itr.current)
             return;
-        ListElement *elementPtr = 0;
-        auto prevElement = element.prev;
-        auto nextElement = element.next;
+        const Element &element = *itr.current;
+        Element *elementPtr = 0;
+        Element *prevElement = element.prev;
+        Element *nextElement = element.next;
         if (prevElement)
         {
             elementPtr = prevElement->next;
@@ -156,15 +261,19 @@ public:
 
     void RemoveFirst()
     {
+        if (IsEmpty())
+            return;
         Remove(First());
     }
 
     void RemoveLast()
     {
+        if (IsEmpty())
+            return;
         Remove(Last());
     }
 
-    bool Contains(const T &e)
+    bool Contains(const T &e) const
     {
         auto current = head;
         while (current)
@@ -173,26 +282,29 @@ public:
                 return true;
             current = current->next;
         }
-        return fales;
+        return false;
     }
 
-    ListElement *Find(const T &e)
+    Iterator Find(const T &e) const
     {
-        auto current = head;
-        while (current)
+        Iterator itr = First();
+        while (itr != Last())
         {
-            if (current->data == e)
-                return current;
-            current = current->next;
+            if (*itr == e)
+                return itr;
+            itr++;
         }
-        return 0;
+        return itr;
     }
 
-    size_t Length() const { return length; }
+    size_t Length() const
+    {
+        return length;
+    }
 
-private:
-    ListElement *head = 0;
-    ListElement *tail = 0;
+  private:
+    Element *head = 0;
+    Element *tail = 0;
     size_t length = 0;
 };
 
