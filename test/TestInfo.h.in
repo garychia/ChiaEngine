@@ -1,0 +1,1 @@
+#cmakedefine IO_TEST_FILE_PATH "@IO_TEST_FILE_PATH@"
