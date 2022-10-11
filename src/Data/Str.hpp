@@ -1,18 +1,17 @@
 #ifndef STR_HPP
 #define STR_HPP
 
-#include "Types/Types.hpp"
 #include "List.hpp"
+#include "Types/Types.hpp"
 
-template <class T>
-class Str
+
+template <class T> class Str
 {
-private:
+  private:
     T *ptr = 0;
     size_t length = 0;
 
-    template <class U>
-    void CopyPtr(const U *ptrToCopy, size_t len) noexcept
+    template <class U> void CopyPtr(const U *ptrToCopy, size_t len) noexcept
     {
         length = len;
         ptr = new T[length + 1];
@@ -21,11 +20,10 @@ private:
         ptr[length] = '\0';
     }
 
-public:
+  public:
     using CharType = T;
 
-    template <class Int>
-    static Str<T> FromInt(const Int &i) noexcept
+    template <class Int> static Str<T> FromInt(const Int &i) noexcept
     {
         List<T> digits;
         Int n = i;
@@ -44,8 +42,7 @@ public:
         return result;
     }
 
-    template <class FloatType>
-    static Str<T> FromFloat(const FloatType &f, size_t precision = 3)
+    template <class FloatType> static Str<T> FromFloat(const FloatType &f, size_t precision = 3)
     {
         List<T> digits;
         bool negative = f < 0;
@@ -101,14 +98,14 @@ public:
         ptr[length] = '\0';
     }
 
-    template <class U>
-    Str(const U *str, size_t length) noexcept
+    template <class U> Str(const U *str, size_t length) noexcept
     {
         CopyPtr<U>(str, length);
     }
 
-    template <class Char, size_t N>
-    Str(Char (&s)[N]) noexcept : Str(s, N - 1) {}
+    template <class Char, size_t N> Str(Char (&s)[N]) noexcept : Str(s, N - 1)
+    {
+    }
 
     Str<T> &operator=(const Str<T> &s) noexcept
     {
@@ -139,8 +136,7 @@ public:
         return true;
     }
 
-    template <class Char, size_t N>
-    bool operator==(Char (&s)[N]) const noexcept
+    template <class Char, size_t N> bool operator==(Char (&s)[N]) const noexcept
     {
         if (length + 1 != N)
             return false;
@@ -152,13 +148,15 @@ public:
         return true;
     }
 
-    template <class Char, size_t N>
-    bool operator!=(Char (&s)[N]) const noexcept
+    template <class Char, size_t N> bool operator!=(Char (&s)[N]) const noexcept
     {
         return !operator==(s);
     }
 
-    size_t Length() const noexcept { return length; }
+    size_t Length() const noexcept
+    {
+        return length;
+    }
 
     Str<T> SubStr(size_t start) const noexcept
     {
@@ -182,9 +180,15 @@ public:
         return *this;
     }
 
-    T *CStr() noexcept { return ptr; }
+    T *CStr() noexcept
+    {
+        return ptr;
+    }
 
-    const T *CStr() const noexcept { return ptr; }
+    const T *CStr() const noexcept
+    {
+        return ptr;
+    }
 
     T &operator[](size_t index) noexcept
     {
@@ -207,14 +211,25 @@ public:
         return result;
     }
 
+    template <class Char, size_t N>
+    Str<T> operator+(Char (&cStr)[N]) const noexcept
+    {
+        Str<T> result(' ', length + N - 1);
+        size_t idx = 0;
+        for (size_t i = 0; i < length; i++)
+            result[idx++] = (*this)[i];
+        for (size_t i = 0; i < N - 1; i++)
+            result[idx++] = cStr[i];
+        return result;
+    }
+
     virtual ~Str() noexcept
     {
         if (ptr)
             delete[] ptr;
     }
 
-    template <class T>
-    long long Find(const T &c) noexcept
+    template <class T> long long Find(const T &c) noexcept
     {
         for (size_t i = 0; i < length; i++)
         {
@@ -225,26 +240,25 @@ public:
     }
 };
 
-template <class T>
-class StrStream
+template <class T> class StrStream
 {
-private:
+  private:
     List<Str<T>> strs;
 
-public:
+  public:
     using StrType = Str<T>;
 
-    StrStream() : strs() {}
+    StrStream() : strs()
+    {
+    }
 
-    template <class StrType>
-    StrStream &operator<<(StrType &&str) noexcept
+    template <class StrType> StrStream &operator<<(StrType &&str) noexcept
     {
         strs.Append(Forward<StrType>(str));
         return *this;
     }
 
-    template <class T>
-    StrStream &operator<<(const T &input) noexcept
+    template <class T> StrStream &operator<<(const T &input) noexcept
     {
         if (IsChar<T>::Value)
             strs.Append(Str<T>(input));
@@ -260,14 +274,14 @@ public:
         size_t length = 0;
         for (auto current = &strs.First(); current; current = &current->GetNext())
         {
-            const List<Str<T>>::ListElement &e = *current;
+            const List<Str<T>>::Element &e = *current;
             length += (*current)->Length();
         }
         size_t idx = 0;
         Str<T> result(' ', length);
         for (auto current = &strs.First(); current; current = &current->GetNext())
         {
-            const List<Str<T>>::ListElement &e = *current;
+            const List<Str<T>>::Element &e = *current;
             for (size_t i = 0; i < e->Length(); i++)
                 result[idx++] = (*e)[i];
         }
