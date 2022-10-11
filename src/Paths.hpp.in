@@ -1,0 +1,1 @@
+#cmakedefine IMAGE_FILE_PATH "@IMAGE_FILE_PATH@"
