@@ -1,0 +1,3 @@
+#include "pch.hpp"
+
+const D3D_FEATURE_LEVEL DX_SUPPORTED_LEVELS[] = {D3D_FEATURE_LEVEL_11_0};
