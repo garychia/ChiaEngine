@@ -38,6 +38,45 @@ Triangle::~Triangle()
         delete[] renderInfo.colorIndexBuffer;
 }
 
+const unsigned int Rectangle::NumberOfVertexIndices = 6;
+const unsigned int Rectangle::NumberOfVertices = 4;
+const Point3D Rectangle::vertexBuffer[] = {{0.5, 0.5, 0.f}, {-0.5, 0.5, 0.f}, {-0.5, -0.5, 0.f}, {0.5, -0.5, 0.f}};
+const VertexIndexType Rectangle::vertexIndexBuffer[] = {0, 1, 2, 2, 3, 0};
+const Point2D Rectangle::textureCoordinates[] = {{1.f, 1.f}, {0.f, 1.f}, {0.f, 0.f}, {1.f, 0.f}};
+
+Rectangle::Rectangle(const Point3D &position, const Point3D &rotation, const Point3D &scale, const Color &color)
+    : IRenderable(position, rotation, scale), color(color)
+{
+    this->renderInfo.vertexBuffer = vertexBuffer;
+    this->renderInfo.numOfVertices = NumberOfVertices;
+    this->renderInfo.vertexIndexBuffer = vertexIndexBuffer;
+    this->renderInfo.numOfVertexIndices = NumberOfVertexIndices;
+    this->renderInfo.colorBuffer = &this->color;
+    this->renderInfo.numOfColors = 1;
+    this->renderInfo.colorIndexBuffer = new ColorIndexType[NumberOfVertexIndices]{};
+    this->renderInfo.numOfColorIndices = NumberOfVertexIndices;
+    this->renderInfo.textureCoordinates = textureCoordinates;
+    this->renderInfo.numOfTextureCoordinates = sizeof(textureCoordinates) / sizeof(Point2D);
+}
+
+Rectangle::Rectangle(const Transformation &transformation, const Color &color)
+    : IRenderable(transformation), color(color)
+{
+}
+
+Rectangle::Rectangle(const Rectangle &other) : Rectangle(other.transformation, other.color)
+{
+    this->renderInfo.pVertexShader = other.renderInfo.pVertexShader;
+    this->renderInfo.pPixelShader = other.renderInfo.pPixelShader;
+    this->renderInfo.pTexture = other.renderInfo.pTexture;
+}
+
+Rectangle::~Rectangle()
+{
+    if (this->renderInfo.colorIndexBuffer)
+        delete[] renderInfo.colorIndexBuffer;
+}
+
 const Point3D Cube::vertexBuffer[] = {
     // Front
     {0.5, 0.5, 0.5},
