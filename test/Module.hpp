@@ -18,7 +18,7 @@ class Module
 
     Module::Module(const Module &m) = delete;
 
-    Module::Module(Module &&m) noexcept : tests(Move(m.tests))
+    Module::Module(Module &&m) noexcept : tests(Types::Move(m.tests))
     {
         m.tests.clear();
     }
