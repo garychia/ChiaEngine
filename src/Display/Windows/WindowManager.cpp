@@ -16,7 +16,9 @@ LRESULT CALLBACK WindowManager::WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         return 0;
     }
     case WM_SIZE: {
-        WindowManager::GetSingleton().HandleResizing(hwnd);
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        WindowManager::GetSingleton().HandleResizing(hwnd, rect.right, rect.bottom);
         return 0;
     }
     }
@@ -117,31 +119,6 @@ WindowManager &WindowManager::GetSingleton()
     return singleton;
 }
 
-Window *WindowManager::ConstructWindow(const WindowInfo &info)
-{
-    Window *pWindow = new Window(info);
-    if (pWindow->Initialize())
-    {
-        windowMap[pWindow->GetHandle()] = pWindow;
-        pWindows.Append(pWindow);
-    }
-    else
-    {
-        delete pWindow;
-        pWindow = nullptr;
-    }
-    return pWindow;
-}
-
-Window *WindowManager::ConstructChildWindow(Window *pParent, const WindowInfo &childInfo)
-{
-    if (!pParent->AddChild(childInfo))
-        return nullptr;
-    Window *pChild = pParent->GetChildren().GetLast();
-    windowMap[pChild->GetHandle()] = pChild;
-    return pChild;
-}
-
 void WindowManager::UpdateWindows()
 {
     for (size_t i = 0; i < pWindows.Length(); i++)
@@ -154,12 +131,12 @@ void WindowManager::RenderWindows()
         pWindows[i]->Render();
 }
 
-void WindowManager::HandleResizing(const WindowHandle &handle)
+void WindowManager::HandleResizing(const WindowHandle &handle, long newWidth, long newHeight)
 {
     if (!windowMap.Contains(handle))
         return;
     Window *pWindow = windowMap[handle];
-    pWindow->OnWindowResized();
+    pWindow->OnWindowResized(newWidth, newHeight);
 }
 
 bool WindowManager::HandleKeyInput(const WindowHandle &handle, const KeyCombination &keys)

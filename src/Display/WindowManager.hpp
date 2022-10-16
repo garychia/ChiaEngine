@@ -5,7 +5,6 @@
 #include "Data/HashTable.hpp"
 #include "Window.hpp"
 
-
 class WindowManager
 {
   private:
@@ -26,15 +25,42 @@ class WindowManager
 
     static WindowManager &GetSingleton();
 
-    Window *ConstructWindow(const WindowInfo &info);
+    template <class WindowType, class ...Args> Window *ConstructWindow(Args ...args)
+    {
+        Window *pWindow = new WindowType(args...);
+        if (pWindow->Initialize())
+        {
+            windowMap[pWindow->GetHandle()] = pWindow;
+            pWindows.Append(pWindow);
+        }
+        else
+        {
+            delete pWindow;
+            pWindow = nullptr;
+        }
+        return pWindow;
+    }
 
-    Window *ConstructChildWindow(Window *pParent, const WindowInfo &childInfo);
+    template <class WindowType, class ...Args> Window *ConstructChildWindow(Window *pParent, Args ...args)
+    {
+        Window *pChild = new WindowType(args...);
+        if (!pChild->Initialize(pParent))
+        {
+            PRINTLN_ERR("Window: failed to add the child window.");
+            delete pChild;
+            return false;
+        }
+        if (!pParent->AddChild(pChild))
+            return nullptr;
+        windowMap[pChild->GetHandle()] = pChild;
+        return pChild;
+    }
 
     void UpdateWindows();
 
     void RenderWindows();
 
-    void HandleResizing(const WindowHandle &handle);
+    void HandleResizing(const WindowHandle &handle, long newWidth, long newHeight);
 
     bool HandleKeyInput(const WindowHandle &handle, const KeyCombination &keys);
 
