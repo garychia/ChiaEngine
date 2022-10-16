@@ -13,19 +13,19 @@ Point3D Camera::GetPosition() const
 void Camera::Translate(float deltaX, float deltaY, float deltaZ)
 {
     position += Point3D(deltaX, deltaY, deltaZ);
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 void Camera::Translate(const Point3D &delta)
 {
     position += delta;
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 void Camera::Rotate(float deltaPitch, float deltaYaw, float deltaRoll)
 {
     Camera::Rotate(Point3D(deltaPitch, deltaYaw, deltaRoll));
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 void Camera::Rotate(const Point3D &delta)
@@ -35,7 +35,7 @@ void Camera::Rotate(const Point3D &delta)
         rotation.x = 89.5f;
     else if (rotation.x <= -89.5f)
         rotation.x = -89.5f;
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 Point3D Camera::GetFocalPointPosition() const
@@ -78,17 +78,17 @@ float Camera::GetDistanceToFarPlane() const
 void Camera::SetAngleOfView(float angleInDegrees)
 {
     angleOfView = angleInDegrees;
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 void Camera::SetDistanceToNearPlane(float distance)
 {
     nearPlane = distance;
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }
 
 void Camera::SetDistanceToFarPlane(float distance)
 {
     farPlane = distance;
-    onChanged.Invoke(*this);
+    onChanged.Invoke();
 }

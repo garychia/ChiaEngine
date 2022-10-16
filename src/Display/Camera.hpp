@@ -1,9 +1,10 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
+#include "Data/Pointers.hpp"
 #include "Geometry/3D/Point3D.hpp"
 #include "System/Operation/Event.hpp"
-#include "Data/Pointers.hpp"
+
 
 class Camera
 {
@@ -17,7 +18,7 @@ class Camera
     float toFocusDistance = 1.5f;
 
   public:
-    Event<void(const SharedPtr<Camera>)> onChanged;
+    Event<void()> onChanged;
 
     Camera(const Point3D &position = Point3D(), const Point3D &rotation = Point3D());
 
