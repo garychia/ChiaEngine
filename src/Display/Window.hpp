@@ -4,8 +4,8 @@
 #include "Data/DynamicArray.hpp"
 #include "Renderer.hpp"
 #include "Scene.hpp"
-#include "System/Input/InputHandleLayer.hpp"
-#include "System/Operation/Event.hpp"
+#include "System/Input/KeyCombination.hpp"
+#include "System/Input/MouseInfo.hpp"
 #include "WindowInfo.hpp"
 #include "pch.hpp"
 
@@ -13,12 +13,16 @@ class Window
 {
   protected:
     WindowHandle handle;
+
     Window *pParent;
-    WindowInfo info;
+
+    WindowInfo pInfo;
+
     Scene *pScene;
+
     Renderer renderer;
+
     DynamicArray<Window *> pChildren;
-    InputHandleLayer inputLayer;
 
     Window(const WindowInfo &info);
 
@@ -26,24 +30,20 @@ class Window
 
     const DynamicArray<Window *> &GetChildren() const;
 
-    bool AddChild(const WindowInfo &childInfo);
+    bool AddChild(Window *pChild);
 
   public:
-    Callback<bool(const KeyCombination &)> keyboardInputCallback;
-
-    Callback<bool(const MouseInfo &)> mouseInputCallback;
-
     ~Window();
 
-    bool Initialize(Window *pParent = nullptr);
+    virtual bool Initialize(Window *pParent = nullptr);
 
-    bool LoadScene(Scene &scene);
+    virtual bool LoadScene(Scene &scene);
 
     bool Show();
 
-    void Update();
+    virtual void Update();
 
-    void Render();
+    virtual void Render();
 
     WindowHandle GetHandle() const;
 
@@ -53,17 +53,19 @@ class Window
 
     const WindowInfo &GetWindowInfo() const;
 
-    InputHandleLayer &GetInputHandleLayer();
+    virtual void SetPosition(unsigned long newX, unsigned long newY);
 
-    void Destroy();
+    virtual void SetSize(unsigned long newWidth, unsigned long newHeight);
 
-    void OnCameraChanged(const SharedPtr<Camera> pCamera);
+    virtual void Destroy();
 
-    void OnWindowResized();
+    virtual void OnCameraChanged(const Camera *pCamera);
 
-    bool OnKeyboardInputReceived(const KeyCombination &keys);
+    virtual void OnWindowResized(long newWidth, long newHeight);
 
-    bool OnMouseInputReceived(const MouseInfo &mouseInfo);
+    virtual bool OnKeyboardInputReceived(const KeyCombination &keys);
+
+    virtual bool OnMouseInputReceived(const MouseInfo &mouseInfo);
 
     friend class WindowManager;
 };

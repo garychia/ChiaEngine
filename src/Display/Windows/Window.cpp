@@ -1,14 +1,11 @@
 #include "Display/Window.hpp"
 
+#include "Globals.hpp"
 #include "pch.hpp"
 
-extern bool FullScreen;
-extern String AppName;
-extern HINSTANCE AppInstance;
 
 Window::Window(const WindowInfo &info)
-    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren(), inputLayer(),
-      keyboardInputCallback(), mouseInputCallback()
+    : handle(NULL), pParent(nullptr), pInfo(info), pScene(nullptr), renderer(), pChildren()
 {
 }
 
@@ -22,15 +19,8 @@ const DynamicArray<Window *> &Window::GetChildren() const
     return pChildren;
 }
 
-bool Window::AddChild(const WindowInfo &childInfo)
+bool Window::AddChild(Window *pChild)
 {
-    Window *pChild = new Window(childInfo);
-    if (!pChild->Initialize(this))
-    {
-        PRINTLN_ERR("Window: failed to add the child window.");
-        delete pChild;
-        return false;
-    }
     pChildren.Append(pChild);
     return true;
 }
@@ -45,13 +35,13 @@ Window::~Window()
 bool Window::Initialize(Window *pParent)
 {
     this->pParent = pParent;
-    info.fullScreen = info.fullScreen && pParent;
-    const auto windowWidth = info.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : info.width;
-    const auto windowHeight = info.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : info.height;
-    const int winPosX = info.fullScreen ? 0 : info.positionFromLeft;
-    const int winPosY = info.fullScreen ? 0 : info.positionFromTop;
+    pInfo.fullScreen = pInfo.fullScreen && pParent;
+    const auto windowWidth = pInfo.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : pInfo.width;
+    const auto windowHeight = pInfo.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : pInfo.height;
+    const int winPosX = pInfo.fullScreen ? 0 : pInfo.positionFromLeft;
+    const int winPosY = pInfo.fullScreen ? 0 : pInfo.positionFromTop;
 
-    if (info.fullScreen)
+    if (pInfo.fullScreen)
     {
         FullScreen = true;
 
@@ -65,12 +55,12 @@ bool Window::Initialize(Window *pParent)
     }
 
     handle =
-        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)AppName.CStr(), (LPCWSTR)info.title.CStr(),
+        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)AppName.CStr(), (LPCWSTR)pInfo.title.CStr(),
                        !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX, winPosY,
                        windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, AppInstance, NULL);
     if (!handle)
     {
-        if (info.fullScreen)
+        if (pInfo.fullScreen)
         {
             ChangeDisplaySettings(NULL, 0);
             FullScreen = false;
@@ -78,7 +68,7 @@ bool Window::Initialize(Window *pParent)
         return false;
     }
 
-    if (!renderer.Initialize(handle, info.fullScreen))
+    if (!renderer.Initialize(handle, pInfo.fullScreen))
     {
         PRINTLN_ERR("Window: failed to initialize the renderer.");
         Destroy();
@@ -135,17 +125,26 @@ Window *Window::GetParent() const
 
 WindowInfo &Window::GetWindowInfo()
 {
-    return info;
+    return pInfo;
 }
 
 const WindowInfo &Window::GetWindowInfo() const
 {
-    return info;
+    return pInfo;
 }
 
-InputHandleLayer &Window::GetInputHandleLayer()
+void Window::SetPosition(unsigned long newX, unsigned long newY)
 {
-    return inputLayer;
+    pInfo.positionFromLeft = newX;
+    pInfo.positionFromTop = newY;
+    MoveWindow(GetHandle(), newX, newY, pInfo.width, pInfo.height, TRUE);
+}
+
+void Window::SetSize(unsigned long newWidth, unsigned long newHeight)
+{
+    pInfo.width = newWidth;
+    pInfo.height = newHeight;
+    MoveWindow(GetHandle(), pInfo.positionFromLeft, pInfo.positionFromTop, newWidth, newHeight, TRUE);
 }
 
 void Window::Destroy()
@@ -157,20 +156,18 @@ void Window::Destroy()
     handle = nullptr;
 }
 
-void Window::OnCameraChanged(const SharedPtr<Camera> pCamera)
+void Window::OnCameraChanged(const Camera *pCamera)
 {
-    renderer.ApplyCamera(pCamera.GetRaw());
+    renderer.ApplyCamera(pCamera);
 }
 
-void Window::OnWindowResized()
+void Window::OnWindowResized(long newWidth, long newHeight)
 {
-    renderer.OnWindowResized();
+    renderer.OnWindowResized(newWidth, newHeight);
 }
 
 bool Window::OnKeyboardInputReceived(const KeyCombination &keys)
 {
-    if (keyboardInputCallback.Valid() && keyboardInputCallback(keys))
-        return true;
     for (size_t i = 0; i < pChildren.Length(); i++)
     {
         if (pChildren[i]->OnKeyboardInputReceived(keys))
@@ -181,8 +178,6 @@ bool Window::OnKeyboardInputReceived(const KeyCombination &keys)
 
 bool Window::OnMouseInputReceived(const MouseInfo &mouseInfo)
 {
-    if (mouseInputCallback.Valid() && mouseInputCallback(mouseInfo))
-        return true;
     for (size_t i = 0; i < pChildren.Length(); i++)
     {
         if (pChildren[i]->OnMouseInputReceived(mouseInfo))
