@@ -70,9 +70,13 @@ class IRenderable
 
     virtual void Translate(const Point3D &delta);
 
-    virtual void Scale(float deltaX, float deltaY = 0.f, float deltaZ = 0.f);
+    virtual void Scale(float x, float y = 1.f, float z = 1.f);
 
-    virtual void Scale(const Point3D &delta);
+    virtual void Scale(const Point3D &newScale);
+
+    virtual void Zoom(float deltaX, float deltaY = 0.f, float deltaZ = 0.f);
+
+    virtual void Zoom(const Point3D &delta);
 
     virtual void Rotate(float deltaRow, float deltaPitch = 0.f, float deltaYaw = 0.f);
 

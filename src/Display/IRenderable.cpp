@@ -42,12 +42,22 @@ void IRenderable::Translate(const Point3D &delta)
     transformation.position += delta;
 }
 
-void IRenderable::Scale(float deltaX, float deltaY, float deltaZ)
+void IRenderable::Scale(float x, float y, float z)
+{
+    transformation.scale = Point3D(x, y, z);
+}
+
+void IRenderable::Scale(const Point3D &newScale)
+{
+    transformation.scale = newScale;
+}
+
+void IRenderable::Zoom(float deltaX, float deltaY, float deltaZ)
 {
     transformation.scale += Point3D(deltaX, deltaY, deltaZ);
 }
 
-void IRenderable::Scale(const Point3D &delta)
+void IRenderable::Zoom(const Point3D &delta)
 {
     transformation.scale += delta;
 }
