@@ -3,35 +3,54 @@
 
 struct Border
 {
-    struct Distances
+    struct Length
     {
-        float top;
-        float bottom;
-        float left;
-        float right;
+        float value;
+        bool relative;
 
-        Distances(float top = 0.f, float bottom = 0.f, float left = 0.f, float right = 0.f)
-            : top(top), bottom(bottom), left(left), right(right)
+        Length(float value = 0.f, bool relative = false);
+
+        bool IsRelative() const;
+
+        float operator*(float num) const;
+
+        float operator*(const Length &length) const;
+
+        operator float() const
         {
+            return value;
+        }
+
+        Length &operator=(float newValue)
+        {
+            value = newValue;
+            return *this;
         }
     };
 
-    bool sizeFixed;
-    bool relative;
+    struct Distances
+    {
+        Length top;
+        Length bottom;
+        Length left;
+        Length right;
 
-    float width;
-    float height;
+        Distances(const Length &top = Length(0.f), const Length &bottom = Length(0.f), const Length &left = Length(0.f),
+                  const Length &right = Length(0.f));
+    };
+
+    Length xPos;
+    Length yPos;
+
+    Length width;
+    Length height;
 
     Distances margin;
     Distances padding;
 
-    Border(bool sizeFixed = false, float width = 0.f, float height = 0.f, bool relative = false,
-           Distances margin = Distances(), Distances padding = Distances());
+    Border(const Length &xPos = Length(), const Length &yPos = Length(), const Length &width = Length(),
+           const Length &height = Length(), const Distances &margin = Distances(),
+           const Distances &padding = Distances());
 };
-
-Border::Border(bool sizeFixed, float width, float height, bool relative, Distances margin, Distances padding)
-    : sizeFixed(sizeFixed), width(width), height(height), relative(relative), margin(margin), padding(padding)
-{
-}
 
 #endif

@@ -2,34 +2,26 @@
 
 #include "Math/Math.hpp"
 
-IGUI::IGUI(WindowInfo *pWindowInfo, const Point2D &position, const Border &border, IGUI *pParent)
-    : pWindowInfo(pWindowInfo), position(position), border(border), pParent(pParent)
+IGUI::IGUI(const Point2D &windowSize, const Border &border) : windowSize(windowSize), border(border)
 {
+    renderArea = SharedPtr<Rectangle>::Construct();
+    OnResized();
 }
 
-void IGUI::SetPosition(const Point2D &newPosition)
+void IGUI::SetPosition(const Border::Length &newX, const Border::Length &newY)
 {
-    position = newPosition;
+    border.xPos = newX;
+    border.yPos = newY;
+    auto &transform = renderArea->GetTransformation();
+    const auto newPosition = GetTopLeftPosition();
+    transform.position.x = (newPosition.x + GetWidth() / 2) / windowSize.x * 2 - 1;
+    transform.position.y = -(newPosition.y + GetHeight() / 2) / windowSize.y * 2 + 1;
 }
 
-void IGUI::SetParent(IGUI *pNewParent)
+void IGUI::SetWindowSize(const Point2D &newSize)
 {
-    pParent = pNewParent;
-}
-
-void IGUI::SetWindowInfo(WindowInfo *pInfo)
-{
-    pWindowInfo = pInfo;
-}
-
-IGUI *IGUI::GetParent()
-{
-    return pParent;
-}
-
-const IGUI *IGUI::GetParent() const
-{
-    return pParent;
+    windowSize = newSize;
+    OnResized();
 }
 
 Border &IGUI::GetBorder()
@@ -42,95 +34,95 @@ const Border &IGUI::GetBorder() const
     return border;
 }
 
-bool IGUI::IsBorderFixed() const
-{
-    return border.sizeFixed;
-}
-
-bool IGUI::IsBorderRelative() const
-{
-    return border.relative;
-}
-
-bool IGUI::IsBorderResizable() const
-{
-    return !IsBorderFixed() && !IsBorderRelative();
-}
-
 float IGUI::GetPaddingTop() const
 {
-    if (border.relative)
-        return border.padding.top * pWindowInfo->height;
+    if (border.padding.top.IsRelative())
+        return border.padding.top * windowSize.y;
     return border.padding.top;
 }
 
 float IGUI::GetPaddingBottom() const
 {
-    if (border.relative)
-        return border.padding.bottom * pWindowInfo->height;
+    if (border.padding.bottom.IsRelative())
+        return border.padding.bottom * windowSize.y;
     return border.padding.bottom;
 }
 
 float IGUI::GetPaddingLeft() const
 {
-    if (border.relative)
-        return border.padding.left * pWindowInfo->width;
+    if (border.padding.left.IsRelative())
+        return border.padding.left * windowSize.x;
     return border.padding.left;
 }
 
 float IGUI::GetPaddingRight() const
 {
-    if (border.relative)
-        return border.padding.right * pWindowInfo->width;
+    if (border.padding.right.IsRelative())
+        return border.padding.right * windowSize.x;
     return border.padding.right;
 }
 
 float IGUI::GetMarginTop() const
 {
-    if (border.relative)
-        return border.margin.top * pWindowInfo->height;
+    if (border.margin.top.IsRelative())
+        return border.margin.top * windowSize.y;
     return border.margin.top;
 }
 
 float IGUI::GetMarginBottom() const
 {
-    if (border.relative)
-        return border.margin.bottom * pWindowInfo->height;
+    if (border.margin.bottom.IsRelative())
+        return border.margin.bottom * windowSize.y;
     return border.margin.bottom;
 }
 
 float IGUI::GetMarginLeft() const
 {
-    if (border.relative)
-        return border.margin.left * pWindowInfo->width;
+    if (border.margin.left.IsRelative())
+        return border.margin.left * windowSize.x;
     return border.margin.left;
 }
 
 float IGUI::GetMarginRight() const
 {
-    if (border.relative)
-        return border.margin.right * pWindowInfo->width;
+    if (border.margin.right.IsRelative())
+        return border.margin.right * windowSize.x;
     return border.margin.right;
 }
 
 Point2D IGUI::GetTopLeftPosition() const
 {
-    if (!pParent)
-        return Point2D();
-    const Point2D parentPosition = pParent->GetTopLeftPosition();
-    return parentPosition + Point2D(pParent->GetPaddingLeft(), pParent->GetPaddingTop());
+    const float x = border.xPos.IsRelative() ? border.xPos * windowSize.x : border.xPos;
+    const float y = border.yPos.IsRelative() ? border.yPos * windowSize.y : border.yPos;
+    return Point2D(x, y);
 }
 
 float IGUI::GetWidth() const
 {
-    if (border.sizeFixed || !border.relative)
+    if (!border.width.IsRelative())
         return border.width;
-    return border.width * pWindowInfo->width;
+    return border.width * windowSize.x;
 }
 
 float IGUI::GetHeight() const
 {
-    if (border.sizeFixed || !border.relative)
+    if (!border.height.IsRelative())
         return border.height;
-    return border.height * pWindowInfo->height;
+    return border.height * windowSize.y;
+}
+
+void IGUI::OnResized()
+{
+    SetPosition(border.xPos, border.yPos);
+    renderArea->Scale(GetWidth() / windowSize.x * 2, GetHeight() / windowSize.y * 2);
+}
+
+SharedPtr<IRenderable> IGUI::GetRenderable()
+{
+    return renderArea;
+}
+
+const SharedPtr<IRenderable> IGUI::GetRenderable() const
+{
+    return renderArea;
 }

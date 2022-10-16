@@ -6,20 +6,20 @@
 class HorizontalList : public Container
 {
   private:
+    bool resizable;
+
     void ArrangeChildren();
 
-    void ResizeChildren();
-
   public:
-    HorizontalList(WindowInfo *pWindowInfo, const Point2D &position = Point2D(), const Border &border = Border(),
-                   IGUI *pParent = nullptr);
+    HorizontalList(const Point2D &windowSize, const Border &border, bool resizable = false);
 
     virtual ~HorizontalList();
 
-    template <class GUIType, class... Args> void AddChild(Args... args)
+    template <class GUIType, class... Args> IGUI &AddChild(Args... args)
     {
-        Container::AddChild<GUIType, Args...>(args...);
+        IGUI &child = Container::AddChild<GUIType, Args...>(args...);
         ArrangeChildren();
+        return child;
     }
 };
 

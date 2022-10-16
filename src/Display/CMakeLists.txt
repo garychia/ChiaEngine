@@ -25,8 +25,16 @@ set(DISPLAY_SOURCE_FILES
     WindowInfo.hpp
     WindowInfo.cpp
     WindowManager.hpp
+    GUI/Border.hpp
+    GUI/Border.cpp
+    GUI/Container.hpp
+    GUI/Container.cpp
+    GUI/HorizontalList.hpp
+    GUI/HorizontalList.cpp
+    GUI/IGUI.hpp
+    GUI/IGUI.cpp
 )
-if(WIN32)
+if(DIRECTX_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES Windows/Window.cpp)
     list(APPEND DISPLAY_SOURCE_FILES Windows/WindowManager.cpp)
 endif()

@@ -10,18 +10,21 @@ class Container : public IGUI
     DynamicArray<IGUI *> pChildren;
 
   public:
-    Container(WindowInfo *pWindowInfo, const Point2D &position = Point2D(), const Border &border = Border(),
-              IGUI *pParent = nullptr);
+    Container(const Point2D &windowSize, const Border &border);
 
     virtual ~Container();
 
-    template <class GUIType, class... Args> void AddChild(Args... args)
+    template <class GUIType, class... Args> IGUI &AddChild(Args... args)
     {
-        auto *newChild = new GUIType(args...);
-        newChild->SetWindowInfo(pWindowInfo);
-        newChild->SetParent(this);
+        IGUI *newChild = new GUIType(args...);
+        newChild->SetWindowSize(windowSize);
         pChildren.Append(newChild);
+        return *newChild;
     }
+
+    virtual void SetWindowSize(const Point2D &newSize) override;
+
+    virtual void OnResized() override;
 };
 
 #endif

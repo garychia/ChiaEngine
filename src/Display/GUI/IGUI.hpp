@@ -4,41 +4,27 @@
 #include "Border.hpp"
 #include "Display/WindowInfo.hpp"
 #include "Geometry/2D/Point2D.hpp"
+#include "Geometry/Primitives.hpp"
 
 class IGUI
 {
   protected:
-    WindowInfo *pWindowInfo;
-
-    Point2D position;
+    Point2D windowSize;
 
     Border border;
 
-    IGUI *pParent;
+    SharedPtr<class Rectangle> renderArea;
 
   public:
-    IGUI(WindowInfo *pWindowInfo, const Point2D &position = Point2D(), const Border &border = Border(),
-         IGUI *pParent = nullptr);
+    IGUI(const Point2D &windowSize, const Border &border);
 
-    void SetPosition(const Point2D &newPosition);
+    virtual void SetPosition(const Border::Length &newX, const Border::Length &newY = Border::Length());
 
-    void SetParent(IGUI *pNewParent);
-
-    void SetWindowInfo(WindowInfo *pInfo);
-
-    IGUI *GetParent();
-
-    const IGUI *GetParent() const;
+    virtual void SetWindowSize(const Point2D &newSize);
 
     Border &GetBorder();
 
     const Border &GetBorder() const;
-
-    virtual bool IsBorderFixed() const;
-
-    virtual bool IsBorderRelative() const;
-
-    virtual bool IsBorderResizable() const;
 
     virtual float GetPaddingTop() const;
 
@@ -61,6 +47,12 @@ class IGUI
     virtual float GetWidth() const;
 
     virtual float GetHeight() const;
+
+    virtual void OnResized();
+
+    virtual SharedPtr<IRenderable> GetRenderable();
+
+    virtual const SharedPtr<IRenderable> GetRenderable() const;
 };
 
 #endif
