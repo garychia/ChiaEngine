@@ -16,22 +16,19 @@ class Scene
         GUI
     };
 
-    Event<void(const SharedPtr<Camera>)> onCameraChanged;
+    Event<void(const Camera *)> onCameraChanged;
 
     Scene(SceneType type = Game);
 
     ~Scene();
 
-    template <class T, class... Args> void AddRenderable(Args... args)
-    {
-        pRenderables.Append(new T(args...));
-    }
+    void AddRenderable(const SharedPtr<IRenderable> &pRenderable);
 
     SceneType GetType() const;
 
-    DynamicArray<IRenderable *> &GetRenderables();
+    DynamicArray<SharedPtr<IRenderable>> &GetRenderables();
 
-    const DynamicArray<IRenderable *> &GetRenderables() const;
+    const DynamicArray<SharedPtr<IRenderable>> &GetRenderables() const;
 
     void ApplyCamera(SharedPtr<Camera> &pCamera);
 
@@ -42,13 +39,13 @@ class Scene
     const WeakPtr<Camera> &GetCamera() const;
 
   private:
-    DynamicArray<IRenderable *> pRenderables;
+    DynamicArray<SharedPtr<IRenderable>> pRenderables;
 
     WeakPtr<Camera> pCamera;
 
     Scene::SceneType type;
 
-    void OnCameraChanged(const SharedPtr<Camera> pCamera);
+    void OnCameraChanged();
 };
 
 #endif
