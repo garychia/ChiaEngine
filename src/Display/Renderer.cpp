@@ -45,9 +45,9 @@ void Renderer::OnCameraChanged()
     specializedRenderer.OnCameraChanged();
 }
 
-void Renderer::OnWindowResized()
+void Renderer::OnWindowResized(long newWidth, long newHeight)
 {
-    specializedRenderer.OnWindowResized();
+    specializedRenderer.OnWindowResized(newWidth, newHeight);
 }
 
 void Renderer::Update()

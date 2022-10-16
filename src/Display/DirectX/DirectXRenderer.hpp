@@ -2,11 +2,10 @@
 #define DIRECTX_RENDERER_HPP
 
 #include "Data/DynamicArray.hpp"
-#include "Display/Scene.hpp"
-#include "Display/IRenderer.hpp"
 #include "DirectXHelper.hpp"
+#include "Display/IRenderer.hpp"
+#include "Display/Scene.hpp"
 #include "System/Debug/Debug.hpp"
-
 
 using namespace Microsoft::WRL;
 
@@ -107,7 +106,7 @@ class DirectXRenderer : public IRenderer
 
     virtual void OnCameraChanged() override;
 
-    virtual void OnWindowResized() override;
+    virtual void OnWindowResized(long newWidth, long newHeight) override;
 
     virtual void Update() override;
 

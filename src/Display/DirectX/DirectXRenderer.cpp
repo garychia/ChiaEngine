@@ -31,7 +31,7 @@ const char DirectXRenderer::DefaultVertexShader[] =
     "   Pixel pixel;"
     "   float4 position = {vertex.position.xyz, 1};"
     "   if (vertex.gui)"
-    "      pixel.position = position;"
+    "      pixel.position = mul(position, worldMatrix);"
     "   else"
     "      pixel.position = mul(mul(mul(position, worldMatrix), viewMatrix), projectionMatrix);"
     "   pixel.color = vertex.color;"
@@ -484,7 +484,8 @@ bool DirectXRenderer::SwitchToWindowMode()
     return SetupBackBuffer();
 }
 
-DirectXRenderer::VertexInfo *DirectXRenderer::CreateInputBuffer(const IRenderable &renderable, Scene::SceneType sceneType)
+DirectXRenderer::VertexInfo *DirectXRenderer::CreateInputBuffer(const IRenderable &renderable,
+                                                                Scene::SceneType sceneType)
 {
     auto renderInfo = renderable.GetRenderInfo();
     const auto vertexBuffer = renderInfo.vertexBuffer;
@@ -593,9 +594,10 @@ void DirectXRenderer::OnCameraChanged()
             aspectRatioX, pCamera->GetDistanceToNearPlane(), pCamera->GetDistanceToFarPlane())));
 }
 
-void DirectXRenderer::OnWindowResized()
+void DirectXRenderer::OnWindowResized(long newWidth, long newHeight)
 {
     ReleaseBackBuffer();
+    pSwapChain->ResizeBuffers(0, 0, 0, DXGI_FORMAT_UNKNOWN, 0);
     SetupBackBuffer();
 }
 
@@ -615,7 +617,7 @@ void DirectXRenderer::Render(const Scene &scene)
     auto &renderables = scene.GetRenderables();
     for (size_t i = 0; i < renderables.Length(); i++)
     {
-        IRenderable &object = *renderables[i];
+        const IRenderable &object = *renderables[i].GetRaw();
         if (!object.loaded)
         {
             PRINTLN_ERR("DirectXRenderer: Unloaded object found.");

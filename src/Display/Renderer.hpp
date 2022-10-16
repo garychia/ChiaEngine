@@ -34,7 +34,7 @@ class Renderer : public IRenderer
 
     virtual void OnCameraChanged() override;
 
-    virtual void OnWindowResized() override;
+    virtual void OnWindowResized(long newWidth, long newHeight) override;
 
     virtual void Update() override;
 

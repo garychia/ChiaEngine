@@ -26,7 +26,7 @@ class IRenderer
 
     virtual void OnCameraChanged() = 0;
 
-    virtual void OnWindowResized() = 0;
+    virtual void OnWindowResized(long newWidth, long newHeight) = 0;
 
     virtual void Update() = 0;
 
