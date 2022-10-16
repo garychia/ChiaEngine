@@ -16,7 +16,7 @@ template <class T> class DynamicArray : public Array<T>
         for (size_t i = 0; i < nElements && i < newSize; i++)
             this->data[i] = oldData[i];
         if (oldData)
-            delete oldData;
+            delete[] oldData;
     }
 
     inline void DynamicallyResize() noexcept
@@ -127,6 +127,8 @@ template <class T> class DynamicArray : public Array<T>
     inline void RemoveAll() noexcept
     {
         nElements = 0;
+        delete[] this->data;
+        this->data = nullptr;
         DynamicallyResize();
     }
 
