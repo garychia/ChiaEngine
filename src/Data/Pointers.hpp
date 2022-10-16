@@ -1,6 +1,8 @@
 #ifndef POINTERS_HPP
 #define POINTERS_HPP
 
+template <class T> class SharedPtr;
+
 template <class T> class Ptr
 {
   protected:
@@ -9,19 +11,15 @@ template <class T> class Ptr
   public:
     using ValueType = T;
 
-    template <class... Args> Ptr(const Args &...args) : rawPtr(new T(args...))
+    template <class... Args> Ptr(Args ...args) : rawPtr(new T(args...))
     {
     }
 
-    template <class... Args> Ptr(const Ptr<T> &other, Args... args) : rawPtr(nullptr)
+    template <class Subclass, class... Args> Ptr(Args... args) : rawPtr(dynamic_cast<Subclass *>(new Subclass(args...)))
     {
-        if (!other.IsValid())
-            return;
-        rawPtr = new T(args...);
-        *rawPtr = *other.rawPtr;
     }
 
-    Ptr(Ptr<T> &&other) : rawPtr(other.rawPtr)
+    template <class U> Ptr(Ptr<U> &&other) : rawPtr(dynamic_cast<T *>(other.rawPtr))
     {
         other.rawPtr = nullptr;
     }
@@ -55,16 +53,9 @@ template <class T> class Ptr
 
     Ptr &operator=(const Ptr<T> &other)
     {
-        if (other.IsValid())
-        {
-            if (!rawPtr)
-                rawPtr = new T;
+        if (IsValid() && other.IsValid())
             *rawPtr = *other.rawPtr;
-        }
-        else
-        {
-            rawPtr = nullptr;
-        }
+        return *this;
     }
 
     Ptr &operator=(Ptr<T> &&other)
@@ -72,7 +63,7 @@ template <class T> class Ptr
         if (IsValid())
             Release();
         rawPtr = other.rawPtr;
-        other.rawPtr = 0;
+        other.rawPtr = nullptr;
         return *this;
     }
 
@@ -100,85 +91,146 @@ template <class T> class Ptr
     {
         return IsValid();
     }
+
+    friend class SharedPtr<T>;
 };
+
+namespace
+{
+class PtrInfo
+{
+  private:
+    size_t counter;
+
+    size_t weakCount;
+
+    void *ptr;
+
+  public:
+    PtrInfo(void *ptr) : counter(1), weakCount(0), ptr(ptr)
+    {
+    }
+
+    ~PtrInfo()
+    {
+        if (ptr)
+            delete ptr;
+    }
+
+    template <class T> T *GetPtr()
+    {
+        return (T *)ptr;
+    }
+
+    template <class T> const T *GetPtr() const
+    {
+        return (T *)ptr;
+    }
+
+    void IncrementSharedCounter()
+    {
+        counter++;
+    }
+
+    void IncrementWeakCounter()
+    {
+        weakCount++;
+    }
+
+    void DecrementSharedCounter()
+    {
+        counter--;
+    }
+
+    void DecrementWeakCounter()
+    {
+        weakCount--;
+    }
+
+    bool IsValid() const
+    {
+        return counter > 0 && ptr;
+    }
+
+    bool IsDestroyable() const
+    {
+        return !counter && !weakCount;
+    }
+};
+} // namespace
 
 template <class T> class WeakPtr;
 
 template <class T> class SharedPtr
 {
   protected:
-    struct RefInfo
-    {
-        size_t counter;
-
-        size_t weakCount;
-
-        T *ptr;
-
-        RefInfo(T *ptr) : counter(1), weakCount(0), ptr(ptr)
-        {
-        }
-    };
-
-    RefInfo *info;
+    PtrInfo *pInfo;
 
     virtual void CleanUp()
     {
-        if (!info)
+        if (!pInfo)
             return;
-        if (info->counter)
-            info->counter--;
-        if (!info->counter)
-        {
-            delete info->ptr;
-            info->ptr = nullptr;
-            if (!info->weakCount)
-                delete info;
-        }
-        info = nullptr;
+        pInfo->DecrementSharedCounter();
+        if (pInfo->IsDestroyable())
+            delete pInfo;
+        pInfo = nullptr;
     }
 
     virtual void IncrementCounter()
     {
-        if (info && info->counter)
-            info->counter++;
+        if (pInfo)
+            pInfo->IncrementSharedCounter();
     }
 
   public:
     using ValueType = T;
 
-    template <class... Args> SharedPtr(const Args &...args)
+    template <class... Args> static SharedPtr<T> Construct(Args... args)
     {
-        info = new RefInfo(new T(args...));
+        SharedPtr<T> ptr;
+        ptr.pInfo = new PtrInfo(new T(args...));
+        return ptr;
     }
 
-    SharedPtr(const SharedPtr<T> &other) : info(other.info)
+    template <class SubclassType, class... Args> static SharedPtr<T> Construct(Args... args)
+    {
+        SharedPtr<T> ptr;
+        ptr.pInfo = new PtrInfo((T *)new SubclassType(args...));
+        return ptr;
+    }
+
+    SharedPtr() : pInfo(nullptr)
+    {
+    }
+
+    template <class U> SharedPtr(const SharedPtr<U> &other) : pInfo(other.pInfo)
     {
         IncrementCounter();
     }
 
-    SharedPtr(const WeakPtr<T> &other) : info(other.info)
+    SharedPtr(const WeakPtr<T> &other) : pInfo(other.pInfo)
     {
         IncrementCounter();
     }
 
-    SharedPtr(SharedPtr<T> &&other) : info(other.info)
+    SharedPtr(SharedPtr<T> &&other) noexcept : pInfo(other.pInfo)
     {
-        other.info = nullptr;
+        other.pInfo = nullptr;
     }
 
     SharedPtr(WeakPtr<T> &&other)
     {
-        info = other.info;
+        pInfo = other.pInfo;
         IncrementCounter();
         other.CleanUp();
     }
 
-    SharedPtr(Ptr<T> &&other) : info(nullptr)
+    SharedPtr(Ptr<T> &&other) : pInfo(nullptr)
     {
         if (!other.IsValid())
             return;
-        info = new RefInfo(other.GetRaw());
+        pInfo = new PtrInfo(other.GetRaw());
+        other.rawPtr = nullptr;
     }
 
     virtual ~SharedPtr()
@@ -188,17 +240,17 @@ template <class T> class SharedPtr
 
     bool IsValid() const
     {
-        return info && info->ptr;
+        return pInfo && pInfo->IsValid();
     }
 
     T *GetRaw()
     {
-        return IsValid() ? info->ptr : nullptr;
+        return IsValid() ? pInfo->GetPtr<T>() : nullptr;
     }
 
     const T *GetRaw() const
     {
-        return IsValid() ? info->ptr : nullptr;
+        return IsValid() ? pInfo->GetPtr<T>() : nullptr;
     }
 
     void Release()
@@ -214,48 +266,50 @@ template <class T> class SharedPtr
     SharedPtr<T> &operator=(const SharedPtr<T> &ref)
     {
         CleanUp();
-        info = ref.info;
+        pInfo = ref.pInfo;
         IncrementCounter();
         return *this;
     }
 
-    SharedPtr<T> &operator=(SharedPtr<T> &&ref)
+    SharedPtr<T> &operator=(SharedPtr<T> &&ref) noexcept
     {
         CleanUp();
-        info = ref.info;
-        ref.info = nullptr;
+        pInfo = ref.pInfo;
+        ref.pInfo = nullptr;
         return *this;
     }
 
-    bool operator==(const SharedPtr &other) const
+    bool operator==(const SharedPtr<T> &other) const
     {
-        return info == other.info;
+        return pInfo == other.pInfo;
     }
 
     bool operator==(const WeakPtr<T> &other) const
     {
-        return info == other.info;
+        return pInfo == other.pInfo;
     }
 
     T &operator*()
     {
-        return *info->ptr;
+        return *pInfo->GetPtr<T>();
     }
 
     const T &operator*() const
     {
-        return *info->ptr;
+        return *pInfo->GetPtr<T>();
     }
 
     T *operator->()
     {
-        return info->ptr;
+        return pInfo->GetPtr<T>();
     }
 
     const T *operator->() const
     {
-        return info->ptr;
+        return pInfo->GetPtr<T>();
     }
+
+    template <class U> friend class SharedPtr;
 
     friend class WeakPtr<T>;
 };
@@ -265,48 +319,46 @@ template <class T> class WeakPtr : public SharedPtr<T>
   private:
     void CleanUp() override
     {
-        if (!this->info)
+        if (!this->pInfo)
             return;
-        if (this->info->weakCount)
-            this->info->weakCount--;
-        if (!this->info->counter && !this->info->weakCount)
-            delete this->info;
-        this->info = nullptr;
+        this->pInfo->DecrementWeakCounter();
+        if (this->pInfo->IsDestroyable())
+            delete this->pInfo;
+        this->pInfo = nullptr;
     }
 
     void IncrementCounter() override
     {
-        if (this->info)
-            this->info->weakCount++;
+        if (this->pInfo)
+            this->pInfo->IncrementWeakCounter();
     }
 
   public:
-    WeakPtr()
+    WeakPtr() : SharedPtr<T>()
     {
-        this->info = nullptr;
     }
 
     WeakPtr(const WeakPtr<T> &other)
     {
-        this->info = other.info;
+        this->pInfo = other.pInfo;
         IncrementCounter();
     }
 
     WeakPtr(WeakPtr<T> &&other)
     {
-        this->info = other.info;
-        other.info = nullptr;
+        this->pInfo = other.pInfo;
+        other.pInfo = nullptr;
     }
 
     WeakPtr(const SharedPtr<T> &other)
     {
-        this->info = other.info;
+        this->pInfo = other.pInfo;
         IncrementCounter();
     }
 
     WeakPtr(SharedPtr<T> &&other)
     {
-        this->info = other.info;
+        this->pInfo = other.pInfo;
         IncrementCounter();
         other.CleanUp();
     }
@@ -319,37 +371,37 @@ template <class T> class WeakPtr : public SharedPtr<T>
     WeakPtr<T> &operator=(const WeakPtr<T> &other)
     {
         CleanUp();
-        this->info = other.info;
+        this->pInfo = other.pInfo;
         IncrementCounter();
         return *this;
     }
 
-    WeakPtr<T> &operator=(WeakPtr<T> &&other)
+    WeakPtr<T> &operator=(WeakPtr<T> &&other) noexcept
     {
         CleanUp();
-        this->info = other.info;
-        other.info = 0;
+        this->pInfo = other.pInfo;
+        other.pInfo = nullptr;
         return *this;
     }
 
     T &operator*()
     {
-        return *this->info->ptr;
+        return *this->pInfo->GetPtr<T>();
     }
 
     const T &operator*() const
     {
-        return *this->info->ptr;
+        return *this->pInfo->GetPtr<T>();
     }
 
     T *operator->()
     {
-        return this->info->ptr;
+        return this->pInfo->GetPtr<T>();
     }
 
     const T *operator->() const
     {
-        return this->info->ptr;
+        return this->pInfo->GetPtr<T>();
     }
 
     friend class SharedPtr<T>;
