@@ -13,7 +13,7 @@ template <class T> class List
 
         template <class DataType>
         Element(DataType &&data, List<T> *owner, Element *prev = 0, Element *next = 0)
-            : data(Forward<decltype(data)>(data)), owner(owner), next(next), prev(prev)
+            : data(Types::Forward<decltype(data)>(data)), owner(owner), next(next), prev(prev)
         {
         }
 
@@ -134,12 +134,12 @@ template <class T> class List
             return *this;
         }
 
-        bool operator==(const Element &other) const
+        bool operator==(const Iterator &other) const
         {
             return owner == other.owner && current == other.current;
         }
 
-        bool operator!=(const Element &other) const
+        bool operator!=(const Iterator &other) const
         {
             return owner != other.owner || current != other.current;
         }
@@ -163,12 +163,12 @@ template <class T> class List
 
     Iterator First() const
     {
-        return Iterator(this);
+        return Iterator((List<T> *)this);
     }
 
     Iterator Last() const
     {
-        Iterator itr(this);
+        Iterator itr((List<T> *)this);
         itr.prev = tail;
         itr.current = nullptr;
         return itr;
@@ -178,26 +178,26 @@ template <class T> class List
     {
         if (IsEmpty())
         {
-            head = tail = new Element(Forward<decltype(e)>(e), this);
+            head = tail = new Element(Types::Forward<decltype(e)>(e), this);
         }
         else
         {
-            auto newElement = new Element(Forward<decltype(e)>(e), this, tail);
+            auto newElement = new Element(Types::Forward<decltype(e)>(e), this, tail);
             tail->next = newElement;
             tail = newElement;
         }
         length++;
     }
 
-    template <class Element> void Prepend(Element &&e)
+    template <class ElementType> void Prepend(ElementType &&e)
     {
         if (IsEmpty())
         {
-            head = tail = new Element(Forward<T>(e), this);
+            head = tail = new Element(Types::Forward<decltype(e)>(e), this);
         }
         else
         {
-            auto newElement = new Element(Forward<T>(e), this, 0, head);
+            auto newElement = new Element(Types::Forward<decltype(e)>(e), this, 0, head);
             head->prev = newElement;
             head = newElement;
         }
@@ -210,7 +210,7 @@ template <class T> class List
             return;
         Element *nextElement = nextItr.current;
         Element *prevElement = nextElement->prev;
-        auto newElement = new Element(Forward<decltype(e)>(e), this, prevElement, nextElement);
+        auto newElement = new Element(Types::Forward<decltype(e)>(e), this, prevElement, nextElement);
         if (prevElement)
             prevElement->next = newElement;
         if (nextElement)

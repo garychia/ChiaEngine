@@ -37,8 +37,8 @@ template <class T> class Str
             digits.Prepend('-');
         Str<T> result(' ', digits.Length());
         size_t idx = 0;
-        for (auto current = &digits.First(); current; current = &current->GetNext())
-            result[idx++] = current->GetData();
+        for (auto current = digits.First(); current != digits.Last(); current++)
+            result[idx++] = *current;
         return result;
     }
 
@@ -66,8 +66,8 @@ template <class T> class Str
         }
         Str<T> result(' ', digits.Length());
         size_t idx = 0;
-        for (auto current = &digits.First(); current; current = &current->GetNext())
-            result[idx++] = current->GetData();
+        for (auto current = digits.First(); current != digits.Last(); current++)
+            result[idx++] = *current;
         return result;
     }
 
@@ -260,9 +260,9 @@ template <class T> class StrStream
 
     template <class T> StrStream &operator<<(const T &input) noexcept
     {
-        if (IsChar<T>::Value)
+        if (Types::IsChar<T>::Value)
             strs.Append(Str<T>(input));
-        else if (IsInteger<T>::Value)
+        else if (Types::IsInteger<T>::Value)
             strs.Append(Str<T>::FromInt(input));
         else
             strs.Append(Str<T>::FromFloat(input));
@@ -272,18 +272,16 @@ template <class T> class StrStream
     Str<T> ToString() const noexcept
     {
         size_t length = 0;
-        for (auto current = &strs.First(); current; current = &current->GetNext())
+        for (auto current = strs.First(); current != strs.Last(); current++)
         {
-            const List<Str<T>>::Element &e = *current;
-            length += (*current)->Length();
+            length += current->Length();
         }
         size_t idx = 0;
         Str<T> result(' ', length);
-        for (auto current = &strs.First(); current; current = &current->GetNext())
+        for (auto current = strs.First(); current != strs.Last(); current++)
         {
-            const List<Str<T>>::Element &e = *current;
-            for (size_t i = 0; i < e->Length(); i++)
-                result[idx++] = (*e)[i];
+            for (size_t i = 0; i < current->Length(); i++)
+                result[idx++] = (*current)[i];
         }
         return result;
     }
