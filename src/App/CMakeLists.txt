@@ -1,5 +1,9 @@
 set(APP_SOURCE_FILES
     App.hpp
+    Panel.hpp
+    Panel.cpp
+    SceneWindow.hpp
+    SceneWindow.cpp
 )
 
 if(DIRECTX_ENABLED)
