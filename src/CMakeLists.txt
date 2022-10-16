@@ -15,7 +15,12 @@ add_subdirectory(Math)
 add_subdirectory(System)
 
 
-set(COMMON_SOURCE_FILES Globals.hpp pch.hpp Paths.hpp)
+set(COMMON_SOURCE_FILES
+    Globals.hpp
+    Globals.cpp
+    pch.hpp
+    Paths.hpp
+)
 
 if(WIN32)
     add_executable(ChiaEngine WIN32
