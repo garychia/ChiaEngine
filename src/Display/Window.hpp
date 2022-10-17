@@ -16,7 +16,7 @@ class Window
 
     Window *pParent;
 
-    WindowInfo pInfo;
+    WindowInfo info;
 
     Scene *pScene;
 

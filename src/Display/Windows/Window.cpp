@@ -5,7 +5,7 @@
 
 
 Window::Window(const WindowInfo &info)
-    : handle(NULL), pParent(nullptr), pInfo(info), pScene(nullptr), renderer(), pChildren()
+    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren()
 {
 }
 
@@ -35,13 +35,13 @@ Window::~Window()
 bool Window::Initialize(Window *pParent)
 {
     this->pParent = pParent;
-    pInfo.fullScreen = pInfo.fullScreen && pParent;
-    const auto windowWidth = pInfo.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : pInfo.width;
-    const auto windowHeight = pInfo.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : pInfo.height;
-    const int winPosX = pInfo.fullScreen ? 0 : pInfo.positionFromLeft;
-    const int winPosY = pInfo.fullScreen ? 0 : pInfo.positionFromTop;
+    info.fullScreen = info.fullScreen && pParent;
+    const auto windowWidth = info.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : info.width;
+    const auto windowHeight = info.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : info.height;
+    const int winPosX = info.fullScreen ? 0 : info.positionFromLeft;
+    const int winPosY = info.fullScreen ? 0 : info.positionFromTop;
 
-    if (pInfo.fullScreen)
+    if (info.fullScreen)
     {
         FullScreen = true;
 
@@ -55,12 +55,12 @@ bool Window::Initialize(Window *pParent)
     }
 
     handle =
-        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)AppName.CStr(), (LPCWSTR)pInfo.title.CStr(),
+        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)AppName.CStr(), (LPCWSTR)info.title.CStr(),
                        !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX, winPosY,
                        windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, AppInstance, NULL);
     if (!handle)
     {
-        if (pInfo.fullScreen)
+        if (info.fullScreen)
         {
             ChangeDisplaySettings(NULL, 0);
             FullScreen = false;
@@ -68,7 +68,7 @@ bool Window::Initialize(Window *pParent)
         return false;
     }
 
-    if (!renderer.Initialize(handle, pInfo.fullScreen))
+    if (!renderer.Initialize(handle, info.fullScreen))
     {
         PRINTLN_ERR("Window: failed to initialize the renderer.");
         Destroy();
@@ -125,26 +125,26 @@ Window *Window::GetParent() const
 
 WindowInfo &Window::GetWindowInfo()
 {
-    return pInfo;
+    return info;
 }
 
 const WindowInfo &Window::GetWindowInfo() const
 {
-    return pInfo;
+    return info;
 }
 
 void Window::SetPosition(unsigned long newX, unsigned long newY)
 {
-    pInfo.positionFromLeft = newX;
-    pInfo.positionFromTop = newY;
-    MoveWindow(GetHandle(), newX, newY, pInfo.width, pInfo.height, TRUE);
+    info.positionFromLeft = newX;
+    info.positionFromTop = newY;
+    MoveWindow(GetHandle(), newX, newY, info.width, info.height, TRUE);
 }
 
 void Window::SetSize(unsigned long newWidth, unsigned long newHeight)
 {
-    pInfo.width = newWidth;
-    pInfo.height = newHeight;
-    MoveWindow(GetHandle(), pInfo.positionFromLeft, pInfo.positionFromTop, newWidth, newHeight, TRUE);
+    info.width = newWidth;
+    info.height = newHeight;
+    MoveWindow(GetHandle(), info.positionFromLeft, info.positionFromTop, newWidth, newHeight, TRUE);
 }
 
 void Window::Destroy()
@@ -163,6 +163,8 @@ void Window::OnCameraChanged(const Camera *pCamera)
 
 void Window::OnWindowResized(long newWidth, long newHeight)
 {
+    info.width = newWidth;
+    info.height = newHeight;
     renderer.OnWindowResized(newWidth, newHeight);
 }
 
