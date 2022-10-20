@@ -4,9 +4,10 @@
 #include "Globals.hpp"
 #include "System/Input/InputHandler.hpp"
 
-const unsigned long Panel::TopBarHeight = 50;
+const unsigned long Panel::TopBarHeight = 30;
 
-Panel::Panel(const WindowInfo &info) : Window(info), GUIScene(Scene::SceneType::GUI), pSceneWindow(nullptr)
+Panel::Panel(const WindowInfo &info)
+    : Window(info), GUIScene(Scene::SceneType::GUI), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3)
 {
     topBar = SharedPtr<HorizontalList>::Construct(Point2D(info.width, info.height),
                                                   Border(0.f, 0.f, {100.f, true}, TopBarHeight));
@@ -21,8 +22,8 @@ bool Panel::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    const auto sceneWindowWidth = WINDOW_WIDTH / 2;
-    const auto sceneAreaHeight = WINDOW_HEIGHT - TopBarHeight;
+    const auto sceneAreaHeight = GetWindowInfo().height - TopBarHeight;
+    const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
     WindowInfo childWndInfo(String(), false, sceneWindowWidth, sceneAreaHeight, WINDOW_HEIGHT - sceneAreaHeight,
                             sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
@@ -38,13 +39,12 @@ void Panel::Render()
 
 void Panel::OnWindowResized(long newWidth, long newHeight)
 {
-    auto &info = GetWindowInfo();
-    info.width = newWidth;
-    info.height = newHeight;
-    topBar->SetWindowSize(Point2D(newWidth, newHeight));
-    pSceneWindow->SetPosition((newWidth - newHeight * 2 / 3) / 2, TopBarHeight);
-    pSceneWindow->SetSize(newHeight * 2 / 3, newHeight * 2 / 3);
     Window::OnWindowResized(newWidth, newHeight);
+    topBar->SetWindowSize(Point2D(newWidth, newHeight));
+    const auto sceneWindowHeight = newHeight - TopBarHeight;
+    const auto sceneWindowWidth = sceneWindowHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
+    pSceneWindow->SetPosition((newWidth - sceneWindowWidth) / 2, TopBarHeight);
+    pSceneWindow->SetSize(sceneWindowWidth, sceneWindowHeight);
 }
 
 bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)

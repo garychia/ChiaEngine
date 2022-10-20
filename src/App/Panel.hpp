@@ -17,6 +17,8 @@ class Panel : public Window
 
     SceneWindow *pSceneWindow;
 
+    Point2D sceneWidthHeightRatio;
+
     Panel(const WindowInfo &info);
 
   public:
