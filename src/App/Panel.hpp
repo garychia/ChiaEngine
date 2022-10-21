@@ -1,9 +1,9 @@
 #ifndef PANEL_HPP
 #define PANEL_HPP
 
+#include "Components/TopPanelBar.hpp"
 #include "Data/DynamicArray.hpp"
 #include "Data/Pointers.hpp"
-#include "Display/GUI/HorizontalList.hpp"
 #include "SceneWindow.hpp"
 
 class Panel : public Window
@@ -11,7 +11,7 @@ class Panel : public Window
   private:
     static const unsigned long TopBarHeight;
 
-    SharedPtr<HorizontalList> topBar;
+    TopPanelBar topBar;
 
     Scene GUIScene;
 

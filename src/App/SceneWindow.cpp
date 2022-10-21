@@ -10,8 +10,6 @@ SceneWindow::SceneWindow(const WindowInfo &info) : Window(info), pTextures()
 
 SceneWindow::~SceneWindow()
 {
-    for (size_t i = 0; i < pTextures.Length(); i++)
-        delete pTextures[i];
 }
 
 bool SceneWindow::Initialize(Window *pParent)
@@ -19,9 +17,9 @@ bool SceneWindow::Initialize(Window *pParent)
     if (!Window::Initialize(pParent))
         return false;
     auto cube = SharedPtr<IRenderable>::Construct<Cube>();
-    Texture *pTexture = new Texture(String(IMAGE_FILE_PATH) + "michael-sum-unsplash.jpg");
+    auto pTexture = SharedPtr<Texture>::Construct(String(IMAGE_FILE_PATH) + "michael-sum-unsplash.jpg");
     pTextures.Append(pTexture);
-    cube->SetTexture(pTexture);
+    cube->SetTexture(pTexture.GetRaw());
     pMainScene->AddRenderable(cube);
     pMainScene->ApplyCamera(pMainCamera);
     return LoadScene(*pMainScene);

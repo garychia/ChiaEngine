@@ -6,7 +6,7 @@
 class SceneWindow : public Window
 {
   private:
-    DynamicArray<Texture *> pTextures;
+    DynamicArray<SharedPtr<Texture>> pTextures;
 
     SharedPtr<Camera> pMainCamera;
 

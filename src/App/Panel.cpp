@@ -7,11 +7,11 @@
 const unsigned long Panel::TopBarHeight = 30;
 
 Panel::Panel(const WindowInfo &info)
-    : Window(info), GUIScene(Scene::SceneType::GUI), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3)
+    : Window(info), topBar(Point2D(info.GetWidth(), info.GetHeight())), GUIScene(Scene::SceneType::GUI),
+      pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3)
 {
-    topBar = SharedPtr<HorizontalList>::Construct(Point2D(info.width, info.height),
-                                                  Border(0.f, 0.f, {100.f, true}, TopBarHeight));
-    GUIScene.AddRenderable(topBar->GetRenderable());
+    topBar.GetRenderable()->SetColor(Color());
+    GUIScene.GetRenderables() = topBar.GetRenderables();
 }
 
 Panel::~Panel()
@@ -22,7 +22,7 @@ bool Panel::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    const auto sceneAreaHeight = GetWindowInfo().height - TopBarHeight;
+    const auto sceneAreaHeight = GetWindowInfo().border.height - TopBarHeight;
     const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
     WindowInfo childWndInfo(String(), false, sceneWindowWidth, sceneAreaHeight, WINDOW_HEIGHT - sceneAreaHeight,
                             sceneWindowWidth / 2);
@@ -40,7 +40,7 @@ void Panel::Render()
 void Panel::OnWindowResized(long newWidth, long newHeight)
 {
     Window::OnWindowResized(newWidth, newHeight);
-    topBar->SetWindowSize(Point2D(newWidth, newHeight));
+    topBar.SetWindowSize(Point2D(newWidth, newHeight));
     const auto sceneWindowHeight = newHeight - TopBarHeight;
     const auto sceneWindowWidth = sceneWindowHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
     pSceneWindow->SetPosition((newWidth - sceneWindowWidth) / 2, TopBarHeight);
