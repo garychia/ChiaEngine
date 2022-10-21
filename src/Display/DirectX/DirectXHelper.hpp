@@ -31,10 +31,6 @@ class DirectXHelper
 
     static bool LoadPixelShader(ComPtr<ID3D11Device> &pDevice, LPVOID byteCode, size_t codeSize,
                                 ComPtr<ID3D11PixelShader> &pPixelShader);
-
-    static bool HandleWindowResizing(ComPtr<ID3D11Device> &pDevice, ComPtr<ID3D11DeviceContext> &pContext,
-                                     ComPtr<ID3D11RenderTargetView> &pRenderTarget, ComPtr<IDXGISwapChain> &pSwapChain,
-                                     ComPtr<ID3D11Texture2D> &pBackBuffer, D3D11_TEXTURE2D_DESC &backBufferDesc);
 };
 
 #endif
