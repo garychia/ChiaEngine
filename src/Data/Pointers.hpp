@@ -11,11 +11,21 @@ template <class T> class Ptr
   public:
     using ValueType = T;
 
-    template <class... Args> Ptr(Args ...args) : rawPtr(new T(args...))
+    template <class... Args> static Ptr<T> Construct(Args... args)
     {
+        Ptr<T> ptr;
+        ptr.rawPtr = new T(args...);
+        return ptr;
     }
 
-    template <class Subclass, class... Args> Ptr(Args... args) : rawPtr(dynamic_cast<Subclass *>(new Subclass(args...)))
+    template <class Subclass, class... Args> static Ptr<T> Construct(Args... args)
+    {
+        Ptr<T> ptr;
+        ptr.rawPtr = dynamic_cast<Subclass *>(new Subclass(args...));
+        return ptr;
+    }
+
+    Ptr() : rawPtr(nullptr)
     {
     }
 
@@ -201,6 +211,11 @@ template <class T> class SharedPtr
 
     SharedPtr() : pInfo(nullptr)
     {
+    }
+
+    SharedPtr(const SharedPtr<T> &other) : pInfo(other.pInfo)
+    {
+        IncrementCounter();
     }
 
     template <class U> SharedPtr(const SharedPtr<U> &other) : pInfo(other.pInfo)
