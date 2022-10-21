@@ -1,9 +1,9 @@
 #ifndef HORIZONTAL_LIST_HPP
 #define HORIZONTAL_LIST_HPP
 
-#include "Container.hpp"
+#include "GUILayer.hpp"
 
-class HorizontalList : public Container
+class HorizontalList : public GUILayer
 {
   private:
     bool resizable;
@@ -15,9 +15,9 @@ class HorizontalList : public Container
 
     virtual ~HorizontalList();
 
-    template <class GUIType, class... Args> IGUI &AddChild(Args... args)
+    template <class GUIType, class... Args> SharedPtr<IGUI> AddComponent(Args... args)
     {
-        IGUI &child = Container::AddChild<GUIType, Args...>(args...);
+        auto child = GUILayer::AddComponent<GUIType, Args...>(args...);
         ArrangeChildren();
         return child;
     }

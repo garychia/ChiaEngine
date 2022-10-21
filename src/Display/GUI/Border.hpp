@@ -6,6 +6,7 @@ struct Border
     struct Length
     {
         float value;
+
         bool relative;
 
         Length(float value = 0.f, bool relative = false);

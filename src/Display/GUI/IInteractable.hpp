@@ -6,6 +6,8 @@
 class IInteractable : public IGUI
 {
   public:
+    IInteractable(const Point2D &windowSize, const Border &border);
+
     virtual bool WithIn(const Point2D &coordinates) const;
 
     virtual void OnMouseDown(const Point2D &coordinates);

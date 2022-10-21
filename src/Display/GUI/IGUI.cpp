@@ -99,16 +99,12 @@ Point2D IGUI::GetTopLeftPosition() const
 
 float IGUI::GetWidth() const
 {
-    if (!border.width.IsRelative())
-        return border.width;
-    return border.width * windowSize.x;
+    return border.width.IsRelative() ? border.width * windowSize.x : border.width;
 }
 
 float IGUI::GetHeight() const
 {
-    if (!border.height.IsRelative())
-        return border.height;
-    return border.height * windowSize.y;
+    return border.height.IsRelative() ? border.height * windowSize.y : border.height;
 }
 
 void IGUI::OnResized()

@@ -2,7 +2,7 @@
 #define IGUI_HPP
 
 #include "Border.hpp"
-#include "Display/WindowInfo.hpp"
+#include "Data/Pointers.hpp"
 #include "Geometry/2D/Point2D.hpp"
 #include "Geometry/Primitives.hpp"
 

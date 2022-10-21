@@ -1,5 +1,9 @@
 #include "IInteractable.hpp"
 
+IInteractable::IInteractable(const Point2D &windowSize, const Border &border) : IGUI(windowSize, border)
+{
+}
+
 bool IInteractable::WithIn(const Point2D &coordinates) const
 {
     const auto topLeft = GetTopLeftPosition();
