@@ -55,12 +55,13 @@ class IRenderable
   protected:
     RenderInfo renderInfo;
     Transformation transformation;
+    Color color;
 
   public:
     IRenderable(const Point3D &position = Point3D(), const Point3D &rotation = Point3D(),
-                const Point3D &scale = Point3D(1, 1, 1));
+                const Point3D &scale = Point3D(1, 1, 1), const Color &color = Color(1.f, 1.f, 1.f));
 
-    IRenderable(const Transformation &transformation);
+    IRenderable(const Transformation &transformation, const Color &color = Color(1.f, 1.f, 1.f));
 
     virtual RenderInfo GetRenderInfo() const;
 
@@ -85,6 +86,8 @@ class IRenderable
     virtual const Transformation &GetTransformation() const;
 
     virtual void SetTexture(Texture *pTexture);
+
+    virtual void SetColor(const Color &color);
 
 #ifdef DIRECTX_ENABLED
     friend class DirectXRenderer;

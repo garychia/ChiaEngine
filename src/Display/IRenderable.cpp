@@ -12,13 +12,13 @@ Transformation::Transformation(const Point3D &position, const Point3D &rotaion, 
 {
 }
 
-IRenderable::IRenderable(const Point3D &position, const Point3D &rotation, const Point3D &scale)
-    : loaded(false), identifier(0), renderInfo(), transformation(position, rotation, scale)
+IRenderable::IRenderable(const Point3D &position, const Point3D &rotation, const Point3D &scale, const Color &color)
+    : loaded(false), identifier(0), renderInfo(), transformation(position, rotation, scale), color(color)
 {
 }
 
-IRenderable::IRenderable(const Transformation &transformation)
-    : IRenderable(transformation.position, transformation.rotation, transformation.scale)
+IRenderable::IRenderable(const Transformation &transformation, const Color &color)
+    : IRenderable(transformation.position, transformation.rotation, transformation.scale, color)
 {
 }
 
@@ -80,4 +80,9 @@ const Transformation &IRenderable::GetTransformation() const
 void IRenderable::SetTexture(Texture *pTexture)
 {
     renderInfo.pTexture = pTexture;
+}
+
+void IRenderable::SetColor(const Color &color)
+{
+    this->color = color;
 }

@@ -36,10 +36,10 @@ bool Window::Initialize(Window *pParent)
 {
     this->pParent = pParent;
     info.fullScreen = info.fullScreen && pParent;
-    const auto windowWidth = info.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : info.width;
-    const auto windowHeight = info.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : info.height;
-    const int winPosX = info.fullScreen ? 0 : info.positionFromLeft;
-    const int winPosY = info.fullScreen ? 0 : info.positionFromTop;
+    const auto windowWidth = info.fullScreen ? GetSystemMetrics(SM_CXSCREEN) : info.border.width;
+    const auto windowHeight = info.fullScreen ? GetSystemMetrics(SM_CYSCREEN) : info.border.height;
+    const int winPosX = info.fullScreen ? 0 : info.border.xPos;
+    const int winPosY = info.fullScreen ? 0 : info.border.yPos;
 
     if (info.fullScreen)
     {
@@ -135,16 +135,16 @@ const WindowInfo &Window::GetWindowInfo() const
 
 void Window::SetPosition(unsigned long newX, unsigned long newY)
 {
-    info.positionFromLeft = newX;
-    info.positionFromTop = newY;
-    MoveWindow(GetHandle(), newX, newY, info.width, info.height, TRUE);
+    info.border.xPos = newX;
+    info.border.yPos= newY;
+    MoveWindow(GetHandle(), newX, newY, info.border.width, info.border.height, TRUE);
 }
 
 void Window::SetSize(unsigned long newWidth, unsigned long newHeight)
 {
-    info.width = newWidth;
-    info.height = newHeight;
-    MoveWindow(GetHandle(), info.positionFromLeft, info.positionFromTop, newWidth, newHeight, TRUE);
+    info.border.width = newWidth;
+    info.border.height = newHeight;
+    MoveWindow(GetHandle(), info.border.xPos, info.border.yPos, newWidth, newHeight, TRUE);
 }
 
 void Window::Destroy()
@@ -163,8 +163,8 @@ void Window::OnCameraChanged(const Camera *pCamera)
 
 void Window::OnWindowResized(long newWidth, long newHeight)
 {
-    info.width = newWidth;
-    info.height = newHeight;
+    info.border.width = newWidth;
+    info.border.height = newHeight;
     renderer.OnWindowResized(newWidth, newHeight);
 }
 
