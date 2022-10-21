@@ -7,21 +7,18 @@ const VertexIndexType Triangle::vertexIndexBuffer[] = {0, 1, 2};
 const Point2D Triangle::textureCoordinates[] = {{0.5f, 0.5f}, {0.f, 0.f}, {1.f, 0.f}};
 
 Triangle::Triangle(const Point3D &position, const Point3D &rotation, const Point3D &scale, const Color &color)
-    : IRenderable(position, rotation, scale), color(color)
+    : IRenderable(position, rotation, scale, color)
 {
     this->renderInfo.vertexBuffer = vertexBuffer;
     this->renderInfo.numOfVertices = NumberOfVertices;
     this->renderInfo.vertexIndexBuffer = vertexIndexBuffer;
     this->renderInfo.numOfVertexIndices = NumberOfVertexIndices;
-    this->renderInfo.colorBuffer = &this->color;
-    this->renderInfo.numOfColors = 1;
-    this->renderInfo.colorIndexBuffer = new ColorIndexType[NumberOfVertexIndices]{};
-    this->renderInfo.numOfColorIndices = NumberOfVertexIndices;
+    SetColor(color);
     this->renderInfo.textureCoordinates = textureCoordinates;
     this->renderInfo.numOfTextureCoordinates = sizeof(textureCoordinates) / sizeof(Point2D);
 }
 
-Triangle::Triangle(const Transformation &transformation, const Color &color) : IRenderable(transformation), color(color)
+Triangle::Triangle(const Transformation &transformation, const Color &color) : IRenderable(transformation, color)
 {
 }
 
@@ -38,6 +35,17 @@ Triangle::~Triangle()
         delete[] renderInfo.colorIndexBuffer;
 }
 
+void Triangle::SetColor(const Color &color)
+{
+    IRenderable::SetColor(color);
+    this->renderInfo.colorBuffer = &this->color;
+    this->renderInfo.numOfColors = 1;
+    if (this->renderInfo.colorIndexBuffer)
+        delete[] this->renderInfo.colorIndexBuffer;
+    this->renderInfo.colorIndexBuffer = new ColorIndexType[NumberOfVertexIndices]{};
+    this->renderInfo.numOfColorIndices = NumberOfVertexIndices;
+}
+
 const unsigned int Rectangle::NumberOfVertexIndices = 6;
 const unsigned int Rectangle::NumberOfVertices = 4;
 const Point3D Rectangle::vertexBuffer[] = {{0.5, 0.5, 0.f}, {-0.5, 0.5, 0.f}, {-0.5, -0.5, 0.f}, {0.5, -0.5, 0.f}};
@@ -45,22 +53,18 @@ const VertexIndexType Rectangle::vertexIndexBuffer[] = {0, 1, 2, 2, 3, 0};
 const Point2D Rectangle::textureCoordinates[] = {{1.f, 1.f}, {0.f, 1.f}, {0.f, 0.f}, {1.f, 0.f}};
 
 Rectangle::Rectangle(const Point3D &position, const Point3D &rotation, const Point3D &scale, const Color &color)
-    : IRenderable(position, rotation, scale), color(color)
+    : IRenderable(position, rotation, scale, color)
 {
     this->renderInfo.vertexBuffer = vertexBuffer;
     this->renderInfo.numOfVertices = NumberOfVertices;
     this->renderInfo.vertexIndexBuffer = vertexIndexBuffer;
     this->renderInfo.numOfVertexIndices = NumberOfVertexIndices;
-    this->renderInfo.colorBuffer = &this->color;
-    this->renderInfo.numOfColors = 1;
-    this->renderInfo.colorIndexBuffer = new ColorIndexType[NumberOfVertexIndices]{};
-    this->renderInfo.numOfColorIndices = NumberOfVertexIndices;
+    SetColor(color);
     this->renderInfo.textureCoordinates = textureCoordinates;
     this->renderInfo.numOfTextureCoordinates = sizeof(textureCoordinates) / sizeof(Point2D);
 }
 
-Rectangle::Rectangle(const Transformation &transformation, const Color &color)
-    : IRenderable(transformation), color(color)
+Rectangle::Rectangle(const Transformation &transformation, const Color &color) : IRenderable(transformation)
 {
 }
 
@@ -75,6 +79,17 @@ Rectangle::~Rectangle()
 {
     if (this->renderInfo.colorIndexBuffer)
         delete[] renderInfo.colorIndexBuffer;
+}
+
+void Rectangle::SetColor(const Color &color)
+{
+    IRenderable::SetColor(color);
+    this->renderInfo.colorBuffer = &this->color;
+    this->renderInfo.numOfColors = 1;
+    if (this->renderInfo.colorIndexBuffer)
+        delete[] this->renderInfo.colorIndexBuffer;
+    this->renderInfo.colorIndexBuffer = new ColorIndexType[NumberOfVertexIndices]{};
+    this->renderInfo.numOfColorIndices = NumberOfVertexIndices;
 }
 
 const Point3D Cube::vertexBuffer[] = {
@@ -127,16 +142,13 @@ const Point2D Cube::textureCoordinates[] = {{1.f, 1.f}, {0.f, 1.f}, {0.f, 0.f}, 
                                             {0.f, 0.f}, {1.f, 0.f}, {1.f, 1.f}, {0.f, 1.f}, {0.f, 0.f}, {1.f, 0.f}};
 
 Cube::Cube(const Point3D &position, const Point3D &rotation, const Point3D &scale, const Color &color)
-    : IRenderable(position, rotation, scale), color(color)
+    : IRenderable(position, rotation, scale, color)
 {
     this->renderInfo.vertexBuffer = vertexBuffer;
     this->renderInfo.numOfVertices = sizeof(vertexBuffer) / sizeof(Point3D);
     this->renderInfo.vertexIndexBuffer = vertexIndexBuffer;
     this->renderInfo.numOfVertexIndices = sizeof(vertexIndexBuffer) / sizeof(VertexIndexType);
-    this->renderInfo.colorBuffer = &this->color;
-    this->renderInfo.numOfColors = 1;
-    this->renderInfo.colorIndexBuffer = new ColorIndexType[sizeof(vertexIndexBuffer) / sizeof(VertexIndexType)]{};
-    this->renderInfo.numOfColorIndices = sizeof(vertexIndexBuffer) / sizeof(VertexIndexType);
+    SetColor(color);
     this->renderInfo.textureCoordinates = textureCoordinates;
     this->renderInfo.numOfTextureCoordinates = sizeof(textureCoordinates) / sizeof(Point2D);
 }
@@ -157,4 +169,15 @@ Cube::~Cube()
 {
     if (this->renderInfo.colorIndexBuffer)
         delete[] renderInfo.colorIndexBuffer;
+}
+
+void Cube::SetColor(const Color &color)
+{
+    IRenderable::SetColor(color);
+    this->renderInfo.colorBuffer = &this->color;
+    this->renderInfo.numOfColors = 1;
+    if (this->renderInfo.colorIndexBuffer)
+        delete[] this->renderInfo.colorIndexBuffer;
+    this->renderInfo.colorIndexBuffer = new ColorIndexType[sizeof(vertexIndexBuffer) / sizeof(VertexIndexType)]{};
+    this->renderInfo.numOfColorIndices = sizeof(vertexIndexBuffer) / sizeof(VertexIndexType);
 }

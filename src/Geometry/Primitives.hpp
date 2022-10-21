@@ -9,7 +9,6 @@ class Triangle : public IRenderable
     static const Point3D vertexBuffer[];
     static const VertexIndexType vertexIndexBuffer[];
     static const Point2D textureCoordinates[];
-    Color color;
 
   public:
     static const unsigned int NumberOfVertexIndices;
@@ -24,6 +23,8 @@ class Triangle : public IRenderable
     Triangle(const Triangle &other);
 
     virtual ~Triangle();
+
+    virtual void SetColor(const Color &color) override;
 };
 
 class Rectangle : public IRenderable
@@ -32,7 +33,6 @@ class Rectangle : public IRenderable
     static const Point3D vertexBuffer[];
     static const VertexIndexType vertexIndexBuffer[];
     static const Point2D textureCoordinates[];
-    Color color;
 
   public:
     static const unsigned int NumberOfVertexIndices;
@@ -47,6 +47,8 @@ class Rectangle : public IRenderable
     Rectangle(const Rectangle &other);
 
     virtual ~Rectangle();
+
+    virtual void SetColor(const Color &color) override;
 };
 
 class Cube : public IRenderable
@@ -55,7 +57,6 @@ class Cube : public IRenderable
     static const Point3D vertexBuffer[];
     static const VertexIndexType vertexIndexBuffer[];
     static const Point2D textureCoordinates[];
-    Color color;
 
   public:
     Cube(const Point3D &position = Point3D(), const Point3D &rotation = Point3D(),
@@ -66,6 +67,8 @@ class Cube : public IRenderable
     Cube(const Cube &cube);
 
     virtual ~Cube();
+
+    virtual void SetColor(const Color &color) override;
 };
 
 #endif
