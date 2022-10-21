@@ -27,12 +27,16 @@ set(DISPLAY_SOURCE_FILES
     WindowManager.hpp
     GUI/Border.hpp
     GUI/Border.cpp
-    GUI/Container.hpp
-    GUI/Container.cpp
+    GUI/Button.hpp
+    GUI/Button.cpp
+    GUI/GUILayer.hpp
+    GUI/GUILayer.cpp
     GUI/HorizontalList.hpp
     GUI/HorizontalList.cpp
     GUI/IGUI.hpp
     GUI/IGUI.cpp
+    GUI/IInteractable.hpp
+    GUI/IInteractable.cpp
 )
 if(DIRECTX_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES Windows/Window.cpp)

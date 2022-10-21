@@ -4,6 +4,8 @@ set(APP_SOURCE_FILES
     Panel.cpp
     SceneWindow.hpp
     SceneWindow.cpp
+    Components/TopPanelBar.hpp
+    Components/TopPanelBar.cpp
 )
 
 if(DIRECTX_ENABLED)
