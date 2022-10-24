@@ -50,9 +50,7 @@ class IGUI
 
     virtual void OnResized();
 
-    virtual SharedPtr<IRenderable> GetRenderable();
-
-    virtual const SharedPtr<IRenderable> GetRenderable() const;
+    virtual void SetColor(const Color &newColor);
 };
 
 #endif

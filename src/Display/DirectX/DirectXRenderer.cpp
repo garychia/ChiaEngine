@@ -118,7 +118,7 @@ void DirectXRenderer::ReleaseBackBuffer()
     pContext->Flush();
 }
 
-bool DirectXRenderer::loadVertexShaderFromFile(const String &path, ComPtr<ID3D11VertexShader> &pVertexShader)
+bool DirectXRenderer::LoadVertexShaderFromFile(const String &path, ComPtr<ID3D11VertexShader> &pVertexShader)
 {
     const size_t bufferSize = 4196;
     char *buffer = new char[bufferSize];
@@ -160,7 +160,7 @@ bool DirectXRenderer::loadVertexShaderFromFile(const String &path, ComPtr<ID3D11
     return result;
 }
 
-bool DirectXRenderer::loadPixelShaderFromFile(const String &path, ComPtr<ID3D11PixelShader> &pPixelShader)
+bool DirectXRenderer::LoadPixelShaderFromFile(const String &path, ComPtr<ID3D11PixelShader> &pPixelShader)
 {
     const size_t bufferSize = 4196;
     char *buffer = new char[bufferSize];
@@ -200,7 +200,7 @@ bool DirectXRenderer::loadPixelShaderFromFile(const String &path, ComPtr<ID3D11P
     return result;
 }
 
-bool DirectXRenderer::loadDefaultVertexShader()
+bool DirectXRenderer::LoadDefaultVertexShader()
 {
     ComPtr<ID3DBlob> pCompiledBuffer;
     ComPtr<ID3DBlob> pError;
@@ -232,7 +232,7 @@ bool DirectXRenderer::loadDefaultVertexShader()
     return true;
 }
 
-bool DirectXRenderer::loadDefaultPixelShader()
+bool DirectXRenderer::LoadDefaultPixelShader()
 {
     ComPtr<ID3DBlob> pCompiledBuffer;
     ComPtr<ID3DBlob> pError;
@@ -291,9 +291,9 @@ bool DirectXRenderer::Initialize(HWND windowHandle, bool fullScreen)
 
 bool DirectXRenderer::CompileDefaultShaders()
 {
-    if (!loadDefaultVertexShader())
+    if (!LoadDefaultVertexShader())
         return false;
-    if (!loadDefaultPixelShader())
+    if (!LoadDefaultPixelShader())
         return false;
 
     CD3D11_BUFFER_DESC cbufferDesc(sizeof(MatrixBuffer), D3D11_BIND_CONSTANT_BUFFER);
@@ -393,7 +393,7 @@ bool DirectXRenderer::LoadTexture(Texture *pTexture)
 
 bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType sceneType)
 {
-    if (renderable.loaded)
+    if (!renderable.RequiresLoading())
         return true;
 
     RenderInfo renderInfo = renderable.GetRenderInfo();
@@ -441,8 +441,7 @@ bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType s
     }
 
     // Generate an ID for the renderable.
-    renderable.identifier = pIndexBuffers.Length();
-    renderable.loaded = true;
+    renderable.MarkLoaded(pIndexBuffers.Length());
     pVertexBuffers.Append(pVertexBuffer);
     pIndexBuffers.Append(pIndexBuffer);
     return true;
@@ -543,7 +542,7 @@ bool DirectXRenderer::AddVertexShader(Shader *pShader)
         return true;
     const String &path = pShader->GetPath();
     ComPtr<ID3D11VertexShader> pVertexShader;
-    if (!loadVertexShaderFromFile(path, pVertexShader))
+    if (!LoadVertexShaderFromFile(path, pVertexShader))
     {
         PRINTLN_ERR("DirectXRenderer: failed to compile the vertex shader.");
         return false;
@@ -559,7 +558,7 @@ bool DirectXRenderer::AddPixelShader(Shader *pShader)
         return true;
     auto path = pShader->GetPath();
     ComPtr<ID3D11PixelShader> pPixelShader;
-    if (!loadPixelShaderFromFile(path, pPixelShader))
+    if (!LoadPixelShaderFromFile(path, pPixelShader))
     {
         PRINTLN_ERR("DirectXRenderer: failed to compile the pixel shader.");
         return false;
@@ -618,17 +617,16 @@ void DirectXRenderer::Render(const Scene &scene)
     for (size_t i = 0; i < renderables.Length(); i++)
     {
         const IRenderable &object = *renderables[i].GetRaw();
-        if (!object.loaded)
+        if (object.RequiresLoading())
         {
             PRINTLN_ERR("DirectXRenderer: Unloaded object found.");
             continue;
         }
         RenderInfo renderInfo = object.GetRenderInfo();
-        const auto objectID = object.identifier;
-        const auto &transform = object.GetTransformation();
-        const auto &position = transform.position;
-        const auto &rotation = transform.rotation;
-        const auto &scale = transform.scale;
+        const auto objectID = object.GetIdentifier();
+        const auto &position = object.GetPosition();
+        const auto &rotation = object.GetRotation();
+        const auto &scale = object.GetScale();
         const auto ptrVertexShader = renderInfo.pVertexShader;
         const auto ptrPixelShader = renderInfo.pPixelShader;
         const auto ptrTexture = renderInfo.pTexture;

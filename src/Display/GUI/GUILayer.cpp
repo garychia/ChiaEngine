@@ -4,10 +4,6 @@ GUILayer::GUILayer(const Point2D &windowSize, const Border &border) : IGUI(windo
 {
 }
 
-GUILayer::~GUILayer()
-{
-}
-
 void GUILayer::AddComponent(SharedPtr<IGUI> &pComponent)
 {
     pComponents.Append(pComponent);
@@ -26,15 +22,6 @@ DynamicArray<SharedPtr<IGUI>> &GUILayer::GetComponents()
 const DynamicArray<SharedPtr<IGUI>> &GUILayer::GetComponents() const
 {
     return pComponents;
-}
-
-DynamicArray<SharedPtr<IRenderable>> GUILayer::GetRenderables() const
-{
-    DynamicArray<SharedPtr<IRenderable>> pItems;
-    pItems.Append(GetRenderable());
-    for (size_t i = 0; i < pComponents.Length(); i++)
-        pItems.Append(pComponents[i]->GetRenderable());
-    return pItems;
 }
 
 void GUILayer::SetWindowSize(const Point2D &newSize)

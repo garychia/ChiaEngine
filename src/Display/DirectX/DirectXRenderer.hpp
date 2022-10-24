@@ -61,13 +61,13 @@ class DirectXRenderer : public IRenderer
 
     void ReleaseBackBuffer();
 
-    bool loadVertexShaderFromFile(const String &path, ComPtr<ID3D11VertexShader> &pVertexShader);
+    bool LoadVertexShaderFromFile(const String &path, ComPtr<ID3D11VertexShader> &pVertexShader);
 
-    bool loadPixelShaderFromFile(const String &path, ComPtr<ID3D11PixelShader> &pPixelShader);
+    bool LoadPixelShaderFromFile(const String &path, ComPtr<ID3D11PixelShader> &pPixelShader);
 
-    bool loadDefaultVertexShader();
+    bool LoadDefaultVertexShader();
 
-    bool loadDefaultPixelShader();
+    bool LoadDefaultPixelShader();
 
     bool CompileDefaultShaders();
 

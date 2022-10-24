@@ -12,10 +12,10 @@ void IGUI::SetPosition(const Border::Length &newX, const Border::Length &newY)
 {
     border.xPos = newX;
     border.yPos = newY;
-    auto &transform = renderArea->GetTransformation();
     const auto newPosition = GetTopLeftPosition();
-    transform.position.x = (newPosition.x + GetWidth() / 2) / windowSize.x * 2 - 1;
-    transform.position.y = -(newPosition.y + GetHeight() / 2) / windowSize.y * 2 + 1;
+    auto newRederX = (newPosition.x + GetWidth() / 2) / windowSize.x * 2 - 1;
+    auto newRenderY = -(newPosition.y + GetHeight() / 2) / windowSize.y * 2 + 1;
+    renderArea->SetPosition(newRenderY, newRenderY, renderArea->GetPosition().z);
 }
 
 void IGUI::SetWindowSize(const Point2D &newSize)
@@ -113,12 +113,7 @@ void IGUI::OnResized()
     renderArea->Scale(GetWidth() / windowSize.x * 2, GetHeight() / windowSize.y * 2);
 }
 
-SharedPtr<IRenderable> IGUI::GetRenderable()
+void IGUI::SetColor(const Color &newColor)
 {
-    return renderArea;
-}
-
-const SharedPtr<IRenderable> IGUI::GetRenderable() const
-{
-    return renderArea;
+    renderArea->SetColor(newColor);
 }

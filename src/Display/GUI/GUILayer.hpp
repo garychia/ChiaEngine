@@ -28,8 +28,6 @@ class GUILayer : public IGUI
 
     const DynamicArray<SharedPtr<IGUI>> &GetComponents() const;
 
-    DynamicArray<SharedPtr<IRenderable>> GetRenderables() const;
-
     virtual void SetWindowSize(const Point2D &newSize) override;
 };
 
