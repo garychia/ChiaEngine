@@ -20,6 +20,7 @@ set(COMMON_SOURCE_FILES
     Globals.cpp
     pch.hpp
     Paths.hpp
+    Version.hpp
 )
 
 if(WIN32)

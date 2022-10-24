@@ -8,7 +8,6 @@
 #include <Windows.h>
 #include <winbase.h>
 #include <windowsx.h>
-
 #elif (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
 #else
 #error Target operating system is not supported.

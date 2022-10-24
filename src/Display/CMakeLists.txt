@@ -41,6 +41,9 @@ set(DISPLAY_SOURCE_FILES
 if(DIRECTX_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES Windows/Window.cpp)
     list(APPEND DISPLAY_SOURCE_FILES Windows/WindowManager.cpp)
+elseif(VULKAN_ENABLED)
+    list(APPEND DISPLAY_SOURCE_FILES GLFW/Window.cpp)
+    list(APPEND DISPLAY_SOURCE_FILES GLFW/WindowManager.cpp)
 endif()
 
 add_library(ChiaDisplay STATIC ${DISPLAY_SOURCE_FILES})

@@ -2,20 +2,22 @@
 #define GLOBALS_HPP
 
 #include "Data/String.hpp"
+#include "Version.hpp"
 #include "pch.hpp"
 
 extern const unsigned long WINDOW_WIDTH;
 extern const unsigned long WINDOW_HEIGHT;
 
 extern WindowHandle MainWindow;
-#if defined(_WIN32)
+#if defined(DIRECTX_ENABLED)
 extern HINSTANCE AppInstance;
-#elif (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
-extern GLWFwindow *MainWindow;
-#else
-#error Target operating system is not supported.
+#elif defined(VULKAN_ENABLED)
+extern VkInstance VulkanInstance;
 #endif
 
 extern bool FullScreen;
 extern const String AppName;
+
+extern const Version AppVersion; 
+extern const Version EngineVersion;
 #endif // GLOBALS_HPP

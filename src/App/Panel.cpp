@@ -10,8 +10,6 @@ Panel::Panel(const WindowInfo &info)
     : Window(info), topBar(Point2D(info.GetWidth(), info.GetHeight())), GUIScene(Scene::SceneType::GUI),
       pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3)
 {
-    topBar.GetRenderable()->SetColor(Color());
-    GUIScene.GetRenderables() = topBar.GetRenderables();
 }
 
 Panel::~Panel()

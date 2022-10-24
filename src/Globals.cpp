@@ -5,13 +5,14 @@ const unsigned long WINDOW_HEIGHT = 800;
 
 WindowHandle MainWindow = nullptr;
 
-#if defined(_WIN32)
-HINSTANCE AppInstance = nullptr;
-#elif (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
-GLWFwindow *MainWindow = nullptr;
-#else
-#error Target operating system is not supported.
+#if defined(DIRECTX_ENABLED)
+HINSTANCE AppInstance;
+#elif defined(VULKAN_ENABLED)
+VkInstance VulkanInstance;
 #endif
 
 bool FullScreen = false;
 const String AppName("Chia Engine");
+
+const Version AppVersion{1, 0, 0};
+const Version EngineVersion{1, 0, 0};

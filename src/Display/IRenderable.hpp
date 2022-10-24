@@ -5,6 +5,7 @@
 #include "Geometry/2D/Point2D.hpp"
 #include "Geometry/3D/Point3D.hpp"
 #include "Texture.hpp"
+#include "System/Operation/Event.hpp"
 
 class Shader;
 
@@ -50,6 +51,7 @@ class IRenderable
 {
   private:
     bool loaded;
+    bool modified;
     size_t identifier;
 
   protected:
@@ -63,9 +65,27 @@ class IRenderable
 
     IRenderable(const Transformation &transformation, const Color &color = Color(1.f, 1.f, 1.f));
 
+    virtual void MarkLoaded(size_t id);
+
+    virtual void MarkModified();
+
+    virtual bool RequiresLoading() const;
+
+    virtual size_t GetIdentifier() const;
+
     virtual RenderInfo GetRenderInfo() const;
 
-    virtual Transformation &GetTransformation();
+    virtual void SetPosition(float x, float y, float z);
+
+    virtual void SetRotation(float row, float pitch, float yaw);
+
+    virtual void SetScale(float x, float y, float z);
+
+    virtual const Point3D &GetPosition() const;
+
+    virtual const Point3D &GetRotation() const;
+
+    virtual const Point3D &GetScale() const;
 
     virtual void Translate(float deltaX, float deltaY = 0.f, float deltaZ = 0.f);
 
@@ -83,15 +103,9 @@ class IRenderable
 
     virtual void Rotate(const Point3D &delta);
 
-    virtual const Transformation &GetTransformation() const;
-
     virtual void SetTexture(Texture *pTexture);
 
     virtual void SetColor(const Color &color);
-
-#ifdef DIRECTX_ENABLED
-    friend class DirectXRenderer;
-#endif
 };
 
 #endif
