@@ -10,6 +10,8 @@ class GUILayout
   private:
     DynamicArray<SharedPtr<GUILayer>> pLayers;
 
+    void CalculateComponentDepths();
+
   public:
     GUILayout();
 

@@ -587,6 +587,8 @@ bool DirectXRenderer::LoadGUILayout(GUILayout &layout)
     auto &pLayers = layout.GetLayers();
     for (size_t i = 0; i < pLayers.Length(); i++)
     {
+        if (!LoadRenderable(*pLayers[i], Scene::SceneType::GUI))
+            return false;
         auto &pGUIs = pLayers[i]->GetComponents();
         for (size_t j = 0; j < pGUIs.Length(); j++)
         {
@@ -690,6 +692,7 @@ void DirectXRenderer::Render(GUILayout &layout)
     auto &pLayers = layout.GetLayers();
     for (size_t i = 0; i < pLayers.Length(); i++)
     {
+        RenderRenderable(*pLayers[i]);
         auto &pGUIs = pLayers[i]->GetComponents();
         for (size_t j = 0; j < pGUIs.Length(); j++)
             RenderRenderable(*pGUIs[j]);
