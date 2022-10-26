@@ -16,6 +16,12 @@ void Scene::AddRenderable(const SharedPtr<IRenderable> &pRenderable)
     pRenderables.Append(pRenderable);
 }
 
+void Scene::AddRenderables(const DynamicArray<SharedPtr<IRenderable>> &pRenderables)
+{
+    for (size_t i = 0; i < pRenderables.Length(); i++)
+        AddRenderable(pRenderables[i]);
+}
+
 Scene::SceneType Scene::GetType() const
 {
     return type;
@@ -31,22 +37,19 @@ const DynamicArray<SharedPtr<IRenderable>> &Scene::GetRenderables() const
     return pRenderables;
 }
 
-void Scene::ApplyCamera(SharedPtr<Camera> &pCamera)
+void Scene::ApplyCamera(WeakPtr<Camera> pCamera)
 {
-    if (!pCamera.IsValid() || this->pCamera == pCamera)
-        return;
     if (this->pCamera.IsValid())
         this->pCamera->onChanged.Unsubscribe(this);
     this->pCamera = pCamera;
     if (pCamera.IsValid())
         pCamera->onChanged.Subscribe(this, &Scene::OnCameraChanged);
-    onCameraChanged.Invoke(pCamera.GetRaw());
+    onCameraChanged.Invoke(pCamera);
 }
 
 void Scene::RemoveCamera()
 {
-    pCamera.Release();
-    onCameraChanged.Invoke(pCamera.GetRaw());
+    ApplyCamera(WeakPtr<Camera>());
 }
 
 WeakPtr<Camera> &Scene::GetCamera()
@@ -61,5 +64,5 @@ const WeakPtr<Camera> &Scene::GetCamera() const
 
 void Scene::OnCameraChanged()
 {
-    onCameraChanged.Invoke(pCamera.GetRaw());
+    onCameraChanged.Invoke(pCamera);
 }

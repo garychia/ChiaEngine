@@ -10,19 +10,21 @@
 class Scene
 {
   public:
-    enum SceneType
+    enum class SceneType
     {
         Game,
         GUI
     };
 
-    Event<void(const Camera *)> onCameraChanged;
+    Event<void(WeakPtr<Camera> &)> onCameraChanged;
 
-    Scene(SceneType type = Game);
+    Scene(SceneType type = SceneType::Game);
 
     ~Scene();
 
     void AddRenderable(const SharedPtr<IRenderable> &pRenderable);
+
+    void AddRenderables(const DynamicArray<SharedPtr<IRenderable>> &pRenderables);
 
     SceneType GetType() const;
 
@@ -30,7 +32,7 @@ class Scene
 
     const DynamicArray<SharedPtr<IRenderable>> &GetRenderables() const;
 
-    void ApplyCamera(SharedPtr<Camera> &pCamera);
+    void ApplyCamera(WeakPtr<Camera> pCamera);
 
     void RemoveCamera();
 

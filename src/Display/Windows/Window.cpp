@@ -86,11 +86,7 @@ bool Window::LoadScene(Scene &scene)
 
 bool Window::Show()
 {
-    if (!ShowWindow(handle, SW_SHOW))
-    {
-        PRINTLN_ERR("Winodw: failed to display.");
-        return false;
-    }
+    ShowWindow(handle, SW_SHOW);
     SetForegroundWindow(handle);
     SetFocus(handle);
     return true;
@@ -109,8 +105,6 @@ void Window::Render()
         pChildren[i]->Render();
     if (pScene)
         renderer.Render(*pScene);
-    else
-        renderer.Clear();
 }
 
 WindowHandle Window::GetHandle() const
@@ -156,7 +150,7 @@ void Window::Destroy()
     handle = nullptr;
 }
 
-void Window::OnCameraChanged(const Camera *pCamera)
+void Window::OnCameraChanged(WeakPtr<Camera> &pCamera)
 {
     renderer.ApplyCamera(pCamera);
 }

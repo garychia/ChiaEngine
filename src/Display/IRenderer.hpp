@@ -4,6 +4,7 @@
 #include "Camera.hpp"
 #include "Scene.hpp"
 #include "Shader.hpp"
+#include "Display/GUI/GUILayout.hpp"
 #include "pch.hpp"
 
 
@@ -18,11 +19,13 @@ class IRenderer
 
     virtual bool LoadScene(Scene &scene) = 0;
 
-    virtual bool AddVertexShader(Shader *pShader) = 0;
+    virtual bool LoadGUILayout(GUILayout &layout) = 0;
 
-    virtual bool AddPixelShader(Shader *pShader) = 0;
+    virtual bool AddVertexShader(Shader &shader) = 0;
 
-    virtual void ApplyCamera(const Camera *pCamera) = 0;
+    virtual bool AddPixelShader(Shader &shader) = 0;
+
+    virtual void ApplyCamera(WeakPtr<Camera> pCamera) = 0;
 
     virtual void OnCameraChanged() = 0;
 
@@ -30,7 +33,9 @@ class IRenderer
 
     virtual void Update() = 0;
 
-    virtual void Render(const Scene &scene) = 0;
+    virtual void Render(Scene &scene) = 0;
+
+    virtual void Render(GUILayout &layout) = 0;
 
     virtual void Clear() = 0;
 };

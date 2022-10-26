@@ -15,14 +15,19 @@ bool Renderer::LoadScene(Scene &scene)
     return specializedRenderer.LoadScene(scene);
 }
 
-bool Renderer::AddVertexShader(Shader *pShader)
+bool Renderer::LoadGUILayout(GUILayout &layout)
 {
-    return specializedRenderer.AddVertexShader(pShader);
+    return specializedRenderer.LoadGUILayout(layout);
 }
 
-bool Renderer::AddPixelShader(Shader *pShader)
+bool Renderer::AddVertexShader(Shader &shader)
 {
-    return specializedRenderer.AddPixelShader(pShader);
+    return specializedRenderer.AddVertexShader(shader);
+}
+
+bool Renderer::AddPixelShader(Shader &shader)
+{
+    return specializedRenderer.AddPixelShader(shader);
 }
 
 bool Renderer::SwitchToFullScreen()
@@ -35,7 +40,7 @@ bool Renderer::SwitchToWindowMode()
     return specializedRenderer.SwitchToWindowMode();
 }
 
-void Renderer::ApplyCamera(const Camera *pCamera)
+void Renderer::ApplyCamera(WeakPtr<Camera> pCamera)
 {
     specializedRenderer.ApplyCamera(pCamera);
 }
@@ -55,9 +60,14 @@ void Renderer::Update()
     specializedRenderer.Update();
 }
 
-void Renderer::Render(const Scene &scene)
+void Renderer::Render(Scene &scene)
 {
     specializedRenderer.Render(scene);
+}
+
+void Renderer::Render(GUILayout &layout)
+{
+    specializedRenderer.Render(layout);
 }
 
 void Renderer::Clear()

@@ -1,29 +1,23 @@
 #ifndef PANEL_HPP
 #define PANEL_HPP
 
-#include "Components/TopPanelBar.hpp"
 #include "Data/DynamicArray.hpp"
 #include "Data/Pointers.hpp"
 #include "SceneWindow.hpp"
+#include "Components/PanelLayout.hpp"
 
 class Panel : public Window
 {
   private:
-    static const unsigned long TopBarHeight;
-
-    TopPanelBar topBar;
-
-    Scene GUIScene;
-
     SceneWindow *pSceneWindow;
 
     Point2D sceneWidthHeightRatio;
 
+    PanelLayout layout;
+
     Panel(const WindowInfo &info);
 
   public:
-    ~Panel();
-
     virtual bool Initialize(Window *pParent = nullptr) override;
 
     virtual void Render() override;

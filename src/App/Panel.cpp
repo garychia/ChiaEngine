@@ -4,15 +4,9 @@
 #include "Globals.hpp"
 #include "System/Input/InputHandler.hpp"
 
-const unsigned long Panel::TopBarHeight = 30;
-
 Panel::Panel(const WindowInfo &info)
-    : Window(info), topBar(Point2D(info.GetWidth(), info.GetHeight())), GUIScene(Scene::SceneType::GUI),
-      pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3)
-{
-}
-
-Panel::~Panel()
+    : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
+      layout(Point2D(info.GetWidth(), info.GetHeight()))
 {
 }
 
@@ -20,28 +14,28 @@ bool Panel::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    const auto sceneAreaHeight = GetWindowInfo().border.height - TopBarHeight;
+    const auto sceneAreaHeight = GetWindowInfo().border.height - PanelLayout::TopBarHeight;
     const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
     WindowInfo childWndInfo(String(), false, sceneWindowWidth, sceneAreaHeight, WINDOW_HEIGHT - sceneAreaHeight,
                             sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo));
-    return pSceneWindow && LoadScene(GUIScene);
+    return pSceneWindow && this->renderer.LoadGUILayout(layout);
 }
 
 void Panel::Render()
 {
-    this->renderer.Render(GUIScene);
     Window::Render();
+    this->renderer.Render(layout);
 }
 
 void Panel::OnWindowResized(long newWidth, long newHeight)
 {
     Window::OnWindowResized(newWidth, newHeight);
-    topBar.SetWindowSize(Point2D(newWidth, newHeight));
-    const auto sceneWindowHeight = newHeight - TopBarHeight;
+    layout.SetWindowSize(Point2D(newWidth, newHeight));
+    const auto sceneWindowHeight = newHeight - PanelLayout::TopBarHeight;
     const auto sceneWindowWidth = sceneWindowHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
-    pSceneWindow->SetPosition((newWidth - sceneWindowWidth) / 2, TopBarHeight);
+    pSceneWindow->SetPosition((newWidth - sceneWindowWidth) / 2, PanelLayout::TopBarHeight);
     pSceneWindow->SetSize(sceneWindowWidth, sceneWindowHeight);
 }
 

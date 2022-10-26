@@ -2,26 +2,25 @@
 
 #include "Math/Math.hpp"
 
-IGUI::IGUI(const Point2D &windowSize, const Border &border) : windowSize(windowSize), border(border)
+IGUI::IGUI(const Point2D &windowSize, const Border &border) : Rectangle(), windowSize(windowSize), border(border)
 {
-    renderArea = SharedPtr<Rectangle>::Construct();
-    OnResized();
+    OnWindowResized();
 }
 
-void IGUI::SetPosition(const Border::Length &newX, const Border::Length &newY)
+void IGUI::SetTopLeftPosition(const Border::Length &newX, const Border::Length &newY)
 {
     border.xPos = newX;
     border.yPos = newY;
     const auto newPosition = GetTopLeftPosition();
-    auto newRederX = (newPosition.x + GetWidth() / 2) / windowSize.x * 2 - 1;
-    auto newRenderY = -(newPosition.y + GetHeight() / 2) / windowSize.y * 2 + 1;
-    renderArea->SetPosition(newRenderY, newRenderY, renderArea->GetPosition().z);
+    float newRenderX = (newPosition.x + GetWidth() * 0.5f) / windowSize.x * 2 - 1;
+    float newRenderY = 1 - (newPosition.y + GetHeight() * 0.5f) / windowSize.y * 2;
+    IRenderable::SetPosition(newRenderX, newRenderY, transformation.position.z);
 }
 
 void IGUI::SetWindowSize(const Point2D &newSize)
 {
     windowSize = newSize;
-    OnResized();
+    OnWindowResized();
 }
 
 Border &IGUI::GetBorder()
@@ -107,13 +106,8 @@ float IGUI::GetHeight() const
     return border.height.IsRelative() ? border.height * windowSize.y : border.height;
 }
 
-void IGUI::OnResized()
+void IGUI::OnWindowResized()
 {
-    SetPosition(border.xPos, border.yPos);
-    renderArea->Scale(GetWidth() / windowSize.x * 2, GetHeight() / windowSize.y * 2);
-}
-
-void IGUI::SetColor(const Color &newColor)
-{
-    renderArea->SetColor(newColor);
+    SetTopLeftPosition(border.xPos, border.yPos);
+    Scale(GetWidth() / windowSize.x * 2, GetHeight() / windowSize.y * 2);
 }

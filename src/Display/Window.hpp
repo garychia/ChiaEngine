@@ -59,7 +59,7 @@ class Window
 
     virtual void Destroy();
 
-    virtual void OnCameraChanged(const Camera *pCamera);
+    virtual void OnCameraChanged(WeakPtr<Camera> &pCamera);
 
     virtual void OnWindowResized(long newWidth, long newHeight);
 

@@ -15,7 +15,11 @@ class GUILayout
 
     void AddLayer(SharedPtr<GUILayer> &pNewLayer);
 
-    DynamicArray<SharedPtr<IRenderable>> GetRenderables() const;
+    void SetWindowSize(const Point2D &newSize);
+
+    DynamicArray<SharedPtr<GUILayer>> &GetLayers();
+
+    const DynamicArray<SharedPtr<GUILayer>> &GetLayers() const;
 };
 
 #endif // GUI_LAYOUT_HPP

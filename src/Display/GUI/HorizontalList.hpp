@@ -13,8 +13,6 @@ class HorizontalList : public GUILayer
   public:
     HorizontalList(const Point2D &windowSize, const Border &border, bool resizable = false);
 
-    virtual ~HorizontalList();
-
     template <class GUIType, class... Args> SharedPtr<IGUI> AddComponent(Args... args)
     {
         auto child = GUILayer::AddComponent<GUIType, Args...>(args...);

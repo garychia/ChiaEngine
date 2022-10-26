@@ -4,8 +4,8 @@
 #include "Color.hpp"
 #include "Geometry/2D/Point2D.hpp"
 #include "Geometry/3D/Point3D.hpp"
-#include "Texture.hpp"
 #include "System/Operation/Event.hpp"
+#include "Texture.hpp"
 
 class Shader;
 
@@ -51,7 +51,6 @@ class IRenderable
 {
   private:
     bool loaded;
-    bool modified;
     size_t identifier;
 
   protected:
@@ -67,9 +66,7 @@ class IRenderable
 
     virtual void MarkLoaded(size_t id);
 
-    virtual void MarkModified();
-
-    virtual bool RequiresLoading() const;
+    virtual bool IsLoaded() const;
 
     virtual size_t GetIdentifier() const;
 

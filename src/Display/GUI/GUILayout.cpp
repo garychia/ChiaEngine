@@ -9,14 +9,18 @@ void GUILayout::AddLayer(SharedPtr<GUILayer> &pNewLayer)
     pLayers.Append(pNewLayer);
 }
 
-DynamicArray<SharedPtr<IRenderable>> GUILayout::GetRenderables() const
+void GUILayout::SetWindowSize(const Point2D &newSize)
 {
-    DynamicArray<SharedPtr<IRenderable>> pItems;
     for (size_t i = 0; i < pLayers.Length(); i++)
-    {
-        auto pChildItems = pLayers[i]->GetRenderables();
-        for (size_t j = 0; j < pChildItems.Length(); j++)
-            pItems.Append(pChildItems[j]);
-    }
-    return pItems;
+        pLayers[i]->SetWindowSize(newSize);
+}
+
+DynamicArray<SharedPtr<GUILayer>> &GUILayout::GetLayers()
+{
+    return pLayers;
+}
+
+const DynamicArray<SharedPtr<GUILayer>> &GUILayout::GetLayers() const
+{
+    return pLayers;
 }

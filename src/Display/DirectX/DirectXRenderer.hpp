@@ -53,7 +53,7 @@ class DirectXRenderer : public IRenderer
     DynamicArray<ComPtr<ID3D11ShaderResourceView>> pShaderResourceViews;
     ComPtr<ID3D11SamplerState> pSamplerState;
 
-    const Camera *pCamera;
+    WeakPtr<Camera> pCamera;
 
     void UpdateConstantBuffer();
 
@@ -77,6 +77,8 @@ class DirectXRenderer : public IRenderer
 
     bool LoadRenderable(IRenderable &renderable, Scene::SceneType sceneType);
 
+    void RenderRenderable(IRenderable &renderable);
+
     static const char DefaultVertexShader[];
 
     static const char DefaultPixelShader[];
@@ -98,11 +100,13 @@ class DirectXRenderer : public IRenderer
 
     virtual bool LoadScene(Scene &scene) override;
 
-    virtual bool AddVertexShader(Shader *pShader) override;
+    virtual bool LoadGUILayout(GUILayout &layout) override;
 
-    virtual bool AddPixelShader(Shader *pShader) override;
+    virtual bool AddVertexShader(Shader &shader) override;
 
-    virtual void ApplyCamera(const Camera *pCamera) override;
+    virtual bool AddPixelShader(Shader &shader) override;
+
+    virtual void ApplyCamera(WeakPtr<Camera> pCamera) override;
 
     virtual void OnCameraChanged() override;
 
@@ -110,7 +114,9 @@ class DirectXRenderer : public IRenderer
 
     virtual void Update() override;
 
-    virtual void Render(const Scene &scene) override;
+    virtual void Render(Scene &scene) override;
+
+    virtual void Render(GUILayout &layout) override;
 
     virtual void Clear() override;
 };

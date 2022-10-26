@@ -31,6 +31,8 @@ set(DISPLAY_SOURCE_FILES
     GUI/Button.cpp
     GUI/GUILayer.hpp
     GUI/GUILayer.cpp
+    GUI/GUILayout.hpp
+    GUI/GUILayout.cpp
     GUI/HorizontalList.hpp
     GUI/HorizontalList.cpp
     GUI/IGUI.hpp

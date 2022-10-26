@@ -36,11 +36,6 @@ void App::Finalize()
 
 bool App::LoadData()
 {
-    WindowInfo info(String("Main"), false, WINDOW_WIDTH, WINDOW_HEIGHT);
-    pMainWindow = (Panel *)WindowManager::GetSingleton().ConstructWindow<Panel>(info);
-    if (!pMainWindow)
-        return false;
-    pMainWindow->Show();
     return true;
 }
 
@@ -73,6 +68,7 @@ int App::Execute()
         Finalize();
         return EXIT_FAILURE;
     }
+    pMainWindow->Show();
     if (!LoadData())
     {
         Finalize();

@@ -2,6 +2,7 @@
 #define RENDERER_HPP
 
 #include "IRenderer.hpp"
+#include "Display/GUI/GUILayout.hpp"
 
 #ifdef DIRECTX_ENABLED
 #include "Display/DirectX/DirectXRenderer.hpp"
@@ -22,15 +23,17 @@ class Renderer : public IRenderer
 
     virtual bool LoadScene(Scene &scene) override;
 
-    virtual bool AddVertexShader(Shader *pShader) override;
+    virtual bool LoadGUILayout(GUILayout &layout) override;
 
-    virtual bool AddPixelShader(Shader *pShader) override;
+    virtual bool AddVertexShader(Shader &shader) override;
+
+    virtual bool AddPixelShader(Shader &shader) override;
 
     virtual bool SwitchToFullScreen() override;
 
     virtual bool SwitchToWindowMode() override;
 
-    virtual void ApplyCamera(const Camera *pCamera) override;
+    virtual void ApplyCamera(WeakPtr<Camera> pCamera) override;
 
     virtual void OnCameraChanged() override;
 
@@ -38,7 +41,9 @@ class Renderer : public IRenderer
 
     virtual void Update() override;
 
-    virtual void Render(const Scene &scene) override;
+    virtual void Render(Scene &scene) override;
+
+    virtual void Render(GUILayout &layout) override;
 
     virtual void Clear() override;
 };

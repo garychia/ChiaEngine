@@ -6,19 +6,17 @@
 #include "Geometry/2D/Point2D.hpp"
 #include "Geometry/Primitives.hpp"
 
-class IGUI
+class IGUI : public Rectangle
 {
   protected:
     Point2D windowSize;
 
     Border border;
 
-    SharedPtr<class Rectangle> renderArea;
-
   public:
     IGUI(const Point2D &windowSize, const Border &border);
 
-    virtual void SetPosition(const Border::Length &newX, const Border::Length &newY = Border::Length());
+    virtual void SetTopLeftPosition(const Border::Length &newX, const Border::Length &newY = Border::Length());
 
     virtual void SetWindowSize(const Point2D &newSize);
 
@@ -48,9 +46,7 @@ class IGUI
 
     virtual float GetHeight() const;
 
-    virtual void OnResized();
-
-    virtual void SetColor(const Color &newColor);
+    virtual void OnWindowResized();
 };
 
 #endif

@@ -64,7 +64,7 @@ const D3D11_INPUT_ELEMENT_DESC DirectXRenderer::InputDescs[] = {
     {"GUIFLAG", 0, DXGI_FORMAT_R32_UINT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}};
 
 DirectXRenderer::DirectXRenderer()
-    : backBufferDesc(), featureLevel(), matrixBuffer(), viewport(), pVertexShaders(), pPixelShaders(), pCamera(nullptr)
+    : backBufferDesc(), featureLevel(), matrixBuffer(), viewport(), pVertexShaders(), pPixelShaders(), pCamera()
 {
     UpdateConstantBuffer();
 }
@@ -393,7 +393,7 @@ bool DirectXRenderer::LoadTexture(Texture *pTexture)
 
 bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType sceneType)
 {
-    if (!renderable.RequiresLoading())
+    if (renderable.IsLoaded())
         return true;
 
     RenderInfo renderInfo = renderable.GetRenderInfo();
@@ -404,7 +404,7 @@ bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType s
     // Create the input buffer.
     VertexInfo *inputBuffer = CreateInputBuffer(renderable, sceneType);
     if (!inputBuffer)
-        return true;
+        return false;
 
     CD3D11_BUFFER_DESC vDesc(sizeof(VertexInfo) * renderInfo.numOfVertices, D3D11_BIND_VERTEX_BUFFER);
     D3D11_SUBRESOURCE_DATA vertexData;
@@ -425,7 +425,7 @@ bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType s
     const auto indexBuffer = renderInfo.vertexIndexBuffer;
     const auto nIndices = renderInfo.numOfVertexIndices;
     if (!nIndices || !indexBuffer)
-        return true;
+        return false;
     CD3D11_BUFFER_DESC indexDesc(sizeof(unsigned short) * nIndices, D3D11_BIND_INDEX_BUFFER);
     D3D11_SUBRESOURCE_DATA indexData;
     ZeroMemory(&indexData, sizeof(D3D11_SUBRESOURCE_DATA));
@@ -445,6 +445,52 @@ bool DirectXRenderer::LoadRenderable(IRenderable &renderable, Scene::SceneType s
     pVertexBuffers.Append(pVertexBuffer);
     pIndexBuffers.Append(pIndexBuffer);
     return true;
+}
+
+void DirectXRenderer::RenderRenderable(IRenderable &renderable)
+{
+    if (!renderable.IsLoaded())
+        return;
+
+    UINT stride = sizeof(VertexInfo);
+    UINT offset = 0;
+    
+    RenderInfo renderInfo = renderable.GetRenderInfo();
+    const auto objectID = renderable.GetIdentifier();
+    const auto &position = renderable.GetPosition();
+    const auto &rotation = renderable.GetRotation();
+    const auto &scale = renderable.GetScale();
+    const auto ptrVertexShader = renderInfo.pVertexShader;
+    const auto ptrPixelShader = renderInfo.pPixelShader;
+    const auto ptrTexture = renderInfo.pTexture;
+
+    DirectX::XMStoreFloat4x4(
+        &matrixBuffer.world,
+        DirectX::XMMatrixTranspose(DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) *
+                                   DirectX::XMMatrixRotationRollPitchYaw(DirectX::XMConvertToRadians(-rotation.x),
+                                                                         DirectX::XMConvertToRadians(-rotation.y),
+                                                                         DirectX::XMConvertToRadians(-rotation.z)) *
+                                   DirectX::XMMatrixTranslation(position.x, position.y, -position.z)));
+    // Update the constant buffer (transformation matrices).
+    pContext->UpdateSubresource(pMatrixBuffer.Get(), 0, nullptr, &matrixBuffer, 0, 0);
+    // Setup the vertex and the index buffer.
+    pContext->IASetVertexBuffers(0, 1, pVertexBuffers[objectID].GetAddressOf(), &stride, &offset);
+    pContext->IASetIndexBuffer(pIndexBuffers[objectID].Get(), DXGI_FORMAT_R16_UINT, 0);
+    pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+    pContext->IASetInputLayout(pInputLayout.Get());
+
+    if (ptrTexture && ptrTexture->loaded)
+    {
+        const auto textureID = ptrTexture->identifier;
+        pContext->PSSetShaderResources(0, 1, pShaderResourceViews[textureID].GetAddressOf());
+    }
+    pContext->PSSetSamplers(0, 1, pSamplerState.GetAddressOf());
+    pContext->VSSetShader(ptrVertexShader ? pVertexShaders[ptrVertexShader->GetID()].Get() : pDefaultVertexShader.Get(),
+                          nullptr, 0);
+    pContext->PSSetShader(ptrPixelShader ? pPixelShaders[ptrPixelShader->GetID()].Get() : pDefaultPixelShader.Get(),
+                          nullptr, 0);
+    pContext->VSSetConstantBuffers(0, 1, pMatrixBuffer.GetAddressOf());
+    pContext->DrawIndexed(renderInfo.numOfVertexIndices, 0, 0);
 }
 
 bool DirectXRenderer::SwitchToFullScreen()
@@ -518,7 +564,7 @@ DirectXRenderer::VertexInfo *DirectXRenderer::CreateInputBuffer(const IRenderabl
             inputBuffer[i].cmode = 0;
         }
 
-        inputBuffer[i].gui = sceneType;
+        inputBuffer[i].gui = sceneType == Scene::SceneType::Game ? 0 : 1;
     }
     return inputBuffer;
 }
@@ -532,43 +578,58 @@ bool DirectXRenderer::LoadScene(Scene &scene)
             return false;
     }
     if (const auto pCamera = scene.GetCamera())
-        ApplyCamera(pCamera.GetRaw());
+        ApplyCamera(pCamera);
     return true;
 }
 
-bool DirectXRenderer::AddVertexShader(Shader *pShader)
+bool DirectXRenderer::LoadGUILayout(GUILayout &layout)
 {
-    if (pShader->IsLoaded())
+    auto &pLayers = layout.GetLayers();
+    for (size_t i = 0; i < pLayers.Length(); i++)
+    {
+        auto &pGUIs = pLayers[i]->GetComponents();
+        for (size_t j = 0; j < pGUIs.Length(); j++)
+        {
+            if (!LoadRenderable(*pGUIs[j], Scene::SceneType::GUI))
+                return false;
+        }
+    }
+    return true;
+}
+
+bool DirectXRenderer::AddVertexShader(Shader &shader)
+{
+    if (shader.IsLoaded())
         return true;
-    const String &path = pShader->GetPath();
+    const String &path = shader.GetPath();
     ComPtr<ID3D11VertexShader> pVertexShader;
     if (!LoadVertexShaderFromFile(path, pVertexShader))
     {
         PRINTLN_ERR("DirectXRenderer: failed to compile the vertex shader.");
         return false;
     }
-    pShader->identifier = pVertexShaders.Length();
+    shader.identifier = pVertexShaders.Length();
     pVertexShaders.Append(pVertexShader);
     return true;
 }
 
-bool DirectXRenderer::AddPixelShader(Shader *pShader)
+bool DirectXRenderer::AddPixelShader(Shader &shader)
 {
-    if (pShader->IsLoaded())
+    if (shader.IsLoaded())
         return true;
-    auto path = pShader->GetPath();
+    auto path = shader.GetPath();
     ComPtr<ID3D11PixelShader> pPixelShader;
     if (!LoadPixelShaderFromFile(path, pPixelShader))
     {
         PRINTLN_ERR("DirectXRenderer: failed to compile the pixel shader.");
         return false;
     }
-    pShader->identifier = pPixelShaders.Length();
+    shader.identifier = pPixelShaders.Length();
     pPixelShaders.Append(pPixelShader);
     return true;
 }
 
-void DirectXRenderer::ApplyCamera(const Camera *pCamera)
+void DirectXRenderer::ApplyCamera(WeakPtr<Camera> pCamera)
 {
     this->pCamera = pCamera;
     UpdateConstantBuffer();
@@ -604,7 +665,7 @@ void DirectXRenderer::Update()
 {
 }
 
-void DirectXRenderer::Render(const Scene &scene)
+void DirectXRenderer::Render(Scene &scene)
 {
     const FLOAT backgroundColor[] = {0.f, 0.f, 0.f, 1.f};
     pContext->ClearRenderTargetView(pRenderTarget.Get(), backgroundColor);
@@ -615,49 +676,23 @@ void DirectXRenderer::Render(const Scene &scene)
     UINT offset = 0;
     auto &renderables = scene.GetRenderables();
     for (size_t i = 0; i < renderables.Length(); i++)
+        RenderRenderable(*renderables[i]);
+    pSwapChain->Present(1, 0);
+}
+
+void DirectXRenderer::Render(GUILayout &layout)
+{
+    const FLOAT backgroundColor[] = {0.f, 0.f, 0.f, 1.f};
+    pContext->ClearRenderTargetView(pRenderTarget.Get(), backgroundColor);
+    pContext->ClearDepthStencilView(pDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    pContext->OMSetRenderTargets(1, pRenderTarget.GetAddressOf(), pDepthStencilView.Get());
+
+    auto &pLayers = layout.GetLayers();
+    for (size_t i = 0; i < pLayers.Length(); i++)
     {
-        const IRenderable &object = *renderables[i].GetRaw();
-        if (object.RequiresLoading())
-        {
-            PRINTLN_ERR("DirectXRenderer: Unloaded object found.");
-            continue;
-        }
-        RenderInfo renderInfo = object.GetRenderInfo();
-        const auto objectID = object.GetIdentifier();
-        const auto &position = object.GetPosition();
-        const auto &rotation = object.GetRotation();
-        const auto &scale = object.GetScale();
-        const auto ptrVertexShader = renderInfo.pVertexShader;
-        const auto ptrPixelShader = renderInfo.pPixelShader;
-        const auto ptrTexture = renderInfo.pTexture;
-
-        DirectX::XMStoreFloat4x4(
-            &matrixBuffer.world,
-            DirectX::XMMatrixTranspose(DirectX::XMMatrixScaling(scale.x, scale.y, scale.z) *
-                                       DirectX::XMMatrixRotationRollPitchYaw(DirectX::XMConvertToRadians(-rotation.x),
-                                                                             DirectX::XMConvertToRadians(-rotation.y),
-                                                                             DirectX::XMConvertToRadians(-rotation.z)) *
-                                       DirectX::XMMatrixTranslation(position.x, position.y, -position.z)));
-        // Update the constant buffer (transformation matrices).
-        pContext->UpdateSubresource(pMatrixBuffer.Get(), 0, nullptr, &matrixBuffer, 0, 0);
-        // Setup the vertex and the index buffer.
-        pContext->IASetVertexBuffers(0, 1, pVertexBuffers[objectID].GetAddressOf(), &stride, &offset);
-        pContext->IASetIndexBuffer(pIndexBuffers[objectID].Get(), DXGI_FORMAT_R16_UINT, 0);
-        pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-        pContext->IASetInputLayout(pInputLayout.Get());
-
-        if (ptrTexture && ptrTexture->loaded)
-        {
-            const auto textureID = ptrTexture->identifier;
-            pContext->PSSetShaderResources(0, 1, pShaderResourceViews[textureID].GetAddressOf());
-        }
-        pContext->PSSetSamplers(0, 1, pSamplerState.GetAddressOf());
-        pContext->VSSetShader(
-            ptrVertexShader ? pVertexShaders[ptrVertexShader->GetID()].Get() : pDefaultVertexShader.Get(), nullptr, 0);
-        pContext->PSSetShader(ptrPixelShader ? pPixelShaders[ptrPixelShader->GetID()].Get() : pDefaultPixelShader.Get(),
-                              nullptr, 0);
-        pContext->VSSetConstantBuffers(0, 1, pMatrixBuffer.GetAddressOf());
-        pContext->DrawIndexed(renderInfo.numOfVertexIndices, 0, 0);
+        auto &pGUIs = pLayers[i]->GetComponents();
+        for (size_t j = 0; j < pGUIs.Length(); j++)
+            RenderRenderable(*pGUIs[j]);
     }
     pSwapChain->Present(1, 0);
 }

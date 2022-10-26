@@ -8,7 +8,6 @@ class TopPanelBar : public HorizontalList
 {
   public:
     TopPanelBar(const Point2D &windowSize, float height = 30.f);
-    ~TopPanelBar();
 };
 
 #endif // TOP_PANEL_BAR_HPP
