@@ -118,6 +118,7 @@ template <class T, class... Args> class Event<T(Args...)>
     Event &operator=(const Event &other)
     {
         callbacks = other.callbacks;
+        return *this;
     }
 
     Event &operator=(Event &&other)
