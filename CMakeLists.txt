@@ -4,8 +4,12 @@ project(ChiaGameEngine)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
-set(IMAGE_FILE_PATH ${CMAKE_SOURCE_DIR}/src/Display/Images/)
-configure_file(src/Paths.hpp.in ${CMAKE_SOURCE_DIR}/src/Paths.hpp @ONLY)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/archives)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/bin)
+
+set(IMAGE_FILE_PATH ${CMAKE_SOURCE_DIR}/src/include/Display/Images/)
+configure_file(src/source/Paths.hpp.in ${CMAKE_SOURCE_DIR}/src/include/Paths.hpp @ONLY)
 
 include(CMakeDependentOption)
 

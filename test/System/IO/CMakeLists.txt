@@ -5,7 +5,7 @@ set(IO_TEST_SOURCE_FILES
 add_library(IOTest STATIC ${IO_TEST_SOURCE_FILES})
 target_include_directories(IOTest PUBLIC
     ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/src
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/>
+    ${CMAKE_SOURCE_DIR}/src/include
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/include>
 )
-target_link_libraries(IOTest PUBLIC ChiaSystem)
+target_link_libraries(IOTest PUBLIC ChiaEngineLib)

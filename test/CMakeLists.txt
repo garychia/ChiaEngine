@@ -19,8 +19,8 @@ set(TEST_SOURCE_FILES
 add_executable(TestMain ${TEST_SOURCE_FILES})
 target_include_directories(TestMain PRIVATE
     ${CMAKE_SOURCE_DIR}/test
-    ${CMAKE_SOURCE_DIR}/src
-    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/>
+    ${CMAKE_SOURCE_DIR}/src/include
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/include>
 )
 target_link_libraries(TestMain PRIVATE
     SystemTest
