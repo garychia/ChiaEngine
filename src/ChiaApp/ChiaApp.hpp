@@ -9,6 +9,8 @@ class ChiaApp : public App
   private:
     Panel *pMainWindow;
 
+    bool fullScreen;
+
   protected:
     virtual bool Initialize() override;
 

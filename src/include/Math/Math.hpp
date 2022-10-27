@@ -3,13 +3,15 @@
 
 #include "Data/DynamicArray.hpp"
 
-#define EPSILON 0.00000000001
-#define LN_2 0.69314718056
-#define PI 3.14159265359
-#define PI_TIMES_2 6.28318530718
-
 namespace Math
 {
+class Constants
+{
+  public:
+    static const double Constants::Ln2;
+    static const double Constants::Pi;
+};
+
 template <class T> T Abs(const T x)
 {
     return x >= 0 ? x : -x;
@@ -35,7 +37,7 @@ template <class T> T Exponent(const T &x)
     std::size_t denominator = 1;
     std::size_t i = 1;
     T term = numerator / denominator;
-    while (Abs<T>(term) > EPSILON)
+    while (Abs<T>(term) > 1E-10)
     {
         result += term;
         if (Abs<T>(numerator) >= 1E10 / input)
@@ -74,21 +76,22 @@ template <class T> T NaturalLog(const T &x)
         ratio = numerator / denominator;
         positiveTerm = !positiveTerm;
     }
-    return result + LN_2 * exp;
+    return result + Constants::Ln2 * exp;
 }
 
 template <class T> T Sine(const T &x)
 {
     T input = x < 0 ? -x : x;
-    while (input >= PI_TIMES_2)
-        input -= PI_TIMES_2;
+    const auto doublePi = Constants::Pi * 2;
+    while (input >= doublePi)
+        input -= doublePi;
     T squaredInput = input * input;
     T factor = 1;
     T numerator = input;
     T denominator = 1;
     T result = numerator / denominator;
     std::size_t i = 3;
-    while (numerator / denominator > EPSILON)
+    while (numerator / denominator > 1E-10)
     {
         factor = -factor;
         numerator *= squaredInput;
@@ -102,15 +105,16 @@ template <class T> T Sine(const T &x)
 template <class T> T Cosine(const T &x)
 {
     T input = x < 0 ? -x : x;
-    while (input >= PI_TIMES_2)
-        input -= PI_TIMES_2;
+    const auto doublePi = Constants::Pi * 2;
+    while (input >= doublePi)
+        input -= doublePi;
     T squaredInput = input * input;
     T factor = 1;
     T numerator = 1;
     T denominator = 1;
     T result = numerator / denominator;
     std::size_t i = 2;
-    while (numerator / denominator > EPSILON)
+    while (numerator / denominator > 1E-10)
     {
         factor = -factor;
         numerator *= squaredInput;
@@ -206,12 +210,12 @@ template <class T> T Sigmoid(const T &x)
 template <class T> T Gauss(const T &x, const T &mu, const T &sigma)
 {
     const T normalization = (x - mu) / sigma;
-    return 1 / (sigma * Power(2 * PI, 0.5)) * Exponent(-0.5 * normalization * normalization);
+    return 1 / (sigma * Power(2 * Constants::Pi, 0.5)) * Exponent(-0.5 * normalization * normalization);
 }
 
 template <class T> float ToRadians(T degrees)
 {
-    return degrees / 180.f * PI;
+    return degrees / 180.f * Constants::Pi;
 }
 
 } // namespace Math

@@ -1,19 +1,18 @@
 #include "ChiaApp.hpp"
 
 #include "Display/WindowManager.hpp"
-#include "Globals.hpp"
 
-ChiaApp::ChiaApp(const AppInfo &info) : App(info), pMainWindow(nullptr)
+#define DEFAULT_MAIN_WINDOW_WIDTH 1000
+#define DEFAULT_MAIN_WINDOW_HEIGHT 800
+
+ChiaApp::ChiaApp(const AppInfo &info) : App(info), pMainWindow(nullptr), fullScreen(false)
 {
 }
 
 bool ChiaApp::Initialize()
 {
-    MainWindow = nullptr;
-    FullScreen = false;
-    AppInstance = GetModuleHandle(NULL);
     WNDCLASSEX wndClass = {};
-    wndClass.hInstance = AppInstance;
+    wndClass.hInstance = GetModuleHandle(NULL);
     wndClass.lpfnWndProc = WindowManager::WndProc;
     wndClass.hIcon = LoadIcon(NULL, IDI_WINLOGO);
     wndClass.hIconSm = wndClass.hIcon;
@@ -25,16 +24,7 @@ bool ChiaApp::Initialize()
 
 void ChiaApp::Finalize()
 {
-    if (FullScreen)
-    {
-        ChangeDisplaySettings(NULL, 0);
-        FullScreen = false;
-    }
-    if (AppInstance)
-    {
-        UnregisterClass((LPCWSTR)info.appName.CStr(), AppInstance);
-        AppInstance = nullptr;
-    }
+    UnregisterClass((LPCWSTR)info.appName.CStr(), GetModuleHandle(NULL));
 }
 
 bool ChiaApp::LoadData()
@@ -46,7 +36,8 @@ int ChiaApp::Execute()
 {
     if (!Initialize())
         return EXIT_FAILURE;
-    WindowInfo winInfo(info.appName, String("Chia Engine"), false, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
+    WindowInfo winInfo(info.appName, String("Chia Engine"), false, DEFAULT_MAIN_WINDOW_WIDTH,
+                       DEFAULT_MAIN_WINDOW_HEIGHT);
     pMainWindow = (Panel *)WindowManager::GetSingleton().ConstructWindow<Panel>(winInfo);
     if (!pMainWindow)
     {

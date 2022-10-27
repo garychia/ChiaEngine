@@ -1,7 +1,6 @@
 #include "Panel.hpp"
 
 #include "Display/WindowManager.hpp"
-#include "Globals.hpp"
 #include "System/Input/InputHandler.hpp"
 
 Panel::Panel(const WindowInfo &info)

@@ -87,7 +87,11 @@ set(GEOMETRY_SOURCE_FILES
     source/Geometry/Primitives.cpp
 )
 
-add_subdirectory(include/Math)
+set(MATH_SOURCE_FILES
+    include/Math/Math.hpp
+    source/Math/Math.cpp
+)
+
 add_subdirectory(include/System/Operation)
 
 set(SYSTEM_SOURCE_FILES
@@ -116,9 +120,8 @@ set(CHIA_ENGINE_SOURCE_FILES
     ${APP_SOURCE_FILES}
     ${DISPLAY_SOURCE_FILES}
     ${GEOMETRY_SOURCE_FILES}
+    ${MATH_SOURCE_FILES}
     ${SYSTEM_SOURCE_FILES}
-    include/Globals.hpp
-    source/Globals.cpp
     include/pch.hpp
     include/Paths.hpp
     include/Version.hpp

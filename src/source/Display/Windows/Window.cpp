@@ -1,6 +1,5 @@
 #include "Display/Window.hpp"
 
-#include "Globals.hpp"
 #include "pch.hpp"
 
 
@@ -43,8 +42,6 @@ bool Window::Initialize(Window *pParent)
 
     if (info.fullScreen)
     {
-        FullScreen = true;
-
         DEVMODE devMode = {};
         devMode.dmPelsWidth = (DWORD)windowWidth;
         devMode.dmPelsHeight = (DWORD)windowHeight;
@@ -57,13 +54,12 @@ bool Window::Initialize(Window *pParent)
     handle =
         CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)info.appName.CStr(), (LPCWSTR)info.title.CStr(),
                        !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX, winPosY,
-                       windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, AppInstance, NULL);
+                       windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, GetModuleHandle(NULL), NULL);
     if (!handle)
     {
         if (info.fullScreen)
         {
             ChangeDisplaySettings(NULL, 0);
-            FullScreen = false;
         }
         return false;
     }
@@ -145,6 +141,8 @@ void Window::SetSize(unsigned long newWidth, unsigned long newHeight)
 
 void Window::Destroy()
 {
+    if (info.fullScreen)
+        ChangeDisplaySettings(NULL, 0);
     for (size_t i = 0; i < pChildren.Length(); i++)
         pChildren[i]->Destroy();
     if (handle)
