@@ -182,17 +182,15 @@ template <class T, class PowerType> T Power(const T &scaler, PowerType n)
 {
     if (scaler == 0)
         return 0;
-    else if (scaler > 0)
-    {
-        if (n == 0)
-            return 1;
-        else if (n == 1)
-            return scaler;
-        else if (n < 0)
-            return T(1) / Power(scaler, -n);
-        return Exponent(n * NaturalLog(scaler));
-    }
-    return _PowerLong<T>(scaler, (long)n);
+    else if (n == 0)
+        return 1;
+    else if (n == 1)
+        return scaler;
+    else if ((long)n == n)
+        return _PowerLong<T>(scaler, (long)n);
+    else if (n < 0)
+        return T(1) / Power(scaler, -n);
+    return Exponent(n * NaturalLog(scaler));
 }
 
 template <class T> T ReLU(const T &x)
