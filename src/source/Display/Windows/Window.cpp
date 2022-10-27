@@ -79,6 +79,8 @@ bool Window::Initialize(Window *pParent)
 
 bool Window::LoadScene(Scene &scene)
 {
+    if (this->pScene)
+        this->pScene->onCameraChanged.Unsubscribe(this);
     this->pScene = &scene;
     scene.onCameraChanged.Subscribe(this, &Window::OnCameraChanged);
     return renderer.LoadScene(scene);
