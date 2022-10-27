@@ -1,7 +1,7 @@
 #include "Globals.hpp"
 
-const unsigned long WINDOW_WIDTH = 1000;
-const unsigned long WINDOW_HEIGHT = 800;
+const unsigned long DEFAULT_WINDOW_WIDTH = 1000;
+const unsigned long DEFAULT_WINDOW_HEIGHT = 800;
 
 WindowHandle MainWindow = nullptr;
 

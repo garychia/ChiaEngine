@@ -14,10 +14,10 @@ bool Panel::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    const auto sceneAreaHeight = GetWindowInfo().border.height - PanelLayout::TopBarHeight;
+    const auto sceneAreaHeight = GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight;
     const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
-    WindowInfo childWndInfo(String(), false, sceneWindowWidth, sceneAreaHeight, WINDOW_HEIGHT - sceneAreaHeight,
-                            sceneWindowWidth / 2);
+    WindowInfo childWndInfo(String(), false, sceneWindowWidth, sceneAreaHeight,
+                            GetWindowInfo().GetHeight() - sceneAreaHeight, sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo));
     return pSceneWindow && this->renderer.LoadGUILayout(layout);

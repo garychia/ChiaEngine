@@ -5,8 +5,8 @@
 #include "Version.hpp"
 #include "pch.hpp"
 
-extern const unsigned long WINDOW_WIDTH;
-extern const unsigned long WINDOW_HEIGHT;
+extern const unsigned long DEFAULT_WINDOW_WIDTH;
+extern const unsigned long DEFAULT_WINDOW_HEIGHT;
 
 extern WindowHandle MainWindow;
 #if defined(DIRECTX_ENABLED)

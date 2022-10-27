@@ -61,7 +61,7 @@ int App::Execute()
 {
     if (!Initialize())
         return EXIT_FAILURE;
-    WindowInfo winInfo(String("Chia Engine"), false, WINDOW_WIDTH, WINDOW_HEIGHT);
+    WindowInfo winInfo(String("Chia Engine"), false, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT);
     pMainWindow = (Panel *)WindowManager::GetSingleton().ConstructWindow<Panel>(winInfo);
     if (!pMainWindow)
     {
