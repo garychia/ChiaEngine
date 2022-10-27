@@ -55,7 +55,7 @@ bool Window::Initialize(Window *pParent)
     }
 
     handle =
-        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)AppName.CStr(), (LPCWSTR)info.title.CStr(),
+        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)info.appName.CStr(), (LPCWSTR)info.title.CStr(),
                        !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX, winPosY,
                        windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, AppInstance, NULL);
     if (!handle)

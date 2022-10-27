@@ -1,4 +1,4 @@
-#include "App/Components/PanelLayout.hpp"
+#include "PanelLayout.hpp"
 
 const unsigned long PanelLayout::TopBarHeight = 30;
 

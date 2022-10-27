@@ -16,7 +16,6 @@ extern VkInstance VulkanInstance;
 #endif
 
 extern bool FullScreen;
-extern const String AppName;
 
 extern const Version AppVersion; 
 extern const Version EngineVersion;

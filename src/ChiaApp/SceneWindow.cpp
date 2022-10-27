@@ -1,4 +1,4 @@
-#include "App/SceneWindow.hpp"
+#include "SceneWindow.hpp"
 #include "Paths.hpp"
 #include "Geometry/Primitives.hpp"
 

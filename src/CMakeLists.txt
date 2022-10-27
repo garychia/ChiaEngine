@@ -7,17 +7,7 @@ if(VULKAN_ENABLED)
     list(APPEND CHIA_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
 endif()
 
-set(APP_SOURCE_FILES
-    include/App/App.hpp
-    include/App/Panel.hpp
-    source/App/Panel.cpp
-    include/App/SceneWindow.hpp
-    source/App/SceneWindow.cpp
-    include/App/Components/PanelLayout.hpp
-    source/App/Components/PanelLayout.cpp
-    include/App/Components/TopPanelBar.hpp
-    source/App/Components/TopPanelBar.cpp
-)
+set(APP_SOURCE_FILES include/App/App.hpp)
 if(DIRECTX_ENABLED)
     list(APPEND APP_SOURCE_FILES source/App/DirectX/App.cpp)
 elseif(VULKAN_ENABLED)
@@ -147,12 +137,3 @@ if(DIRECTX_ENABLED)
 elseif(VULKAN_ENABLED)
     target_link_libraries(ChiaEngineLib "Vulkan::Vulkan")
 endif()
-
-if(WIN32)
-    add_executable(ChiaApp WIN32 source/WinMain.cpp)
-else()
-    add_executable(ChiaApp source/main.cpp)
-endif()
-
-target_link_libraries(ChiaApp ChiaEngineLib)
-target_include_directories(ChiaApp PUBLIC ${CHIA_INCLUDE_DIRS})

@@ -1,7 +1,9 @@
-﻿#include "App/App.hpp"
+﻿#include "ChiaApp.hpp"
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-    App app;
+    AppInfo info;
+    info.appName = String("Chia Engine");
+    ChiaApp app(info);
     return app.Execute();
 }

@@ -12,7 +12,6 @@ VkInstance VulkanInstance;
 #endif
 
 bool FullScreen = false;
-const String AppName("Chia Engine");
 
 const Version AppVersion{1, 0, 0};
 const Version EngineVersion{1, 0, 0};

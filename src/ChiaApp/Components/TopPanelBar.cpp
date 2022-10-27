@@ -1,4 +1,4 @@
-#include "App/Components/TopPanelBar.hpp"
+#include "TopPanelBar.hpp"
 
 #include "Display/GUI/Button.hpp"
 

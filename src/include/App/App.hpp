@@ -1,32 +1,34 @@
 #ifndef APP_HPP
 #define APP_HPP
 
-#include "App/Panel.hpp"
-#include "Data/DynamicArray.hpp"
-#include "Display/WindowInfo.hpp"
-#include "pch.hpp"
+#include "Data/String.hpp"
+
+struct AppInfo
+{
+    String appName;
+};
 
 class App
 {
-  private:
-    Panel *pMainWindow;
+  protected:
+    AppInfo info;
 
-    bool Initialize();
+    virtual bool Initialize() = 0;
 
-    void Finalize();
+    virtual void Finalize() = 0;
 
-    bool LoadData();
+    virtual bool LoadData() = 0;
 
-    void Update();
+    virtual void Update();
 
-    void Render();
+    virtual void Render();
 
   public:
-    App();
+    App(const AppInfo &info);
 
-    ~App();
+    virtual ~App();
 
-    int Execute();
+    virtual int Execute();
 };
 
 #endif

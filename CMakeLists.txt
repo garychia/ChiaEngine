@@ -57,4 +57,6 @@ else()
 endif()
 
 add_subdirectory(src)
+add_subdirectory(src/ChiaApp)
+
 add_subdirectory(test)
