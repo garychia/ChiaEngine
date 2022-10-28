@@ -95,6 +95,7 @@ set(MATH_SOURCE_FILES
 add_subdirectory(include/System/Operation)
 
 set(SYSTEM_SOURCE_FILES
+    include/System/Debug/Debug.hpp
     include/System/Input/InputHandleLayer.hpp
     source/System/Input/InputHandleLayer.cpp
     include/System/Input/InputHandler.hpp
@@ -113,6 +114,7 @@ set(SYSTEM_SOURCE_FILES
 )
 
 if(WIN32)
+    list(APPEND SYSTEM_SOURCE_FILES source/System/Debug/Windows/Debug.cpp)
     list(APPEND SYSTEM_SOURCE_FILES include/System/Input/Windows/WinKeyCode.hpp)
 endif()
 

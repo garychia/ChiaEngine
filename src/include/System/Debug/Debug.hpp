@@ -3,98 +3,45 @@
 
 #include <iostream>
 
-#define PRINT_ERR(...) Debug::PrintError("At File: ", __FILE__, "\nAt Line: ", __LINE__, "\n", __VA_ARGS__)
+#include "Data/String.hpp"
 
-#define PRINTLN_ERR(...)                                                                                               \
-    Debug::PrintError("At File: ", __FILE__, "\nAt Line: ", __LINE__, "\n");                                           \
-    Debug::PrintLineError(__VA_ARGS__)
+#define PRINT_ERR(msg) Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n", L##msg)
+
+#define PRINTLN_ERR(msg)                                                                                               \
+    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n");                             \
+    Debug::PrintLine(L##msg)
 
 class Debug
 {
   public:
-    Debug() = delete;
+    static void Print(const String &msg);
 
-    static void Print()
+    static void Print(const wchar_t *msg);
+
+    template <class T> static void Print(const T &msg)
     {
+        Print(msg);
     }
 
-    template <class T> static void Print(const T &arg)
+    template <class T, class... Strings> static void Print(const T &msg, const Strings &...args)
     {
-#ifdef DEBUG
-        std::cout << arg;
-#endif
+        Print(msg);
+        Print<Strings...>(args...);
     }
 
-    template <class T, class U, class... Args> static void Print(const T &arg1, const U &arg2, const Args &...args)
+    static void PrintLine(const String &msg);
+
+    static void PrintLine(const wchar_t *msg);
+
+    template <class T> static void PrintLine(const T &msg)
     {
-#ifdef DEBUG
-        std::cout << arg1;
-        std::cout << arg2;
-        Print(args...);
-#endif
+        PrintLine(msg);
     }
 
-    static void PrintLine()
+    template <class T, class... Strings> static void PrintLine(const T &msg, const Strings &...args)
     {
-        std::cout << std::endl;
-    }
-
-    template <class T> static void PrintLine(const T &arg)
-    {
-#ifdef DEBUG
-        std::cout << arg << std::endl;
-#endif
-    }
-
-    template <class T, class U, class... Args> static void PrintLine(const T &arg1, const U &arg2, const Args &...args)
-    {
-#ifdef DEBUG
-        std::cout << arg1 << std::endl;
-        std::cout << arg2 << std::endl;
-        PrintLine(args...);
-#endif
-    }
-
-    static void PrintError()
-    {
-    }
-
-    template <class T> static void PrintError(const T &arg)
-    {
-#ifdef DEBUG
-        std::cerr << arg;
-#endif
-    }
-
-    template <class T, class U, class... Args> static void PrintError(const T &arg1, const U &arg2, const Args &...args)
-    {
-#ifdef DEBUG
-        std::cerr << arg1;
-        std::cerr << arg2;
-        PrintError(args...);
-#endif
-    }
-
-    static void PrintLineError()
-    {
-        std::cerr << std::endl;
-    }
-
-    template <class T> static void PrintLineError(const T &arg)
-    {
-#ifdef DEBUG
-        std::cerr << arg << std::endl;
-#endif
-    }
-
-    template <class T, class U, class... Args>
-    static void PrintLineError(const T &arg1, const U &arg2, const Args &...args)
-    {
-#ifdef DEBUG
-        std::cerr << arg1 << std::endl;
-        std::cerr << arg2 << std::endl;
-        PrintLineError(args...);
-#endif
+        PrintLine(msg);
+        PrintLine<Strings...>(args...);
     }
 };
 
