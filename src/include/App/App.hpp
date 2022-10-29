@@ -2,6 +2,8 @@
 #define APP_HPP
 
 #include "Data/String.hpp"
+#include "Display/Window.hpp"
+#include "MainLoop.hpp"
 
 struct AppInfo
 {
@@ -13,22 +15,24 @@ class App
   protected:
     AppInfo info;
 
-    virtual bool Initialize() = 0;
+    MainLoop mainLoop;
 
-    virtual void Finalize() = 0;
-
-    virtual bool LoadData() = 0;
-
-    virtual void Update();
-
-    virtual void Render();
+    Window *pMainWindow;
 
   public:
     App(const AppInfo &info);
 
     virtual ~App();
 
+    virtual bool Initialize();
+
+    virtual void Finalize();
+
     virtual int Execute();
+
+    virtual void Update();
+
+    virtual void Render();
 };
 
 #endif

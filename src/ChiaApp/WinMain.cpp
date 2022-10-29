@@ -5,5 +5,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     AppInfo info;
     info.appName = String("Chia Engine");
     ChiaApp app(info);
-    return app.Execute();
+    app.Initialize();
+    auto result = app.Execute();
+    app.Finalize();
+    return result;
 }
