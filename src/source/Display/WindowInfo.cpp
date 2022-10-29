@@ -1,14 +1,15 @@
 #include "Display/WindowInfo.hpp"
 
-WindowInfo::WindowInfo(const String &appName, const String &title, bool fullScreen, unsigned int width,
-                       unsigned int height,
-                       unsigned int positionFromTop, unsigned int positionFromLeft)
-    : appName(appName), title(title), fullScreen(fullScreen), border(positionFromLeft, positionFromTop, width, height)
+#include "App/App.hpp"
+
+WindowInfo::WindowInfo(const AppInfo *pAppInfo, const String &title, bool fullScreen, unsigned int width,
+                       unsigned int height, unsigned int positionFromTop, unsigned int positionFromLeft)
+    : pAppInfo(pAppInfo), title(title), fullScreen(fullScreen), border(positionFromLeft, positionFromTop, width, height)
 {
 }
 
-WindowInfo::WindowInfo(const String &appName, const String &title, bool fullScreen, const Border &border)
-    : appName(appName), title(title), fullScreen(fullScreen), border(border)
+WindowInfo::WindowInfo(const AppInfo *pAppInfo, const String &title, bool fullScreen, const Border &border)
+    : pAppInfo(pAppInfo), title(title), fullScreen(fullScreen), border(border)
 {
 }
 

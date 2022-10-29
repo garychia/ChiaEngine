@@ -19,7 +19,7 @@ class Renderer : public IRenderer
   public:
     Renderer();
 
-    virtual bool Initialize(WindowHandle windowHandle, bool fullScreen) override;
+    virtual bool Initialize(const Window *pWindow) override;
 
     virtual bool LoadScene(Scene &scene) override;
 

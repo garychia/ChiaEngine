@@ -1,7 +1,7 @@
 #include "Display/Window.hpp"
 
+#include "App/App.hpp"
 #include "pch.hpp"
-
 
 Window::Window(const WindowInfo &info)
     : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren()
@@ -51,10 +51,10 @@ bool Window::Initialize(Window *pParent)
         ChangeDisplaySettings(&devMode, CDS_FULLSCREEN);
     }
 
-    handle =
-        CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)info.appName.CStr(), (LPCWSTR)info.title.CStr(),
-                       !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX, winPosY,
-                       windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL, GetModuleHandle(NULL), NULL);
+    handle = CreateWindowEx(WS_EX_APPWINDOW, (LPCWSTR)info.pAppInfo->appName.CStr(), (LPCWSTR)info.title.CStr(),
+                            !pParent ? WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN : WS_CHILDWINDOW | WS_VISIBLE, winPosX,
+                            winPosY, windowWidth, windowHeight, pParent ? pParent->GetHandle() : NULL, NULL,
+                            GetModuleHandle(NULL), NULL);
     if (!handle)
     {
         if (info.fullScreen)
@@ -64,7 +64,7 @@ bool Window::Initialize(Window *pParent)
         return false;
     }
 
-    if (!renderer.Initialize(handle, info.fullScreen))
+    if (!renderer.Initialize(this))
     {
         PRINTLN_ERR("Window: failed to initialize the renderer.");
         Destroy();
@@ -128,7 +128,7 @@ const WindowInfo &Window::GetWindowInfo() const
 void Window::SetPosition(unsigned long newX, unsigned long newY)
 {
     info.border.xPos = newX;
-    info.border.yPos= newY;
+    info.border.yPos = newY;
     MoveWindow(GetHandle(), newX, newY, info.border.width, info.border.height, TRUE);
 }
 

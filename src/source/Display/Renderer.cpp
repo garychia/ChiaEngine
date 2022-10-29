@@ -5,9 +5,9 @@ Renderer::Renderer() : specializedRenderer()
 {
 }
 
-bool Renderer::Initialize(WindowHandle windowHandle, bool fullScreen)
+bool Renderer::Initialize(const Window *pWindow)
 {
-    return specializedRenderer.Initialize(windowHandle, fullScreen);
+    return specializedRenderer.Initialize(pWindow);
 }
 
 bool Renderer::LoadScene(Scene &scene)

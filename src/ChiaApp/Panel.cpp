@@ -15,7 +15,7 @@ bool Panel::Initialize(Window *pParent)
         return false;
     const auto sceneAreaHeight = GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight;
     const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
-    WindowInfo childWndInfo(info.appName, String(), false, sceneWindowWidth, sceneAreaHeight,
+    WindowInfo childWndInfo(info.pAppInfo, String(), false, sceneWindowWidth, sceneAreaHeight,
                             GetWindowInfo().GetHeight() - sceneAreaHeight, sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo));

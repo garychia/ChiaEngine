@@ -4,10 +4,15 @@
 #include "Data/String.hpp"
 #include "Display/Window.hpp"
 #include "MainLoop.hpp"
+#include "Version.hpp"
 
 struct AppInfo
 {
     String appName;
+
+    Version appVersion;
+
+    Version engineVersion;
 };
 
 class App

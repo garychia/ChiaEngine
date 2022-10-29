@@ -11,7 +11,7 @@ ChiaApp::ChiaApp(const AppInfo &info) : App(info)
 
 int ChiaApp::Execute()
 {
-    WindowInfo winInfo(info.appName, String("Chia Engine"), false, DEFAULT_MAIN_WINDOW_WIDTH,
+    WindowInfo winInfo(&info, String("Chia Engine"), false, DEFAULT_MAIN_WINDOW_WIDTH,
                        DEFAULT_MAIN_WINDOW_HEIGHT);
     pMainWindow = WindowManager::GetSingleton().ConstructWindow<Panel>(winInfo);
     if (!pMainWindow)

@@ -7,11 +7,12 @@
 #include "Display/GUI/GUILayout.hpp"
 #include "pch.hpp"
 
+class Window;
 
 class IRenderer
 {
   public:
-    virtual bool Initialize(WindowHandle windowHandle, bool fullScreen) = 0;
+    virtual bool Initialize(const Window *pWindow) = 0;
 
     virtual bool SwitchToFullScreen() = 0;
 

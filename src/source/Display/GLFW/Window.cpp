@@ -49,12 +49,7 @@ bool Window::Show()
     info.title.ToUTF8(title, sizeof(title));
     handle = glfwCreateWindow(info.GetWidth(), info.GetHeight(), title,
                               info.fullScreen ? glfwGetPrimaryMonitor() : NULL, pParent ? pParent->GetHandle() : NULL);
-    if (!handle)
-    {
-        PRINTLN_ERR("Winodw: failed to display.");
-        return false;
-    }
-    return true;
+    return !!handle;
 }
 
 void Window::Update()

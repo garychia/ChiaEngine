@@ -1,4 +1,6 @@
 #include "Display/DirectX/DirectXRenderer.hpp"
+
+#include "Display/Window.hpp"
 #include "System/IO/IO.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -258,7 +260,7 @@ bool DirectXRenderer::LoadDefaultPixelShader()
     return true;
 }
 
-bool DirectXRenderer::Initialize(HWND windowHandle, bool fullScreen)
+bool DirectXRenderer::Initialize(const Window *pWindow)
 {
     if (!DirectXHelper::CreateDevice(pDevice, pContext, featureLevel))
         return false;
@@ -284,7 +286,7 @@ bool DirectXRenderer::Initialize(HWND windowHandle, bool fullScreen)
     pContext->RSSetState(pRasterizerState.Get());
 
     if (!InitializeTextureSampleState() || !CompileDefaultShaders() ||
-        !DirectXHelper::CreateSwapChain(windowHandle, fullScreen, pSwapChain, pDevice))
+        !DirectXHelper::CreateSwapChain(pWindow->GetHandle(), pWindow->GetWindowInfo().fullScreen, pSwapChain, pDevice))
         return false;
     return SetupBackBuffer();
 }
@@ -454,7 +456,7 @@ void DirectXRenderer::RenderRenderable(IRenderable &renderable)
 
     UINT stride = sizeof(VertexInfo);
     UINT offset = 0;
-    
+
     RenderInfo renderInfo = renderable.GetRenderInfo();
     const auto objectID = renderable.GetIdentifier();
     const auto &position = renderable.GetPosition();

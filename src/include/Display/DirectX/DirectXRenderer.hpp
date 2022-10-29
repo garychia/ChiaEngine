@@ -92,7 +92,7 @@ class DirectXRenderer : public IRenderer
 
     ~DirectXRenderer();
 
-    virtual bool Initialize(HWND windowHandle, bool fullScreen) override;
+    virtual bool Initialize(const Window *pWindow) override;
 
     virtual bool SwitchToFullScreen() override;
 
