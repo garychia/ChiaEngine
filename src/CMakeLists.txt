@@ -7,11 +7,20 @@ if(VULKAN_ENABLED)
     list(APPEND CHIA_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
 endif()
 
-set(APP_SOURCE_FILES include/App/App.hpp)
+set(APP_SOURCE_FILES
+    include/App/App.hpp
+    include/App/MainLoop.hpp
+)
 if(DIRECTX_ENABLED)
-    list(APPEND APP_SOURCE_FILES source/App/DirectX/App.cpp)
+    list(APPEND APP_SOURCE_FILES
+        source/App/DirectX/App.cpp
+        source/App/DirectX/MainLoop.cpp
+    )
 elseif(VULKAN_ENABLED)
-    list(APPEND APP_SOURCE_FILES source/App/Vulkan/App.cpp)
+    list(APPEND APP_SOURCE_FILES
+        source/App/Vulkan/App.cpp
+        source/App/Vulkan/MainLoop.cpp
+    )
 endif()
 
 add_subdirectory(include/Data)
@@ -63,16 +72,12 @@ if (DIRECTX_ENABLED)
     )
 elseif(VULKAN_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES
-        include/Display/GLFW/Window.hpp
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
-        include/Display/VulkanHelper.hpp
-        source/Display/VulkanHelper.cpp
     )
 else()
     # TODO: Support OpenGL
     list(APPEND DISPLAY_SOURCE_FILES
-        include/Display/GLFW/Window.hpp
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
     )
