@@ -5,7 +5,7 @@
 #define DEFAULT_MAIN_WINDOW_WIDTH 1000
 #define DEFAULT_MAIN_WINDOW_HEIGHT 800
 
-ChiaApp::ChiaApp(const AppInfo &info) : App(info), fullScreen(false)
+ChiaApp::ChiaApp(const AppInfo &info) : App(info)
 {
 }
 

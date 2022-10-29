@@ -6,9 +6,6 @@
 
 class ChiaApp : public App
 {
-  private:
-    bool fullScreen;
-
   public:
     ChiaApp(const AppInfo &info);
 
