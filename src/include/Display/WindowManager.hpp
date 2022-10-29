@@ -4,6 +4,7 @@
 #include "Data/DynamicArray.hpp"
 #include "Data/HashTable.hpp"
 #include "Window.hpp"
+#include "System/Debug/Debug.hpp"
 
 class WindowManager
 {

@@ -5,11 +5,15 @@
 
 #include "Data/String.hpp"
 
+#ifndef NDEBUG
 #define PRINT_ERR(msg) Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n", L##msg)
-
 #define PRINTLN_ERR(msg)                                                                                               \
     Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n");                             \
     Debug::PrintLine(L##msg)
+#else
+#define PRINT_ERR(msg)
+#define PRINTLN_ERR(msg)
+#endif
 
 class Debug
 {

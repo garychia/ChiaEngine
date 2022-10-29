@@ -1,6 +1,5 @@
 #include "Display/Window.hpp"
 
-#include "Globals.hpp"
 #include "System/Debug/Debug.hpp"
 #include "pch.hpp"
 
@@ -118,7 +117,7 @@ void Window::Destroy()
     handle = nullptr;
 }
 
-void Window::OnCameraChanged(const Camera *pCamera)
+void Window::OnCameraChanged(WeakPtr<Camera> &pCamera)
 {
     renderer.ApplyCamera(pCamera);
 }
