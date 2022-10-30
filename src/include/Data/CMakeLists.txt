@@ -3,6 +3,7 @@ set(DATA_SOURCE_FILES
     DynamicArray.hpp
     HashTable.hpp
     List.hpp
+    Maybe.hpp
     Pair.hpp
     Pointers.hpp
     Str.hpp
