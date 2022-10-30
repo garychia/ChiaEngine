@@ -59,6 +59,10 @@ template <class T> class DynamicArray : public Array<T>
         Array<T>::Array(Forward<Array<T>>(arr));
     }
 
+    DynamicArray(size_t initialSize) noexcept : Array<T>(initialSize), nElements(0)
+    {
+    }
+
     DynamicArray(const T &element, size_t nElements) noexcept : Array<T>(element, nElements), nElements(nElements)
     {
     }
