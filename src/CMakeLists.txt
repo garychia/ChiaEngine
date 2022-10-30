@@ -74,6 +74,10 @@ elseif(VULKAN_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
+        include/Display/Vulkan/VulkanHelper.hpp
+        source/Display/Vulkan/VulkanHelper.cpp
+        include/Display/Vulkan/VulkanRenderer.hpp
+        source/Display/Vulkan/VulkanRenderer.cpp
     )
 else()
     # TODO: Support OpenGL
@@ -145,5 +149,8 @@ if(DIRECTX_ENABLED)
         Windowscodecs.lib
     )
 elseif(VULKAN_ENABLED)
-    target_link_libraries(ChiaEngineLib "Vulkan::Vulkan")
+    target_link_libraries(ChiaEngineLib
+        "Vulkan::Vulkan"
+        glfw
+    )
 endif()

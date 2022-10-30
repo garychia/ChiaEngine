@@ -6,6 +6,8 @@
 
 #ifdef DIRECTX_ENABLED
 #include "Display/DirectX/DirectXRenderer.hpp"
+#elif VULKAN_ENABLED
+#include "Display/Vulkan/VulkanRenderer.hpp"
 #endif
 
 class Camera;
@@ -15,7 +17,10 @@ class Renderer : public IRenderer
   private:
 #ifdef DIRECTX_ENABLED
     DirectXRenderer specializedRenderer;
+#elif VULKAN_ENABLED
+    VulkanRenderer specializedRenderer;
 #endif
+
   public:
     Renderer();
 

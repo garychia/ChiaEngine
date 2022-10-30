@@ -3,8 +3,7 @@
 bool VulkanHelper::CreateInstance(const char *pAppName, const Version &appVersion, const char *pEngineName,
                                   const Version &engineVersion, uint32_t nExtensions, const char **ppExtensionNames,
                                   uint32_t nValidationLayers, const char **ppValidationLayerNames,
-                                  const VkAllocationCallbacks *pAllocationCallbacks,
-                                  VkInstance *pInstance)
+                                  const VkAllocationCallbacks *pAllocationCallbacks, VkInstance *pInstance)
 {
     VkApplicationInfo appInfo{};
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -23,4 +22,40 @@ bool VulkanHelper::CreateInstance(const char *pAppName, const Version &appVersio
     instanceInfo.ppEnabledLayerNames = ppValidationLayerNames;
     VkResult result = vkCreateInstance(&instanceInfo, pAllocationCallbacks, pInstance);
     return result == VK_SUCCESS;
+}
+
+bool VulkanHelper::ListSupportedExtensions(const char *pLayerNmae, uint32_t *nExtensions,
+                                           DynamicArray<VkExtensionProperties> *pExtensionProperties)
+{
+    const auto result = vkEnumerateInstanceExtensionProperties(pLayerNmae, nExtensions, nullptr);
+    if (VK_SUCCESS != result)
+        return false;
+    pExtensionProperties->Resize(*nExtensions);
+    return VK_SUCCESS == vkEnumerateInstanceExtensionProperties(pLayerNmae, nExtensions, &(*pExtensionProperties)[0]);
+}
+
+bool VulkanHelper::ListSupportedValidationLayers(uint32_t *pNLayers, DynamicArray<VkLayerProperties> *pLayers)
+{
+    const auto result = vkEnumerateInstanceLayerProperties(pNLayers, nullptr);
+    if (VK_SUCCESS != result)
+        return false;
+    pLayers->Resize(*pNLayers);
+    return VK_SUCCESS == vkEnumerateInstanceLayerProperties(pNLayers, &(*pLayers)[0]);
+}
+
+VkResult VulkanHelper::CreateDebugUtilsMessengerEXT(VkInstance instance,
+                                                    const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+                                                    const VkAllocationCallbacks *pAllocator,
+                                                    VkDebugUtilsMessengerEXT *pDebugMessenger)
+{
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+    return func ? func(instance, pCreateInfo, pAllocator, pDebugMessenger) : VK_ERROR_EXTENSION_NOT_PRESENT;
+}
+
+void VulkanHelper::DestroyDebugUtilsMessengerEXT(VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
+                                                 const VkAllocationCallbacks *pAllocator)
+{
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func)
+        func(instance, debugMessenger, pAllocator);
 }

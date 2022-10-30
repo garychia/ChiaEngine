@@ -6,10 +6,11 @@
 #include "Data/String.hpp"
 
 #ifndef NDEBUG
-#define PRINT_ERR(msg) Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n", L##msg)
+#define PRINT_ERR(msg)                                                                                                 \
+    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n", String(msg))
 #define PRINTLN_ERR(msg)                                                                                               \
     Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n");                             \
-    Debug::PrintLine(L##msg)
+    Debug::PrintLine(String(msg))
 #else
 #define PRINT_ERR(msg)
 #define PRINTLN_ERR(msg)
@@ -27,9 +28,10 @@ class Debug
         Print(msg);
     }
 
-    template <class T, class... Strings> static void Print(const T &msg, const Strings &...args)
+    template <class T, class U, class... Strings> static void Print(const T &msg1, const U &msg2, const Strings &...args)
     {
-        Print(msg);
+        Print(msg1);
+        Print(msg2);
         Print<Strings...>(args...);
     }
 
@@ -42,9 +44,10 @@ class Debug
         PrintLine(msg);
     }
 
-    template <class T, class... Strings> static void PrintLine(const T &msg, const Strings &...args)
+    template <class T, class U, class... Strings> static void PrintLine(const T &msg1, const U &msg2, const Strings &...args)
     {
-        PrintLine(msg);
+        PrintLine(msg1);
+        PrintLine(msg2);
         PrintLine<Strings...>(args...);
     }
 };

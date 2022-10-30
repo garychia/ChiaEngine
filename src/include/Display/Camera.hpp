@@ -5,7 +5,6 @@
 #include "Geometry/3D/Point3D.hpp"
 #include "System/Operation/Event.hpp"
 
-
 class Camera
 {
   private:

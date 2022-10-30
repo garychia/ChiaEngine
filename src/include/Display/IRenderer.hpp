@@ -5,7 +5,6 @@
 #include "Scene.hpp"
 #include "Shader.hpp"
 #include "Display/GUI/GUILayout.hpp"
-#include "pch.hpp"
 
 class Window;
 

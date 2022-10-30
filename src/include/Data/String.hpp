@@ -27,6 +27,10 @@ class String : public Str<char16_t>
     {
     }
 
+    template <class Char> String(const Char *cStr) : Str<char16_t>(cStr)
+    {
+    }
+
     size_t ToUTF8(char *buffer, size_t bufferSize) const noexcept
     {
         if (!buffer || !bufferSize)

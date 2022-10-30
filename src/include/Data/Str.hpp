@@ -107,6 +107,18 @@ template <class T> class Str
     {
     }
 
+    template <class Char> Str(const Char *cStr)
+    {
+        size_t length = 0;
+        const Char *pCurrentChar = cStr;
+        while (*pCurrentChar != '\0')
+        {
+            length++;
+            pCurrentChar++;
+        }
+        CopyPtr<Char>(cStr, length);
+    }
+
     Str<T> &operator=(const Str<T> &s) noexcept
     {
         CopyPtr(&s[0], s.length);

@@ -2,20 +2,34 @@
 #define VULKAN_RENDERER_HPP
 
 #include "Display/IRenderer.hpp"
-#include "Display/Window.hpp"
 #include "pch.hpp"
+
+class Window;
 
 class VulkanRenderer : public IRenderer
 {
   private:
     VkInstance vulkanInstance;
 
+    VkDebugUtilsMessengerEXT debugMessenger;
+
+    bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
+
+    bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
+
+    bool SetupDebugMessenger();
+
+    static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                        VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                                        const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                                                        void *pUserData);
+
   public:
     VulkanRenderer();
 
     ~VulkanRenderer();
 
-    virtual bool Initialize(Window *pWindow) override;
+    virtual bool Initialize(const Window *pWindow) override;
 
     virtual bool SwitchToFullScreen() override;
 
@@ -43,28 +57,5 @@ class VulkanRenderer : public IRenderer
 
     virtual void Clear() override;
 };
-
-#include "VulkanHelper.hpp"
-
-VulkanRenderer::VulkanRenderer() : IRenderer(), vulkanInstance()
-{
-}
-
-VulkanRenderer::~VulkanRenderer()
-{
-}
-
-bool VulkanRenderer::Initialize(Window *pWindow)
-{
-    uint32_t nExtensions = 0;
-    const char **glfwExtensionNames;
-    glfwExtensionNames = glfwGetRequiredInstanceExtensions(&nExtensions);
-
-    char appName[1024];
-    const auto &winInfo = pWindow->GetWindowInfo();
-    winInfo.pAppInfo->appName.ToUTF8(appName, 1024);
-    VulkanHelper::CreateInstance(appName, winInfo.pAppInfo->appVersion, "Chia Engine", winInfo.pAppInfo->engineVersion,
-                                 nExtensions, glfwExtensionNames, 0, NULL, NULL, &vulkanInstance);
-}
 
 #endif

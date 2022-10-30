@@ -2,8 +2,8 @@
 #define WINDOW_HPP
 
 #include "Data/DynamicArray.hpp"
-#include "Renderer.hpp"
 #include "Scene.hpp"
+#include "Display/Renderer.hpp"
 #include "System/Input/KeyCombination.hpp"
 #include "System/Input/MouseInfo.hpp"
 #include "WindowInfo.hpp"
