@@ -71,6 +71,12 @@ template <class T> class DynamicArray : public Array<T>
     {
     }
 
+    DynamicArray<T> &operator=(const std::initializer_list<T> &l)
+    {
+        *this = DynamicArray<T>(l);
+        return *this;
+    }
+
     DynamicArray<T> &operator=(const Array<T> &arr) noexcept
     {
         Array<T>::operator=(arr);
