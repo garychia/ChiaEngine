@@ -59,7 +59,7 @@ template <class T> class DynamicArray : public Array<T>
         Array<T>::Array(Forward<Array<T>>(arr));
     }
 
-    DynamicArray(size_t initialSize) noexcept : Array<T>(initialSize), nElements(0)
+    DynamicArray(size_t initialSize) noexcept : Array<T>(initialSize), nElements(initialSize)
     {
     }
 
@@ -138,8 +138,8 @@ template <class T> class DynamicArray : public Array<T>
 
     inline void Resize(size_t newSize) noexcept
     {
+        ResizeArray(newSize);
         nElements = newSize;
-        DynamicallyResize();
     }
 
     inline bool IsEmpty() const noexcept
