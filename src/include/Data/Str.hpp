@@ -136,7 +136,7 @@ template <class T> class Str
         return *this;
     }
 
-    bool operator==(const Str<T> &s) const noexcept
+    template <class Char> bool operator==(const Str<Char> &s) const noexcept
     {
         if (length != s.length)
             return false;
@@ -146,6 +146,11 @@ template <class T> class Str
                 return false;
         }
         return true;
+    }
+
+    template <class Char> bool operator!=(const Str<Char> &s) const noexcept
+    {
+        return !operator==(s);
     }
 
     template <class Char, size_t N> bool operator==(Char (&s)[N]) const noexcept
