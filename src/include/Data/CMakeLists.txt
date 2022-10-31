@@ -6,6 +6,7 @@ set(DATA_SOURCE_FILES
     Maybe.hpp
     Pair.hpp
     Pointers.hpp
+    Set.hpp
     Str.hpp
     String.hpp
 )
