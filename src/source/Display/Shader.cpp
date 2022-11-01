@@ -1,6 +1,6 @@
 #include "Display/Shader.hpp"
 
-Shader::Shader(const String &path) : path(path)
+Shader::Shader(const String &path) : identifier(0), loaded(false), path(path)
 {
 }
 
