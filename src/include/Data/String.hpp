@@ -6,6 +6,18 @@
 
 class String : public Str<char16_t>
 {
+  private:
+    template <class Char>
+    static size_t CalculateStrSize(const Char *cStr, size_t size)
+    {
+        size_t strLength = 0;
+        for (size_t i = 0; i < size; i++)
+        {
+            strLength += cStr[i] < 0XD800 || cStr[i] > 0XDFFF ? 1 : 2;
+        }
+        return strLength;
+    }
+
   public:
     String() noexcept : Str<char16_t>()
     {
@@ -29,14 +41,8 @@ class String : public Str<char16_t>
         }
     }
 
-    template <class T> String(const T *str, size_t length) noexcept
+    template <class T> String(const T *str, size_t length) noexcept : Str<CharType>('\0', CalculateStrSize<T>(str, length))
     {
-        size_t strLength = 0;
-        for (size_t i = 0; i < length; i++)
-        {
-            strLength += str[i] < 0XD800 || str[i] > 0XDFFF ? 1 : 2;
-        }
-        Str<char16_t>::Str('\0', strLength);
         size_t currentIdx = 0;
         for (size_t i = 0; i < length; i++)
         {
