@@ -333,12 +333,10 @@ bool DirectXRenderer::LoadTexture(Texture *pTexture)
     // Load the texture image file.
     const auto &imagePath = pTexture->imagePath;
     const auto charPathSize = (imagePath.Length() << 1) + 1;
-    char *imagePathCharPath = new char[charPathSize];
-    imagePath.ToUTF8(imagePathCharPath, charPathSize);
+    const auto imgPath = imagePath.ToUTF8();
     int width, height, bitsPerPixel;
     stbi_set_flip_vertically_on_load(1);
-    float *imageData = stbi_loadf(imagePathCharPath, &width, &height, &bitsPerPixel, 4);
-    delete[] imagePathCharPath;
+    float *imageData = stbi_loadf(imgPath.CStr(), &width, &height, &bitsPerPixel, 4);
     if (!imageData)
     {
         PRINTLN_ERR("DirectXRenderer: failed to open the texture image.");

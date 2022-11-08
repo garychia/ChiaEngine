@@ -28,10 +28,9 @@ class Debug
         Print(msg);
     }
 
-    template <class T, class U, class... Strings> static void Print(const T &msg1, const U &msg2, const Strings &...args)
+    template <class T, class... Strings> static void Print(const T &msg, const Strings &...args)
     {
-        Print(msg1);
-        Print(msg2);
+        Print(msg);
         Print<Strings...>(args...);
     }
 
@@ -44,10 +43,9 @@ class Debug
         PrintLine(msg);
     }
 
-    template <class T, class U, class... Strings> static void PrintLine(const T &msg1, const U &msg2, const Strings &...args)
+    template <class T, class... Strings> static void PrintLine(const T &msg, const Strings &...args)
     {
-        PrintLine(msg1);
-        PrintLine(msg2);
+        PrintLine(msg);
         PrintLine<Strings...>(args...);
     }
 };
