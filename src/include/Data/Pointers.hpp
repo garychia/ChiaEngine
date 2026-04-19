@@ -260,12 +260,12 @@ template <class T> class SharedPtr
 
     T *GetRaw()
     {
-        return IsValid() ? pInfo->GetPtr<T>() : nullptr;
+        return IsValid() ? pInfo->template GetPtr<T>() : nullptr;
     }
 
     const T *GetRaw() const
     {
-        return IsValid() ? pInfo->GetPtr<T>() : nullptr;
+        return IsValid() ? pInfo->template GetPtr<T>() : nullptr;
     }
 
     void Release()
@@ -306,22 +306,22 @@ template <class T> class SharedPtr
 
     T &operator*()
     {
-        return *pInfo->GetPtr<T>();
+        return *pInfo->template GetPtr<T>();
     }
 
     const T &operator*() const
     {
-        return *pInfo->GetPtr<T>();
+        return *pInfo->template GetPtr<T>();
     }
 
     T *operator->()
     {
-        return pInfo->GetPtr<T>();
+        return pInfo->template GetPtr<T>();
     }
 
     const T *operator->() const
     {
-        return pInfo->GetPtr<T>();
+        return pInfo->template GetPtr<T>();
     }
 
     template <class U> friend class SharedPtr;
@@ -401,22 +401,22 @@ template <class T> class WeakPtr : public SharedPtr<T>
 
     T &operator*()
     {
-        return *this->pInfo->GetPtr<T>();
+        return *this->pInfo->template GetPtr<T>();
     }
 
     const T &operator*() const
     {
-        return *this->pInfo->GetPtr<T>();
+        return *this->pInfo->template GetPtr<T>();
     }
 
     T *operator->()
     {
-        return this->pInfo->GetPtr<T>();
+        return this->pInfo->template GetPtr<T>();
     }
 
     const T *operator->() const
     {
-        return this->pInfo->GetPtr<T>();
+        return this->pInfo->template GetPtr<T>();
     }
 
     friend class SharedPtr<T>;

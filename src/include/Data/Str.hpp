@@ -246,7 +246,7 @@ template <class T> class Str
             delete[] ptr;
     }
 
-    template <class T> long long Find(const T &c) noexcept
+    template <class TChar> long long Find(const TChar &c) noexcept
     {
         for (size_t i = 0; i < length; i++)
         {
@@ -271,18 +271,18 @@ template <class T> class StrStream
 
     template <class StrType> StrStream &operator<<(StrType &&str) noexcept
     {
-        strs.Append(Forward<StrType>(str));
+        strs.Append(Types::Forward<StrType>(str));
         return *this;
     }
 
-    template <class T> StrStream &operator<<(const T &input) noexcept
+    template <class TInput> StrStream &operator<<(const TInput &input) noexcept
     {
-        if (Types::IsChar<T>::Value)
-            strs.Append(Str<T>(input));
-        else if (Types::IsInteger<T>::Value)
-            strs.Append(Str<T>::FromInt(input));
+        if (Types::IsChar<TInput>::Value)
+            strs.Append(Str<TInput>(input));
+        else if (Types::IsInteger<TInput>::Value)
+            strs.Append(Str<TInput>::FromInt(input));
         else
-            strs.Append(Str<T>::FromFloat(input));
+            strs.Append(Str<TInput>::FromFloat(input));
         return *this;
     }
 
