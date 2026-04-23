@@ -4,7 +4,9 @@
 #include "System/Input/InputHandler.hpp"
 #include "System/Input/KeyboardHandler.hpp"
 #include "System/Input/MouseInput.hpp"
+#ifdef _WIN32
 #include "System/Input/Windows/WinKeyCode.hpp"
+#endif
 #include "pch.hpp"
 
 WindowManager::WindowManager() : windowMap(), pWindows()

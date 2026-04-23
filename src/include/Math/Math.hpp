@@ -8,8 +8,8 @@ namespace Math
 class Constants
 {
   public:
-    static const double Constants::Ln2;
-    static const double Constants::Pi;
+    static const double Ln2;
+    static const double Pi;
 };
 
 template <class T> T Abs(const T x)

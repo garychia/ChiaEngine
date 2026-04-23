@@ -49,7 +49,7 @@ class WindowManager
         {
             PRINTLN_ERR("Window: failed to add the child window.");
             delete pChild;
-            return false;
+            return nullptr;
         }
         if (!pParent->AddChild(pChild))
             return nullptr;

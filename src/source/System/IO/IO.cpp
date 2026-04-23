@@ -1,13 +1,25 @@
 #include "System/IO/IO.hpp"
+#include <cstring>
 
 bool FileIO::Open()
 {
     if (opened)
         return true;
-    const String::CharType *fileName = path.CStr();
+    const char16_t* src = path.CStr();
+    size_t len = path.Length();
+    char* fileName = new char[len + 1];
+    for (size_t i = 0; i < len; i++)
+        fileName[i] = static_cast<char>(src[i]);
+    fileName[len] = '\0';
+    
     if (!FILE_EXIST(fileName))
+    {
+        delete[] fileName;
         return false;
-    OPEN_HANDLE(handle, fileName, option.openMode, option.accessMode);
+    }
+    OPEN_HANDLE(handle, fileName, static_cast<unsigned long>(option.openMode), static_cast<unsigned long>(option.accessMode));
+    delete[] fileName;
+    
     if (!VALID_HANDLE(handle))
         return false;
     opened = true;

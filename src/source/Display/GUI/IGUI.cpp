@@ -91,19 +91,19 @@ float IGUI::GetMarginRight() const
 
 Point2D IGUI::GetTopLeftPosition() const
 {
-    const float x = border.xPos.IsRelative() ? border.xPos * windowSize.x : border.xPos;
-    const float y = border.yPos.IsRelative() ? border.yPos * windowSize.y : border.yPos;
+    const float x = border.xPos.IsRelative() ? border.xPos * windowSize.x : static_cast<float>(border.xPos);
+    const float y = border.yPos.IsRelative() ? border.yPos * windowSize.y : static_cast<float>(border.yPos);
     return Point2D(x, y);
 }
 
 float IGUI::GetWidth() const
 {
-    return border.width.IsRelative() ? border.width * windowSize.x : border.width;
+    return border.width.IsRelative() ? border.width * windowSize.x : static_cast<float>(border.width);
 }
 
 float IGUI::GetHeight() const
 {
-    return border.height.IsRelative() ? border.height * windowSize.y : border.height;
+    return border.height.IsRelative() ? border.height * windowSize.y : static_cast<float>(border.height);
 }
 
 void IGUI::OnWindowResized()

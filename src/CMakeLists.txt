@@ -112,8 +112,8 @@ set(SYSTEM_SOURCE_FILES
     include/System/Input/KeyboardHandler.hpp
     source/System/Input/KeyboardHandler.cpp
     include/System/Input/KeyCodes.hpp
-    include/System/Input/keyCombination.hpp
-    source/System/Input/keyCombination.cpp
+    include/System/Input/KeyCombination.hpp
+    source/System/Input/KeyCombination.cpp
     include/System/Input/MouseInfo.hpp
     source/System/Input/MouseInfo.cpp
     include/System/Input/MouseInput.hpp
@@ -125,6 +125,8 @@ set(SYSTEM_SOURCE_FILES
 if(WIN32)
     list(APPEND SYSTEM_SOURCE_FILES source/System/Debug/Windows/Debug.cpp)
     list(APPEND SYSTEM_SOURCE_FILES include/System/Input/Windows/WinKeyCode.hpp)
+else()
+    list(APPEND SYSTEM_SOURCE_FILES source/System/Debug/Linux/Debug.cpp)
 endif()
 
 set(CHIA_ENGINE_SOURCE_FILES

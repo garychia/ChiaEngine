@@ -31,11 +31,9 @@ class String : public Str<char16_t>
     {
     }
 
-    template <class T> String(const T &c, size_t length) noexcept
+    template <class T> String(const T &c, size_t length) noexcept : Str<char16_t>(c, c < 0XD800 || c > 0XDFFF ? length : length << 1)
     {
-        const size_t strLength = c < 0XD800 || c > 0XDFFF ? length : length << 1;
-        Str<char16_t>::Str(c, strLength);
-        for (size_t i = 0; i < strLength; i++)
+        for (size_t i = 0; i < this->Length(); i++)
         {
             (*this)[i] = i % 2 == 0 ? ((c & 0XFFC00) >> 10) + 0XD800 : (c & 0X3FF) + 0XDC00;
         }
@@ -59,22 +57,13 @@ class String : public Str<char16_t>
         }
     }
 
-    template <class Char> String(const Char *cStr) : Str<char16_t>(cStr)
+    template <class Char> String(const Char *cStr) : Str<char16_t>(cStr, CalculateStrSize<Char>(cStr, String::Length()))
     {
-        size_t strLength = 0;
-        size_t i = 0;
-        while (cStr[i])
-        {
-            strLength += cStr[i] < 0XD800 || cStr[i] > 0XDFFF ? 1 : 2;
-            i++;
-        }
-        Str<char16_t>::Str('\0', strLength);
-        const size_t cStrLength = i;
         size_t currentIdx = 0;
-        for (i = 0; i < cStrLength; i++)
+        for (size_t i = 0; i < String::Length(); i++)
         {
             if (cStr[i] < 0XD800 || cStr[i] > 0XDFFF)
-            {   
+            {
                 (*this)[currentIdx] = cStr[i];
             }
             else
@@ -124,6 +113,32 @@ class String : public Str<char16_t>
             i++;
         }
         return result;
+    }
+
+    void ToUTF8(char *buffer, size_t bufferSize) const noexcept
+    {
+        size_t i = 0;
+        size_t resultIdx = 0;
+        while (i < Length() && resultIdx < bufferSize - 1)
+        {
+            if ((*this)[i] <= 0x7f)
+            {
+                buffer[resultIdx++] = (*this)[i];
+            }
+            else if ((*this)[i] <= 0x7ff && resultIdx < bufferSize - 2)
+            {
+                buffer[resultIdx++] = ((*this)[i] >> 6) | 0b11000000;
+                buffer[resultIdx++] = 0b111111 & (*this)[i] | 0b10000000;
+            }
+            else if (resultIdx < bufferSize - 3)
+            {
+                buffer[resultIdx++] = ((*this)[i] >> 12) | 0b11100000;
+                buffer[resultIdx++] = 0b111111 & ((*this)[i] >> 6) | 0b10000000;
+                buffer[resultIdx++] = 0b111111 & (*this)[i] | 0b10000000;
+            }
+            i++;
+        }
+        buffer[resultIdx] = '\0';
     }
 };
 

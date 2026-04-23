@@ -5,7 +5,10 @@
 
 #if defined(_WIN32)
 #include "System/IO/Windows/IOHelpers.hpp"
+#elif defined(__linux__)
+#include "System/IO/Linux/IOHelpers.hpp"
 #elif (defined(__unix__) || defined(__unix) || (defined(__APPLE__) && defined(__MACH__)))
+#include "System/IO/Linux/IOHelpers.hpp"
 #else
 #error Target operating system is not supported.
 #endif

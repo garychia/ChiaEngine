@@ -7,19 +7,19 @@
 template <class Key, class Value> class HashTable
 {
   private:
-    template <class Key> class KeyHash
+    template <class KeyType> class KeyHash
     {
       public:
-        static size_t Generate(const Key &key)
+        static size_t Generate(const KeyType &key)
         {
             return ((size_t)key & 0xff) * 17 + (((size_t)key >> 8) & 0xff) * 13 + (((size_t)key >> 16) & 0xff) * 3;
         }
     };
 
-    template <class Key> class ProbeHash
+    template <class KeyType> class ProbeHash
     {
       public:
-        static size_t Generate(const Key &key)
+        static size_t Generate(const KeyType &key)
         {
             return ((size_t)key & 0xff) * 7 + (((size_t)key >> 8) & 0xff) * 11 + (((size_t)key >> 16) & 0xff) * 19;
         }

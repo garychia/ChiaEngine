@@ -1,6 +1,8 @@
 #ifndef LIST_HPP
 #define LIST_HPP
 
+#include "Types/Types.hpp"
+
 template <class T> class List
 {
   private:
@@ -23,7 +25,7 @@ template <class T> class List
 
         template <class ElementType> Element &operator=(ElementType &&e)
         {
-            data = Forward<decltype(e)>(e.data);
+            data = Types::Forward<decltype(e)>(e.data);
             next = e.next;
             prev = e.prev;
             owner = e.owner;
@@ -50,7 +52,6 @@ template <class T> class List
         }
 
         friend class List<T>;
-        friend class List<T>::Iterator;
     };
 
   public:
@@ -206,9 +207,9 @@ template <class T> class List
 
     template <class DataType> void Insert(DataType &&e, const Iterator &nextItr)
     {
+        Element *nextElement = nextItr.current;
         if (nextElement.owner != this)
             return;
-        Element *nextElement = nextItr.current;
         Element *prevElement = nextElement->prev;
         auto newElement = new Element(Types::Forward<decltype(e)>(e), this, prevElement, nextElement);
         if (prevElement)
