@@ -194,6 +194,7 @@ template <class T> class Str
         if (newSize >= length)
             return *this;
         length = newSize;
+        ptr[length] = '\0';
         return *this;
     }
 
