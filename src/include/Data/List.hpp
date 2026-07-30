@@ -58,8 +58,15 @@ template <class T> class List
     using ValueType = T;
 
     class Iterator
-    {
-      private:
+        {
+          public:
+            using iterator_category = std::bidirectional_iterator_tag;
+            using value_type = T;
+            using difference_type = std::ptrdiff_t;
+            using pointer = T *;
+            using reference = T &;
+
+          private:
         List<T> *owner;
         Element *prev;
         Element *current;
@@ -302,6 +309,16 @@ template <class T> class List
     Element *head = 0;
     Element *tail = 0;
     size_t length = 0;
+
+    // STL interop
+  public:
+    using Iterator = typename List<T>::Iterator;
+    using ConstIterator = const Iterator;
+
+    Iterator begin() { return First(); }
+    Iterator end() { return Last(); }
+    ConstIterator begin() const { return First(); }
+    ConstIterator end() const { return Last(); }
 };
 
 #endif

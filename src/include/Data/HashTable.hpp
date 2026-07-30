@@ -158,6 +158,13 @@ template <class Key, class Value> class HashTable
   public:
     class Iterator
     {
+      public:
+        using iterator_category = std::bidirectional_iterator_tag;
+        using value_type = Pair<Key, Value>;
+        using difference_type = std::ptrdiff_t;
+        using pointer = Pair<Key, Value> *;
+        using reference = Pair<Key, Value> &;
+
       private:
         HashTable *owner;
         size_t idx;
@@ -396,6 +403,16 @@ template <class Key, class Value> class HashTable
     }
 
     friend class HashTable<Key, Value>::Iterator;
+
+    // STL interop
+  public:
+    using Iterator = HashTable<Key, Value>::Iterator;
+    using ConstIterator = const Iterator;
+
+    Iterator begin() { return First(); }
+    Iterator end() { return Last(); }
+    ConstIterator begin() const { return First(); }
+    ConstIterator end() const { return Last(); }
 };
 
 template <class Key, class Value>

@@ -162,6 +162,17 @@ template <class T> class Array
     {
         return data[length - 1];
     }
+
+    // STL interop
+    using Iterator = T *;
+    using ConstIterator = const T *;
+
+    Iterator begin() noexcept { return data; }
+    Iterator end() noexcept { return data + length; }
+    ConstIterator begin() const noexcept { return data; }
+    ConstIterator end() const noexcept { return data + length; }
+    ConstIterator cbegin() const noexcept { return data; }
+    ConstIterator cend() const noexcept { return data + length; }
 };
 
 #endif

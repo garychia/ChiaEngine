@@ -194,6 +194,13 @@ template <class T> class Set
   public:
     class Iterator
     {
+      public:
+        using iterator_category = std::forward_iterator_tag;
+        using value_type = T;
+        using difference_type = std::ptrdiff_t;
+        using pointer = T *;
+        using reference = T &;
+
       private:
         Set<T> *owner;
         size_t idx;
@@ -446,6 +453,15 @@ template <class T> class Set
     }
 
     friend class Set<T>::Iterator;
+
+    // STL interop
+  public:
+    using Iterator = Set<T>::Iterator;
+    using ConstIterator = const Iterator;
+    Iterator begin() { return First(); }
+    Iterator end() { return Last(); }
+    ConstIterator begin() const { return First(); }
+    ConstIterator end() const { return Last(); }
 };
 
 template <class T> const size_t Set<T>::SetSizes[] = {13, 37, 79, 97, 199, 401, 857, 1699, 3307};

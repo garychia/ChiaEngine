@@ -255,6 +255,17 @@ template <class T> class Str
         }
         return -1;
     }
+
+    // STL interop
+    using Iterator = T *;
+    using ConstIterator = const T *;
+
+    Iterator begin() noexcept { return ptr; }
+    Iterator end() noexcept { return ptr + length; }
+    ConstIterator begin() const noexcept { return ptr; }
+    ConstIterator end() const noexcept { return ptr + length; }
+    ConstIterator cbegin() const noexcept { return ptr; }
+    ConstIterator cend() const noexcept { return ptr + length; }
 };
 
 template <class T> class StrStream
