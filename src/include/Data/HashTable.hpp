@@ -258,7 +258,7 @@ template <class Key, class Value> class HashTable
         AllocateMemory();
     }
 
-    HashTable(const HashTable &other) : size(other.size), sizeIndex(other.sizeIndex), nElements(other.nElements)
+    HashTable(const HashTable &other) : size(other.size), sizeIndex(other.sizeIndex), nElements(0)
     {
         AllocateMemory();
         for (size_t i = 0; i < other.size; i++)
@@ -286,7 +286,7 @@ template <class Key, class Value> class HashTable
         ReleaseMemory();
         size = other.size;
         sizeIndex = other.sizeIndex;
-        nElements = other.nElements;
+        nElements = 0;
         AllocateMemory();
         for (size_t i = 0; i < other.size; i++)
         {

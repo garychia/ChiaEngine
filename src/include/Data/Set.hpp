@@ -300,7 +300,7 @@ template <class T> class Set
             Insert(value);
     }
 
-    Set(const Set<T> &other) : size(other.size), sizeIndex(other.sizeIndex), nElements(other.nElements)
+    Set(const Set<T> &other) : size(other.size), sizeIndex(other.sizeIndex), nElements(0)
     {
         AllocateMemory();
         for (size_t i = 0; i < other.size; i++)
@@ -328,7 +328,7 @@ template <class T> class Set
         ReleaseMemory();
         size = other.size;
         sizeIndex = other.sizeIndex;
-        nElements = other.nElements;
+        nElements = 0;
         AllocateMemory();
         for (size_t i = 0; i < other.size; i++)
         {

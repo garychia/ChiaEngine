@@ -14,7 +14,7 @@ bool StringTest::Run()
     char testStr[] = "Test1";
     String s1;
     EXPECT_TRUE(s1.Length() == 0, "String Empty Constructor Failed.", true);
-    s1 = String(testStr, sizeof(testStr) - 1);
+    s1 = String(static_cast<const char *>(testStr), sizeof(testStr) - 1);
     EXPECT_TRUE(s1.Length() == sizeof(testStr) - 1, "String C String Constructor Failed.", true);
     SUCCESS_MESSAGE("String Constructors");
 

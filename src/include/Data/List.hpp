@@ -273,7 +273,15 @@ template <class T> class List
     {
         if (IsEmpty())
             return;
-        Remove(Last());
+        Element *target = tail;
+        Element *prevElement = target->prev;
+        if (prevElement)
+            prevElement->next = nullptr;
+        tail = prevElement;
+        if (target == head)
+            head = nullptr;
+        delete target;
+        length--;
     }
 
     bool Contains(const T &e) const
