@@ -46,4 +46,5 @@ external/
 
 # Temporary files
 *.tmp
-*.temp
+*.temp.gitignore
+test/AllTests
