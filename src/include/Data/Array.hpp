@@ -163,6 +163,9 @@ template <class T> class Array
         return data[length - 1];
     }
 
+    virtual size_t GetNElements() const noexcept { return length; }
+    virtual void ResetNElements() noexcept {}
+
     // STL interop
     using Iterator = T *;
     using ConstIterator = const T *;

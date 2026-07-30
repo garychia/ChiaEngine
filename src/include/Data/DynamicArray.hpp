@@ -40,22 +40,13 @@ template <class T> class DynamicArray : public Array<T>
 
     DynamicArray(const Array<T> &arr) noexcept : Array<T>(arr)
     {
-        nElements = arr.Length();
-        if (auto dyArr = dynamic_cast<const DynamicArray<T> *>(&arr))
-            nElements = dyArr->nElements;
+        nElements = arr.GetNElements();
     }
 
     DynamicArray(Array<T> &&arr) noexcept
     {
-        if (auto dyArr = dynamic_cast<DynamicArray<T> *>(&arr))
-        {
-            nElements = dyArr->nElements;
-            dyArr->nElements = 0;
-        }
-        else
-        {
-            nElements = arr.length;
-        }
+        nElements = arr.GetNElements();
+        arr.ResetNElements();
         Array<T>::Array(Types::Forward<Array<T>>(arr));
     }
 
@@ -80,24 +71,14 @@ template <class T> class DynamicArray : public Array<T>
     DynamicArray<T> &operator=(const Array<T> &arr) noexcept
     {
         Array<T>::operator=(arr);
-        if (auto dyArr = dynamic_cast<DynamicArray<T> *>(&arr))
-            nElements = dyArr->nElements;
-        else
-            nElements = arr.length;
+        nElements = arr.GetNElements();
         return *this;
     }
 
     DynamicArray<T> &operator=(Array<T> &&arr) noexcept
     {
-        if (auto dyArr = dynamic_cast<DynamicArray<T> *>(&arr))
-        {
-            nElements = dyArr->nElements;
-            dyArr->nElements = 0;
-        }
-        else
-        {
-nElements = arr.length;
-        }
+        nElements = arr.GetNElements();
+        arr.ResetNElements();
         Array<T>::operator=(Move(arr));
         return *this;
     }
@@ -105,11 +86,7 @@ nElements = arr.length;
     template <class Comparator> bool operator==(const Array<T> &other) const noexcept
     {
         Comparator cmp;
-        size_t otherNElements = other.length;
-        if (auto dyArr = dynamic_cast<DynamicArray<T> *>(&other))
-        {
-            otherNElements = dyArr->nElements;
-        }
+        size_t otherNElements = other.GetNElements();
         if (nElements != otherNElements)
             return false;
         for (size_t i = 0; i < nElements; i++)
@@ -176,6 +153,9 @@ nElements = arr.length;
     {
         return this->data[nElements - 1];
     }
+
+    size_t GetNElements() const noexcept override { return nElements; }
+    void ResetNElements() noexcept override { nElements = 0; }
 };
 
 #endif
