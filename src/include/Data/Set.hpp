@@ -449,7 +449,10 @@ template <class T> class Set
 
     const T &operator[](const T &value) const
     {
-        return *Find(value);
+        Iterator itr = Find(value);
+        if (itr == Last())
+            throw std::out_of_range("Set: element not found in const access");
+        return *itr;
     }
 
     friend class Set<T>::Iterator;

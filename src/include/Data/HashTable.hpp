@@ -399,7 +399,10 @@ template <class Key, class Value> class HashTable
 
     const Value &operator[](const Key &key) const
     {
-        return Find(key)->Value();
+        Iterator itr = Find(key);
+        if (itr == Last())
+            throw std::out_of_range("HashTable: key not found in const access");
+        return itr->Value();
     }
 
     friend class HashTable<Key, Value>::Iterator;

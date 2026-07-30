@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <stdexcept>
 
 namespace Types
 {
