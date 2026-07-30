@@ -1,6 +1,8 @@
 #ifndef TYPES_HPP
 #define TYPES_HPP
 
+#include <cstddef>
+
 namespace Types
 {
 #define BOOL_TYPE_DECLARATION(name, value)                                                                             \

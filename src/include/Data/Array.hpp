@@ -2,6 +2,7 @@
 #define ARRAY_HPP
 
 #include <initializer_list>
+#include <cstddef>
 
 template <class T> class Array
 {

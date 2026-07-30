@@ -1,6 +1,8 @@
 #ifndef POINTERS_HPP
 #define POINTERS_HPP
 
+#include <cstddef>
+
 template <class T> class SharedPtr;
 
 template <class T> class Ptr
