@@ -19,6 +19,14 @@ class String : public Str<char16_t>
     }
 
   public:
+    template <class Char>
+    static size_t GetCStrLength(const Char *str)
+    {
+        size_t len = 0;
+        while (str[len] != 0) len++;
+        return len;
+    }
+
     String() noexcept : Str<char16_t>()
     {
     }
@@ -57,7 +65,7 @@ class String : public Str<char16_t>
         }
     }
 
-    template <class Char> String(const Char *cStr) : Str<char16_t>(cStr, CalculateStrSize<Char>(cStr, String::Length()))
+    template <class Char> String(const Char *cStr) : Str<char16_t>(cStr, CalculateStrSize<Char>(cStr, GetCStrLength(cStr)))
     {
         size_t currentIdx = 0;
         for (size_t i = 0; i < String::Length(); i++)

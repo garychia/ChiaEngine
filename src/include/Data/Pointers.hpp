@@ -411,12 +411,12 @@ template <class T> class WeakPtr : public SharedPtr<T>
 
     T *operator->()
     {
-        return this->pInfo->template GetPtr<T>();
+        return this->IsValid() ? this->pInfo->template GetPtr<T>() : nullptr;
     }
 
     const T *operator->() const
     {
-        return this->pInfo->template GetPtr<T>();
+        return this->IsValid() ? this->pInfo->template GetPtr<T>() : nullptr;
     }
 
     friend class SharedPtr<T>;

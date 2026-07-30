@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 project(ChiaGameEngine)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/build/archives)
@@ -12,6 +12,7 @@ set(IMAGE_FILE_PATH ${CMAKE_SOURCE_DIR}/src/include/Display/Images/)
 configure_file(src/source/Paths.hpp.in ${CMAKE_SOURCE_DIR}/src/include/Paths.hpp @ONLY)
 
 include(CMakeDependentOption)
+set(CHIA_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include)
 
 cmake_dependent_option(
     DIRECTX_ENABLED

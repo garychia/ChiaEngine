@@ -7,9 +7,9 @@
 
 #ifndef NDEBUG
 #define PRINT_ERR(msg)                                                                                                 \
-    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n", String(msg))
+    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", Str<char16_t>::FromInt(__LINE__), L"\n", String(msg))
 #define PRINTLN_ERR(msg)                                                                                               \
-    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", String(__LINE__), L"\n");                             \
+    Debug::Print(L"At File: ", String(__FILE__), L"\nAt Line: ", Str<char16_t>::FromInt(__LINE__), L"\n");             \
     Debug::PrintLine(String(msg))
 #else
 #define PRINT_ERR(msg)

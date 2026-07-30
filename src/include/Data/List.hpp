@@ -107,12 +107,13 @@ template <class T> class List
 
         Iterator operator++(int)
         {
+            Iterator temp = *this;
             if (current)
             {
                 prev = current;
                 current = current->next;
             }
-            return *this;
+            return temp;
         }
 
         Iterator &operator--()
@@ -127,12 +128,13 @@ template <class T> class List
 
         Iterator operator--(int)
         {
+            Iterator temp = *this;
             if (prev)
             {
                 current = prev;
                 prev = prev->prev;
             }
-            return *this;
+            return temp;
         }
 
         bool operator==(const Iterator &other) const
@@ -208,7 +210,7 @@ template <class T> class List
     template <class DataType> void Insert(DataType &&e, const Iterator &nextItr)
     {
         Element *nextElement = nextItr.current;
-        if (nextElement.owner != this)
+        if (!nextElement || nextElement->owner != this)
             return;
         Element *prevElement = nextElement->prev;
         auto newElement = new Element(Types::Forward<decltype(e)>(e), this, prevElement, nextElement);
@@ -216,8 +218,8 @@ template <class T> class List
             prevElement->next = newElement;
         if (nextElement)
             nextElement->prev = newElement;
-        if (IsEmpty())
-            head = tail = newElement;
+        if (!prevElement)
+            head = newElement;
         length++;
     }
 
@@ -238,26 +240,19 @@ template <class T> class List
     {
         if (itr.owner != this || !itr.current)
             return;
-        const Element &element = *itr.current;
-        Element *elementPtr = 0;
-        Element *prevElement = element.prev;
-        Element *nextElement = element.next;
+        Element *target = itr.current;
+        Element *prevElement = target->prev;
+        Element *nextElement = target->next;
         if (prevElement)
-        {
-            elementPtr = prevElement->next;
             prevElement->next = nextElement;
-        }
         if (nextElement)
-        {
-            elementPtr = nextElement->prev;
             nextElement->prev = prevElement;
-        }
-        if (!elementPtr)
-            elementPtr = head;
-        delete elementPtr;
+        if (target == head)
+            head = nextElement;
+        if (target == tail)
+            tail = prevElement;
+        delete target;
         length--;
-        if (IsEmpty())
-            head = tail = 0;
     }
 
     void RemoveFirst()
