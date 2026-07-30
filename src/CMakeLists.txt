@@ -79,8 +79,17 @@ elseif(VULKAN_ENABLED)
         source/Display/Vulkan/VulkanRenderer.cpp
     )
 else()
-    # TODO: Support OpenGL
+    list(APPEND CHIA_INCLUDE_DIRS ${OPENGL_INCLUDE_DIRS})
+    if(EXISTS ${CMAKE_SOURCE_DIR}/src/include/3rdparty/glad/glad.c)
+        list(APPEND DISPLAY_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/include/3rdparty/glad/glad.c)
+    else()
+        message(WARNING "glad.c not found — generate it from https://glad.dav1d.de/ (OpenGL 3.3 Core, Generate a loader) and place in src/include/3rdparty/glad/")
+    endif()
     list(APPEND DISPLAY_SOURCE_FILES
+        include/Display/OpenGLHelper.hpp
+        source/Display/OpenGLHelper.cpp
+        include/Display/OpenGLRenderer.hpp
+        source/Display/OpenGLRenderer.cpp
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
     )
@@ -152,6 +161,11 @@ if(DIRECTX_ENABLED)
 elseif(VULKAN_ENABLED)
     target_link_libraries(ChiaEngineLib
         "Vulkan::Vulkan"
+        glfw
+    )
+else()
+    target_link_libraries(ChiaEngineLib
+        OpenGL::GL
         glfw
     )
 endif()

@@ -55,6 +55,7 @@ elseif(VULKAN_ENABLED)
 else()
     find_package(OpenGL REQUIRED)
     add_compile_definitions(OPENGL_ENABLED)
+    list(APPEND CHIA_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include/3rdparty)
 endif()
 
 add_subdirectory(src)

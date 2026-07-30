@@ -29,6 +29,18 @@ ChiaEngine is a modular game engine supporting **DirectX**, **Vulkan**, and **Op
 sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
+### OpenGL Backend Setup
+
+When building with the OpenGL backend (default on non-Windows without Vulkan SDK), you need **GLAD** (OpenGL function loader). Generate the files at [glad.dav1d.de](https://glad.dav1d.de/) with:
+
+| Setting | Value |
+|---------|-------|
+| API | `gl` Version `3.3` |
+| Profile | `Core` |
+| Options | ✅ Generate a loader |
+
+Place the generated `glad/glad.h` and `glad.c` in `src/include/3rdparty/glad/`.
+
 ## Building
 
 ```bash

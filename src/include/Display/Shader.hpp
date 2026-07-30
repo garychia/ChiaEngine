@@ -26,6 +26,9 @@ class Shader
 #ifdef DIRECTX_ENABLED
     friend class DirectXRenderer;
 #endif
+#ifdef OPENGL_ENABLED
+    friend class OpenGLRenderer;
+#endif
 };
 
 #endif
