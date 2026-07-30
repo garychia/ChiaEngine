@@ -20,8 +20,8 @@
         }                                                                                                              \
     }
 
-#define TEST_MESSAGE(test_name) std::cout << "Testing "##test_name "..." << std::endl
-#define SUCCESS_MESSAGE(test_name) std::cout << ##test_name " - DONE" << std::endl
+#define TEST_MESSAGE(test_name) std::cout << "Testing " << test_name << "..." << std::endl
+#define SUCCESS_MESSAGE(test_name) std::cout << test_name << " - DONE" << std::endl
 
 class Test
 {

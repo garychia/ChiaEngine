@@ -18,7 +18,7 @@ template <class T> class Set
                    (((size_t)value >> 16) & 0xff) * 3;
         }
 
-        template <> static size_t Generate(const String &s)
+        static size_t Generate(const String &s)
         {
             size_t hashValue = 0;
             for (size_t i = 0; i < s.Length(); i++)
@@ -44,7 +44,7 @@ template <class T> class Set
                    (((size_t)value >> 16) & 0xff) * 19;
         }
 
-        template <> static size_t Generate(const String &s)
+        static size_t Generate(const String &s)
         {
             size_t hashValue = 0;
             for (size_t i = 0; i < s.Length(); i++)

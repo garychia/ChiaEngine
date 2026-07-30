@@ -12,13 +12,13 @@ class Module
     std::vector<Test *> tests;
 
   public:
-    Module::Module() : tests()
+    Module() : tests()
     {
     }
 
-    Module::Module(const Module &m) = delete;
+    Module(const Module &m) = delete;
 
-    Module::Module(Module &&m) noexcept : tests(Types::Move(m.tests))
+    Module(Module &&m) noexcept : tests(Types::Move(m.tests))
     {
         m.tests.clear();
     }

@@ -31,7 +31,7 @@ template <class T> class Ptr
     {
     }
 
-    template <class U> Ptr(Ptr<U> &&other) : rawPtr(dynamic_cast<T *>(other.rawPtr))
+    template <class U> Ptr(Ptr<U> &&other) : rawPtr(static_cast<T *>(other.rawPtr))
     {
         other.rawPtr = nullptr;
     }
