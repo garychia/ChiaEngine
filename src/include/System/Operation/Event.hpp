@@ -124,6 +124,7 @@ template <class T, class... Args> class Event<T(Args...)>
     Event &operator=(Event &&other)
     {
         callbacks = Types::Move(other.callbacks);
+        return *this;
     }
 
     ~Event()

@@ -3,6 +3,7 @@
 
 #include "Data/String.hpp"
 #include "Module.hpp"
+#include "OperationTest.hpp"
 
 
 class SystemModule : public Module

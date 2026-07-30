@@ -4,4 +4,5 @@
 SystemModule::SystemModule(const String &ioTestPath)
 {
     AddTest<IOTest>(ioTestPath);
+    AddTest<SystemOperationTest>();
 }
