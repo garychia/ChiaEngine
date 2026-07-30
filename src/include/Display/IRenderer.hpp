@@ -11,6 +11,7 @@ class Window;
 class IRenderer
 {
   public:
+    virtual ~IRenderer() = default;
     virtual bool Initialize(const Window *pWindow) = 0;
 
     virtual bool SwitchToFullScreen() = 0;

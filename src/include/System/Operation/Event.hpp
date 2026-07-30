@@ -131,14 +131,14 @@ template <class T, class... Args> class Event<T(Args...)>
         Clear();
     }
 
-    template <class Subscriber> void Subscribe(Subscriber *pSubstruber, T (Subscriber::*pFunc)(Args...))
+    template <class Subscriber> void Subscribe(Subscriber *pSubscriber, T (Subscriber::*pFunc)(Args...))
     {
-        callbacks.Insert((void *)pSubstruber, new Callback<T(Args...)>(pSubstruber, pFunc));
+        callbacks.Insert((void *)pSubscriber, new Callback<T(Args...)>(pSubscriber, pFunc));
     }
 
-    template <class Subscriber> void Unsubscribe(Subscriber *pSubstruber)
+    template <class Subscriber> void Unsubscribe(Subscriber *pSubscriber)
     {
-        callbacks.Remove((void *)pSubstruber);
+        callbacks.Remove((void *)pSubscriber);
     }
 
     void Invoke(Args... args)

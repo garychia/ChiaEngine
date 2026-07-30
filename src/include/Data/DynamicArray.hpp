@@ -139,7 +139,6 @@ nElements = arr.length;
         nElements = 0;
         delete[] this->data;
         this->data = nullptr;
-        DynamicallyResize();
     }
 
     inline void Resize(size_t newSize) noexcept

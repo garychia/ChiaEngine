@@ -6,9 +6,9 @@
 #define READ_WRITE_MODE (GENERIC_READ | GENERIC_WRITE)
 
 #define ACCESS_CREATE_OR_OVERRIDE CREATE_ALWAYS // Create a new file and override it if it exists.
-#define CREATE_IF_NOT_EXIST CREATE_NEW          // Create only if the file does not exist.
+#define CREATE_NON_EXISTING CREATE_NEW          // Create only if the file does not exist.
 #define OPEN_ONLY_ACCESS OPEN_EXISTING          // Open the file and fail if the file does not exist.
-#define OVERRIDE_IF_EXIST TRUNCATE_EXISTING     // Override the file if it exists.
+#define OVERRIDE_IF_EXISTS TRUNCATE_EXISTING     // Override the file if it exists.
 
 #define FILE_EXIST(path)                                                                                               \
     (!(INVALID_FILE_ATTRIBUTES == GetFileAttributes((LPCWSTR)(path)) && GetLastError() == ERROR_FILE_NOT_FOUND))

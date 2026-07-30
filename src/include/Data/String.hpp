@@ -86,11 +86,15 @@ class String : public Str<char16_t>
     Str<char> ToUTF8() const noexcept
     {
         size_t i = 0;
-        size_t bufferIdx = 0;
         size_t targetLength = 0;
         while (i < Length())
         {
-            if ((*this)[i] <= 0x7f)
+            if ((*this)[i] >= 0xD800 && (*this)[i] <= 0xDBFF && i + 1 < Length())
+            {
+                targetLength += 4;
+                i++;
+            }
+            else if ((*this)[i] <= 0x7f)
                 targetLength++;
             else if ((*this)[i] <= 0x7ff)
                 targetLength += 2;
@@ -103,7 +107,18 @@ class String : public Str<char16_t>
         i = 0;
         while (i < Length())
         {
-            if ((*this)[i] <= 0x7f)
+            if ((*this)[i] >= 0xD800 && (*this)[i] <= 0xDBFF && i + 1 < Length())
+            {
+                char32_t high = (*this)[i];
+                char32_t low = (*this)[i + 1];
+                char32_t codepoint = ((high - 0xD800) << 10) + (low - 0xDC00) + 0x10000;
+                result[resultIdx++] = ((codepoint >> 18) & 0x07) | 0xF0;
+                result[resultIdx++] = ((codepoint >> 12) & 0x3F) | 0x80;
+                result[resultIdx++] = ((codepoint >> 6) & 0x3F) | 0x80;
+                result[resultIdx++] = (codepoint & 0x3F) | 0x80;
+                i++;
+            }
+            else if ((*this)[i] <= 0x7f)
             {
                 result[resultIdx++] = (*this)[i];
             }
@@ -129,7 +144,20 @@ class String : public Str<char16_t>
         size_t resultIdx = 0;
         while (i < Length() && resultIdx < bufferSize - 1)
         {
-            if ((*this)[i] <= 0x7f)
+            if ((*this)[i] >= 0xD800 && (*this)[i] <= 0xDBFF && i + 1 < Length())
+            {
+                if (resultIdx >= bufferSize - 4)
+                    break;
+                char32_t high = (*this)[i];
+                char32_t low = (*this)[i + 1];
+                char32_t codepoint = ((high - 0xD800) << 10) + (low - 0xDC00) + 0x10000;
+                buffer[resultIdx++] = ((codepoint >> 18) & 0x07) | 0xF0;
+                buffer[resultIdx++] = ((codepoint >> 12) & 0x3F) | 0x80;
+                buffer[resultIdx++] = ((codepoint >> 6) & 0x3F) | 0x80;
+                buffer[resultIdx++] = (codepoint & 0x3F) | 0x80;
+                i++;
+            }
+            else if ((*this)[i] <= 0x7f)
             {
                 buffer[resultIdx++] = (*this)[i];
             }

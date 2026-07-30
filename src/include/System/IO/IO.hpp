@@ -25,8 +25,8 @@ enum class OpenMode : unsigned long
 enum class AccessMode : unsigned long
 {
     OpenOnly = OPEN_ONLY_ACCESS,
-    OverrideExisting = OVERRIDE_IF_EXIST,
-    CreateNonExsting = CREATE_IF_NOT_EXIST,
+    OverrideIfExists = OVERRIDE_IF_EXISTS,
+    CreateNonExisting = CREATE_NON_EXISTING,
     CreateOverride = ACCESS_CREATE_OR_OVERRIDE
 };
 

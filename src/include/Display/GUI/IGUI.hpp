@@ -8,6 +8,9 @@
 
 class IGUI : public Rectangle
 {
+  public:
+    virtual ~IGUI() = default;
+
   protected:
     Point2D windowSize;
 

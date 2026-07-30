@@ -30,7 +30,7 @@
 #ifdef CREATE_IF_NOT_EXIST
 #undef CREATE_IF_NOT_EXIST
 #endif
-#define CREATE_IF_NOT_EXIST 5
+#define CREATE_NON_EXISTING 5
 
 #ifdef OPEN_ONLY_ACCESS
 #undef OPEN_ONLY_ACCESS
@@ -40,29 +40,29 @@
 #ifdef OVERRIDE_IF_EXIST
 #undef OVERRIDE_IF_EXIST
 #endif
-#define OVERRIDE_IF_EXIST 7
+#define OVERRIDE_IF_EXISTS 7
 
 inline const char* GetOpenModeString(unsigned long openMode, unsigned long accessMode)
 {
     if (openMode == READ_MODE)
     {
         if (accessMode == OPEN_ONLY_ACCESS) return "r";
-        if (accessMode == OVERRIDE_IF_EXIST) return "r";
-        if (accessMode == CREATE_IF_NOT_EXIST) return "a";
+        if (accessMode == OVERRIDE_IF_EXISTS) return "r";
+        if (accessMode == CREATE_NON_EXISTING) return "r+";
         if (accessMode == ACCESS_CREATE_OR_OVERRIDE) return "w";
     }
     else if (openMode == WRITE_MODE)
     {
-        if (accessMode == OPEN_ONLY_ACCESS) return "w";
-        if (accessMode == OVERRIDE_IF_EXIST) return "w";
-        if (accessMode == CREATE_IF_NOT_EXIST) return "a";
+        if (accessMode == OPEN_ONLY_ACCESS) return "r+";
+        if (accessMode == OVERRIDE_IF_EXISTS) return "w";
+        if (accessMode == CREATE_NON_EXISTING) return "a";
         if (accessMode == ACCESS_CREATE_OR_OVERRIDE) return "w";
     }
     else if (openMode == READ_WRITE_MODE)
     {
         if (accessMode == OPEN_ONLY_ACCESS) return "r+";
-        if (accessMode == OVERRIDE_IF_EXIST) return "r+";
-        if (accessMode == CREATE_IF_NOT_EXIST) return "a+";
+        if (accessMode == OVERRIDE_IF_EXISTS) return "r+";
+        if (accessMode == CREATE_NON_EXISTING) return "a+";
         if (accessMode == ACCESS_CREATE_OR_OVERRIDE) return "w+";
     }
     return "r";

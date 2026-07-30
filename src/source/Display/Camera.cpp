@@ -25,7 +25,6 @@ void Camera::Translate(const Point3D &delta)
 void Camera::Rotate(float deltaPitch, float deltaYaw, float deltaRoll)
 {
     Camera::Rotate(Point3D(deltaPitch, deltaYaw, deltaRoll));
-    onChanged.Invoke();
 }
 
 void Camera::Rotate(const Point3D &delta)

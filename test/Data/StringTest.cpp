@@ -43,7 +43,7 @@ bool StringTest::Run()
     SUCCESS_MESSAGE("String Shrink Function");
 
     TEST_MESSAGE("String FromInt Function");
-    s1 = String::FromInt(-9876543210);
+    s1 = String::FromInt(-9876543210LL);
     EXPECT_TRUE(s1 == "-9876543210", "String FromInt Function Failed.", true);
     s1 = String::FromInt(9876543210);
     EXPECT_TRUE(s1 == "9876543210", "String FromInt Function Failed.", true);

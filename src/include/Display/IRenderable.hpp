@@ -38,17 +38,20 @@ struct RenderInfo
 
 struct Transformation
 {
-    // right-handed cooridnate system
+    // right-handed coordinate system
     Point3D position;
     Point3D rotation;
     Point3D scale;
 
-    Transformation(const Point3D &position = Point3D(), const Point3D &rotaion = Point3D(),
+    Transformation(const Point3D &position = Point3D(), const Point3D &rotation = Point3D(),
                    const Point3D &scale = Point3D(1, 1, 1));
 };
 
 class IRenderable
 {
+  public:
+    virtual ~IRenderable() = default;
+
   private:
     bool loaded;
     size_t identifier;
