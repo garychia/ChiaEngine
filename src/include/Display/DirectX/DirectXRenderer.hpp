@@ -7,8 +7,6 @@
 #include "Display/Scene.hpp"
 #include "System/Debug/Debug.hpp"
 
-using namespace Microsoft::WRL;
-
 class DirectXRenderer : public IRenderer
 {
   private:
@@ -30,28 +28,28 @@ class DirectXRenderer : public IRenderer
 
     MatrixBuffer matrixBuffer;
 
-    ComPtr<ID3D11Device> pDevice;
-    ComPtr<ID3D11RasterizerState> pRasterizerState;
-    ComPtr<ID3D11DeviceContext> pContext;
-    ComPtr<IDXGISwapChain> pSwapChain;
-    ComPtr<ID3D11Texture2D> pBackBuffer;
+    Microsoft::WRL::ComPtr<ID3D11Device> pDevice;
+    Microsoft::WRL::ComPtr<ID3D11RasterizerState> pRasterizerState;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> pContext;
+    Microsoft::WRL::ComPtr<IDXGISwapChain> pSwapChain;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> pBackBuffer;
     D3D11_TEXTURE2D_DESC backBufferDesc;
-    ComPtr<ID3D11RenderTargetView> pRenderTarget;
-    ComPtr<ID3D11Texture2D> pDepthStencil;
-    ComPtr<ID3D11DepthStencilView> pDepthStencilView;
+    Microsoft::WRL::ComPtr<ID3D11RenderTargetView> pRenderTarget;
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> pDepthStencil;
+    Microsoft::WRL::ComPtr<ID3D11DepthStencilView> pDepthStencilView;
     D3D11_VIEWPORT viewport;
     D3D_FEATURE_LEVEL featureLevel;
-    ComPtr<ID3D11VertexShader> pDefaultVertexShader;
-    ComPtr<ID3D11PixelShader> pDefaultPixelShader;
-    ComPtr<ID3D11InputLayout> pInputLayout;
-    ComPtr<ID3D11Buffer> pMatrixBuffer;
-    DynamicArray<ComPtr<ID3D11VertexShader>> pVertexShaders;
-    DynamicArray<ComPtr<ID3D11PixelShader>> pPixelShaders;
-    DynamicArray<ComPtr<ID3D11Buffer>> pVertexBuffers;
-    DynamicArray<ComPtr<ID3D11Buffer>> pIndexBuffers;
-    DynamicArray<ComPtr<ID3D11Texture2D>> pTextures;
-    DynamicArray<ComPtr<ID3D11ShaderResourceView>> pShaderResourceViews;
-    ComPtr<ID3D11SamplerState> pSamplerState;
+    Microsoft::WRL::ComPtr<ID3D11VertexShader> pDefaultVertexShader;
+    Microsoft::WRL::ComPtr<ID3D11PixelShader> pDefaultPixelShader;
+    Microsoft::WRL::ComPtr<ID3D11InputLayout> pInputLayout;
+    Microsoft::WRL::ComPtr<ID3D11Buffer> pMatrixBuffer;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11VertexShader>> pVertexShaders;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11PixelShader>> pPixelShaders;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11Buffer>> pVertexBuffers;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11Buffer>> pIndexBuffers;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11Texture2D>> pTextures;
+    DynamicArray<Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> pShaderResourceViews;
+    Microsoft::WRL::ComPtr<ID3D11SamplerState> pSamplerState;
 
     WeakPtr<Camera> pCamera;
 
@@ -61,9 +59,9 @@ class DirectXRenderer : public IRenderer
 
     void ReleaseBackBuffer();
 
-    bool LoadVertexShaderFromFile(const String &path, ComPtr<ID3D11VertexShader> &pVertexShader);
+    bool LoadVertexShaderFromFile(const String &path, Microsoft::WRL::ComPtr<ID3D11VertexShader> &pVertexShader);
 
-    bool LoadPixelShaderFromFile(const String &path, ComPtr<ID3D11PixelShader> &pPixelShader);
+    bool LoadPixelShaderFromFile(const String &path, Microsoft::WRL::ComPtr<ID3D11PixelShader> &pPixelShader);
 
     bool LoadDefaultVertexShader();
 

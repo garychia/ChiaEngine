@@ -3,6 +3,8 @@
 #include "Display/Window.hpp"
 #include "System/IO/IO.hpp"
 
+using namespace Microsoft::WRL;
+
 #define STB_IMAGE_IMPLEMENTATION
 #include "3rdparty/stb_image.h"
 

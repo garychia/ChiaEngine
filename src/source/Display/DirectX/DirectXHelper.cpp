@@ -3,6 +3,8 @@
 #include "Display/DirectX/Constants.hpp"
 #include "System/Debug/Debug.hpp"
 
+using namespace Microsoft::WRL;
+
 bool DirectXHelper::CreateDevice(ComPtr<ID3D11Device> &pDevice, ComPtr<ID3D11DeviceContext> &pContext,
                                  D3D_FEATURE_LEVEL &featureLevel)
 {
