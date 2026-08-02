@@ -1,6 +1,7 @@
 #include "SystemModule.hpp"
 #include "IO/IOTest.hpp"
 #include "ModuleTest.hpp"
+#include "ReplayTest.hpp"
 #include "WorldTest.hpp"
 
 SystemModule::SystemModule(const String &ioTestPath)
@@ -9,4 +10,5 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<SystemOperationTest>();
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
+    AddTest<replaytest::ReplayTest>();
 }

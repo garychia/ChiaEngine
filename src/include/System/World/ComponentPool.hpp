@@ -2,6 +2,7 @@
 #define COMPONENT_POOL_HPP
 
 #include "Data/DynamicArray.hpp"
+#include "Data/Hash.hpp"
 #include "Data/HashTable.hpp"
 #include "System/Module/TypeId.hpp"
 
@@ -12,6 +13,10 @@ class IComponentPool
     virtual ~IComponentPool() = default;
 
     virtual uint32_t GetTypeId() const = 0;
+
+    // 池內容的確定性雜湊(FNV-1a 64):replay 驗證用。
+    // 前提:元件是 trivially copyable,且儲存時 padding 已歸零(見 Add)。
+    virtual uint64_t Hash() const = 0;
 
     // Entity 銷毀時清掉它的元件
     virtual void RemoveEntity(uint32_t entityIndex) = 0;
@@ -57,7 +62,11 @@ template <class T> class ComponentPool : public IComponentPool
         if (Contains(entityIndex))
             return Get(entityIndex); // 已存在,回傳現有(冪等)
         lookup.Insert(entityIndex, static_cast<uint32_t>(data.GetNElements()));
-        data.Append(value);
+        // 先放零初始化的 slot,再成員指派 — padding 位元組保證為零,
+        // 讓 Hash() 對原始位元組雜湊時不會吃到未定義的記憶體。
+        T slot{};
+        slot = value;
+        data.Append(slot);
         owners.Append(entityIndex);
         return &data.GetLast();
     }
@@ -83,6 +92,17 @@ template <class T> class ComponentPool : public IComponentPool
     uint32_t OwnerAt(uint32_t pos) const
     {
         return owners[pos];
+    }
+
+    uint64_t Hash() const override
+    {
+        uint64_t h = FNV1A64_OFFSET;
+        h = FNV1A64(h, GetTypeId());
+        for (size_t i = 0; i < data.GetNElements(); i++)
+            h = FNV1A64(h, &data[i], sizeof(T));
+        for (size_t i = 0; i < owners.GetNElements(); i++)
+            h = FNV1A64(h, owners[i]);
+        return h;
     }
 };
 

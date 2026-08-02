@@ -1,6 +1,7 @@
 set(DATA_SOURCE_FILES
     Array.hpp
     DynamicArray.hpp
+    Hash.hpp
     HashTable.hpp
     List.hpp
     Maybe.hpp

@@ -2,6 +2,7 @@
 #define WORLD_HPP
 
 #include "Data/DynamicArray.hpp"
+#include "Data/Hash.hpp"
 #include "Data/HashTable.hpp"
 #include "ComponentPool.hpp"
 #include "Entity.hpp"
@@ -124,6 +125,18 @@ class World
         if (itr == poolByType.Last())
             return nullptr;
         return static_cast<ComponentPool<T> *>(itr->Value());
+    }
+
+    // 整個世界狀態的確定性雜湊:entity 數 + 每個元件池(data + owners,依註冊順序)。
+    // 兩個相同輸入的執行必須逐 bit 相同;任何狀態分歧都會反映在 hash 上。
+    // 註:池註冊順序 = 首次 AddComponent<T> 的順序,對確定性 Sim 來說是確定的。
+    uint64_t Hash() const
+    {
+        uint64_t h = FNV1A64_OFFSET;
+        h = FNV1A64(h, GetEntityCount());
+        for (size_t i = 0; i < pools.GetNElements(); i++)
+            h = FNV1A64(h, pools[i]->Hash());
+        return h;
     }
 };
 
