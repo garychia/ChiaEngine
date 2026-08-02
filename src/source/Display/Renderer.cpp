@@ -74,3 +74,8 @@ void Renderer::Clear()
 {
     specializedRenderer.Clear();
 }
+
+bool Renderer::Execute(const Frame &frame)
+{
+    return specializedRenderer.Execute(frame);
+}

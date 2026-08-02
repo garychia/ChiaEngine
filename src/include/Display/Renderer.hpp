@@ -2,6 +2,7 @@
 #define RENDERER_HPP
 
 #include "IRenderer.hpp"
+#include "IFrameExecutor.hpp"
 #include "Display/GUI/GUILayout.hpp"
 
 #ifdef DIRECTX_ENABLED
@@ -12,7 +13,7 @@
 
 class Camera;
 
-class Renderer : public IRenderer
+class Renderer : public IRenderer, public IFrameExecutor
 {
   private:
 #ifdef DIRECTX_ENABLED
@@ -51,6 +52,9 @@ class Renderer : public IRenderer
     virtual void Render(GUILayout &layout) override;
 
     virtual void Clear() override;
+
+    // IFrameExecutor
+    virtual bool Execute(const Frame &frame) override;
 };
 
 #endif

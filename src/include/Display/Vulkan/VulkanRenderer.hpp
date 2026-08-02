@@ -2,11 +2,12 @@
 #define VULKAN_RENDERER_HPP
 
 #include "Display/IRenderer.hpp"
+#include "Display/IFrameExecutor.hpp"
 #include "pch.hpp"
 
 class Window;
 
-class VulkanRenderer : public IRenderer
+class VulkanRenderer : public IRenderer, public IFrameExecutor
 {
   private:
     // Instance
@@ -30,6 +31,7 @@ class VulkanRenderer : public IRenderer
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore renderFinishedSemaphore;
     VkFence inFlightFence;
+    uint32_t currentImageIndex; // 本幀正在使用的 swapchain image
 
     // Device
     VkPhysicalDevice physicalDevice;
@@ -38,6 +40,9 @@ class VulkanRenderer : public IRenderer
     VkQueue presentQueue;
     uint32_t graphicsQueueFamilyIndex;
     uint32_t presentQueueFamilyIndex;
+
+    // Frame 狀態
+    Camera *pActiveCamera;
 
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
@@ -64,6 +69,11 @@ class VulkanRenderer : public IRenderer
     bool CreateCommandBuffers();
     bool CreateSyncObjects();
     void CleanupSyncObjects();
+
+    // ── Frame 執行 ─────────────────────────────────────────────────────────
+    bool BeginFrame();                             // acquire + 清畫面命令
+    void RecordClearCommands(VkCommandBuffer cmdBuffer, VkFormat format); // 清色 + 轉換 layout
+    bool EndFrame();                               // submit + present
 
     // ── Device helpers ────────────────────────────────────────────────────
     struct QueueFamilyIndices
@@ -107,6 +117,9 @@ class VulkanRenderer : public IRenderer
     virtual void Render(Scene &scene) override;
     virtual void Render(GUILayout &layout) override;
     virtual void Clear() override;
+
+    // IFrameExecutor
+    virtual bool Execute(const Frame &frame) override;
 };
 
 #endif

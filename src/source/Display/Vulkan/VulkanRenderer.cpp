@@ -100,7 +100,8 @@ bool VulkanRenderer::CreateSwapchain()
     swapchainInfo.imageColorSpace = format.colorSpace;
     swapchainInfo.imageExtent = ChooseSwapExtent(caps);
     swapchainInfo.imageArrayLayers = 1;
-    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    // COLOR_ATTACHMENT:未來的 render pass;TRANSFER_DST:目前的清色路徑(vkCmdClearColorImage)
+    swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     // Queue families
     QueueFamilyIndices indices;
@@ -171,6 +172,9 @@ bool VulkanRenderer::CreateSwapchainImageViews()
 
 void VulkanRenderer::CleanupSwapchain()
 {
+    if (!device)
+        return;  // Initialize failed before device creation; nothing to destroy
+
     for (size_t i = 0; i < swapchainImageViews.Length(); i++)
         vkDestroyImageView(device, swapchainImageViews[i], nullptr);
     swapchainImageViews.RemoveAll();
@@ -518,12 +522,14 @@ VulkanRenderer::VulkanRenderer()
       imageAvailableSemaphore(),
       renderFinishedSemaphore(),
       inFlightFence(),
+      currentImageIndex(0),
       physicalDevice(),
       device(),
       graphicsQueue(),
       presentQueue(),
       graphicsQueueFamilyIndex(UINT32_MAX),
-      presentQueueFamilyIndex(UINT32_MAX)
+      presentQueueFamilyIndex(UINT32_MAX),
+      pActiveCamera(nullptr)
 {
 }
 
@@ -544,7 +550,8 @@ VulkanRenderer::~VulkanRenderer()
         device = nullptr;
     }
     VulkanHelper::DestroyDebugUtilsMessengerEXT(vulkanInstance, debugMessenger, NULL);
-    vkDestroyInstance(vulkanInstance, nullptr);
+    if (vulkanInstance)
+        vkDestroyInstance(vulkanInstance, nullptr);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -687,6 +694,13 @@ void VulkanRenderer::OnCameraChanged()
 
 void VulkanRenderer::OnWindowResized(long newWidth, long newHeight)
 {
+    (void)newWidth;
+    (void)newHeight;
+    // swapchain 依賴 surface 尺寸,resize 後整組重建
+    vkDeviceWaitIdle(device);
+    CleanupSwapchain();
+    CreateSwapchain();
+    CreateSwapchainImageViews();
 }
 
 void VulkanRenderer::Update()
@@ -703,4 +717,149 @@ void VulkanRenderer::Render(GUILayout &layout)
 
 void VulkanRenderer::Clear()
 {
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  IFrameExecutor — Frame 驅動的渲染
+// ══════════════════════════════════════════════════════════════════════════════
+
+bool VulkanRenderer::Execute(const Frame &frame)
+{
+    for (size_t i = 0; i < frame.GetNumCommands(); i++)
+    {
+        const Frame::CommandData &command = frame.GetCommand(i);
+        switch (command.command)
+        {
+            case Frame::Command::BeginFrame:
+                if (!BeginFrame())
+                    return false;
+                break;
+            case Frame::Command::SetCamera:
+                pActiveCamera = command.pCamera;
+                break;
+            case Frame::Command::DrawRenderable:
+                // TODO(P2.5): 需要 render pass + pipeline + vertex buffer 上傳
+                break;
+            case Frame::Command::DrawGUILayout:
+                // TODO(P2.5): GUI 走 Frame 命令
+                break;
+            case Frame::Command::EndFrame:
+                if (!EndFrame())
+                    return false;
+                break;
+        }
+    }
+    return true;
+}
+
+bool VulkanRenderer::BeginFrame()
+{
+    vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &inFlightFence);
+
+    uint32_t imageIndex = 0;
+    const VkResult acquireResult = vkAcquireNextImageKHR(
+        device, swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
+        return false; // TODO: 觸發 swapchain 重建
+    if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
+        return false;
+    currentImageIndex = imageIndex;
+
+    VkCommandBuffer cmdBuffer = commandBuffers[imageIndex];
+    vkResetCommandBuffer(cmdBuffer, 0);
+
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+    if (vkBeginCommandBuffer(cmdBuffer, &beginInfo) != VK_SUCCESS)
+        return false;
+
+    RecordClearCommands(cmdBuffer, swapchainImageFormat);
+    return true;
+}
+
+void VulkanRenderer::RecordClearCommands(VkCommandBuffer cmdBuffer, VkFormat format)
+{
+    (void)format;
+    const VkImage swapchainImage = swapchainImages[currentImageIndex];
+
+    // UNDEFINED -> TRANSFER_DST_OPTIMAL:準備接收 clear
+    VkImageMemoryBarrier toTransfer = {};
+    toTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toTransfer.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    toTransfer.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toTransfer.image = swapchainImage;
+    toTransfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toTransfer.subresourceRange.levelCount = 1;
+    toTransfer.subresourceRange.layerCount = 1;
+    toTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    vkCmdPipelineBarrier(cmdBuffer,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toTransfer);
+
+    // 清色:深藍黑(引擎暗色調)
+    const VkClearColorValue clearColor = {0.02f, 0.04f, 0.08f, 1.0f};
+    VkImageSubresourceRange range = {};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.levelCount = 1;
+    range.layerCount = 1;
+    vkCmdClearColorImage(cmdBuffer, swapchainImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         &clearColor, 1, &range);
+
+    // TRANSFER_DST_OPTIMAL -> PRESENT_SRC_KHR:準備呈現
+    VkImageMemoryBarrier toPresent = {};
+    toPresent.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    toPresent.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    toPresent.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    toPresent.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toPresent.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    toPresent.image = swapchainImage;
+    toPresent.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    toPresent.subresourceRange.levelCount = 1;
+    toPresent.subresourceRange.layerCount = 1;
+    toPresent.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    vkCmdPipelineBarrier(cmdBuffer,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toPresent);
+}
+
+bool VulkanRenderer::EndFrame()
+{
+    VkCommandBuffer cmdBuffer = commandBuffers[currentImageIndex];
+    if (vkEndCommandBuffer(cmdBuffer) != VK_SUCCESS)
+        return false;
+
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+
+    VkSubmitInfo submitInfo = {};
+    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = waitSemaphores;
+    submitInfo.pWaitDstStageMask = waitStages;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuffer;
+    submitInfo.signalSemaphoreCount = 1;
+    submitInfo.pSignalSemaphores = signalSemaphores;
+
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
+        return false;
+
+    VkSwapchainKHR swapchains[] = {swapchain};
+    VkPresentInfoKHR presentInfo = {};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = signalSemaphores;
+    presentInfo.swapchainCount = 1;
+    presentInfo.pSwapchains = swapchains;
+    presentInfo.pImageIndices = &currentImageIndex;
+
+    const VkResult presentResult = vkQueuePresentKHR(presentQueue, &presentInfo);
+    return presentResult == VK_SUCCESS || presentResult == VK_SUBOPTIMAL_KHR;
 }

@@ -63,10 +63,19 @@ void Window::Render()
 {
     for (size_t i = 0; i < pChildren.Length(); i++)
         pChildren[i]->Render();
+
+    // Frame 驅動的渲染:錄製命令 → executor 執行
+    Frame frame;
+    frame.BeginFrame();
     if (pScene)
-        renderer.Render(*pScene);
-    else
-        renderer.Clear();
+    {
+        frame.SetCamera(pScene->GetCamera());
+        const DynamicArray<SharedPtr<IRenderable>> &renderables = pScene->GetRenderables();
+        for (size_t i = 0; i < renderables.GetNElements(); i++)
+            frame.DrawRenderable(*renderables[i]);
+    }
+    frame.EndFrame();
+    renderer.Execute(frame);
 }
 
 WindowHandle Window::GetHandle() const
