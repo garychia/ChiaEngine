@@ -10,6 +10,11 @@ Point3D Camera::GetPosition() const
     return position;
 }
 
+Point3D Camera::GetRotation() const
+{
+    return rotation;
+}
+
 void Camera::Translate(float deltaX, float deltaY, float deltaZ)
 {
     position += Point3D(deltaX, deltaY, deltaZ);

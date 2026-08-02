@@ -3,7 +3,12 @@
 
 #include "Display/IRenderer.hpp"
 #include "Display/IFrameExecutor.hpp"
+#include "Data/HashTable.hpp"
 #include "pch.hpp"
+
+#include <glm/glm.hpp>
+
+#include <string>
 
 class Window;
 
@@ -44,6 +49,39 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     // Frame 狀態
     Camera *pActiveCamera;
 
+    // ── Render pass / pipeline / framebuffers ───────────────────────────────
+    VkRenderPass renderPass;
+    DynamicArray<VkFramebuffer> swapchainFramebuffers;
+    VkPipelineLayout pipelineLayout;
+    VkPipeline graphicsPipeline;
+    VkShaderModule vertShaderModule;
+    VkShaderModule fragShaderModule;
+
+    // ── Descriptors / UBO ───────────────────────────────────────────────────
+    VkDescriptorSetLayout descriptorSetLayout;
+    VkDescriptorPool descriptorPool;
+    VkDescriptorSet descriptorSet;
+    VkBuffer uniformBuffer;
+    VkDeviceMemory uniformBufferMemory;
+
+    // ── 材質 / 貼圖(單一 slot,v1)────────────────────────────────────────────
+        VkImage textureImage;
+        VkDeviceMemory textureImageMemory;
+        VkImageView textureImageView;
+        VkSampler textureSampler;
+        bool textureReady;
+    std::string loadedTexturePath; // 目前載入的真實貼圖路徑(空 = fallback 白色)
+
+        // ── Renderable GPU 資料快取(以 identifier 為 key)─────────────────────────
+        struct RenderableGpuData
+        {
+            VkBuffer vertexBuffer;
+            VkDeviceMemory vertexMemory;
+            uint32_t vertexCount;
+        };
+
+        HashTable<size_t, RenderableGpuData> renderableGpuMap;
+
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
     bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
@@ -74,6 +112,28 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool BeginFrame();                             // acquire + 清畫面命令
     void RecordClearCommands(VkCommandBuffer cmdBuffer, VkFormat format); // 清色 + 轉換 layout
     bool EndFrame();                               // submit + present
+
+    // ── Pipeline 建置 ───────────────────────────────────────────────────────
+    bool CreateRenderPass();
+    bool CreateFramebuffers();
+    void CleanupFramebuffers();
+    bool CreateDescriptorSetLayout();
+    bool CreateDescriptorPool();
+    bool CreateGraphicsPipeline();
+    bool CreateShaderModule(const unsigned char *pCode, size_t codeSize, VkShaderModule &outModule);
+    bool CreateUniformBuffer();
+    bool CreateWhiteTexture();
+    VkImageView CreateImageView(VkImage image, VkFormat format);
+    void CleanupPipelineResources();
+    void CleanupRenderableGpuMap();
+
+    // ── Renderable 繪製 ─────────────────────────────────────────────────────
+    bool LoadRenderable(const IRenderable &renderable);       // RenderInfo → GPU buffer
+    bool LoadTextureImage(const Texture &texture);            // 載入真實貼圖(單一 slot)
+    void UpdateTextureDescriptor();                           // 重新寫 UBO + sampler 描述子
+    void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable);
+    void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
+                             const glm::mat4 &projection, bool useTexture);
 
     // ── Device helpers ────────────────────────────────────────────────────
     struct QueueFamilyIndices

@@ -23,6 +23,8 @@ class Camera
 
     Point3D GetPosition() const;
 
+    Point3D GetRotation() const;
+
     void Translate(float deltaX, float deltaY = 0.f, float deltaZ = 0.f);
 
     void Translate(const Point3D &delta);
