@@ -15,6 +15,8 @@ bool MainLoop::ShouldContinue() const
 
 void MainLoop::Execute(WindowHandle mainWindowHandle)
 {
+#ifdef DIRECTX_ENABLED
+    // DirectX backend:Win32 訊息泵
     static MSG msg;
     msg = {};
     if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
@@ -23,4 +25,9 @@ void MainLoop::Execute(WindowHandle mainWindowHandle)
         DispatchMessage(&msg);
     }
     shouldContinue = msg.message != WM_QUIT;
+#else
+    // GLFW backends (Vulkan / OpenGL):原生事件輪詢
+    glfwPollEvents();
+    shouldContinue = !glfwWindowShouldClose(mainWindowHandle);
+#endif
 }

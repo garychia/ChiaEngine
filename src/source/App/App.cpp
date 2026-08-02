@@ -1,4 +1,4 @@
-﻿#include "App/App.hpp"
+#include "App/App.hpp"
 
 #include "Display/WindowManager.hpp"
 
@@ -12,6 +12,7 @@ App::~App()
 
 bool App::Initialize()
 {
+#ifdef DIRECTX_ENABLED
     WNDCLASSEX wndClass = {};
     wndClass.hInstance = GetModuleHandle(NULL);
     wndClass.lpfnWndProc = WindowManager::WndProc;
@@ -21,11 +22,17 @@ bool App::Initialize()
     wndClass.lpszClassName = (LPCWSTR)info.appName.CStr();
     wndClass.cbSize = sizeof(WNDCLASSEX);
     return RegisterClassEx(&wndClass);
+#else
+    // GLFW backends (Vulkan / OpenGL):視窗類別由 GLFW 管理,無需註冊
+    return true;
+#endif
 }
 
 void App::Finalize()
 {
+#ifdef DIRECTX_ENABLED
     UnregisterClass((LPCWSTR)info.appName.CStr(), GetModuleHandle(NULL));
+#endif
 }
 
 int App::Execute()

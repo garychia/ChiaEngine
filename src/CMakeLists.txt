@@ -9,18 +9,9 @@ endif()
 set(APP_SOURCE_FILES
     include/App/App.hpp
     include/App/MainLoop.hpp
+    source/App/App.cpp
+    source/App/MainLoop.cpp
 )
-if(DIRECTX_ENABLED)
-    list(APPEND APP_SOURCE_FILES
-        source/App/DirectX/App.cpp
-        source/App/DirectX/MainLoop.cpp
-    )
-elseif(VULKAN_ENABLED)
-    list(APPEND APP_SOURCE_FILES
-        source/App/Vulkan/App.cpp
-        source/App/Vulkan/MainLoop.cpp
-    )
-endif()
 
 add_subdirectory(include/Data)
 
