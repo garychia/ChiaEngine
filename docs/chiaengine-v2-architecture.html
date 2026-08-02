@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChiaEngine v2 Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1240px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 940px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.orange { background: #fb923c; }
+    .card-dot.rose { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>ChiaEngine v2 — Kernel &amp; Projection</h1>
+      </div>
+      <p class="subtitle">確定性 Sim 心臟 + Frame 貨幣 + 模組匯流排 · 全部長在你自己的容器上</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 820">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ============ LAYER BOUNDARIES ============ -->
+        <rect x="20" y="60" width="720" height="90" rx="12" fill="transparent" stroke="#22d3ee" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="76" fill="#22d3ee" font-size="10" font-weight="600">App Layer — 組合根 · 一切皆 Module</text>
+
+        <rect x="20" y="180" width="720" height="180" rx="12" fill="transparent" stroke="#34d399" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="196" fill="#34d399" font-size="10" font-weight="600">View Layer — 呈現 = 模擬的投影</text>
+
+        <rect x="20" y="390" width="720" height="170" rx="12" fill="transparent" stroke="#a78bfa" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="406" fill="#a78bfa" font-size="10" font-weight="600">Sim Layer — 引擎心臟 · 可無頭執行 · 禁止 GPU/牆鐘</text>
+
+        <rect x="20" y="590" width="720" height="60" rx="12" fill="transparent" stroke="#94a3b8" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="606" fill="#94a3b8" font-size="10" font-weight="600">Foundation — 地基(已存在)</text>
+
+        <rect x="20" y="660" width="720" height="60" rx="12" fill="transparent" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="32" y="676" fill="#fbbf24" font-size="10" font-weight="600">Platform — 平台層</text>
+
+        <!-- ============ EVENT BUS (bottom bar) ============ -->
+        <rect x="20" y="745" width="720" height="34" rx="8" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.5"/>
+        <text x="380" y="766" fill="#fb923c" font-size="11" font-weight="600" text-anchor="middle">Event Bus — Event&lt;T(Args...)&gt; 型別事件 · EngineContext 服務表 · 零直接耦合</text>
+
+        <!-- ============ APP LAYER ============ -->
+        <rect x="40" y="85" width="180" height="50" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="130" y="106" fill="white" font-size="12" font-weight="600" text-anchor="middle">ChiaApp</text>
+        <text x="130" y="122" fill="#94a3b8" font-size="9" text-anchor="middle">Panels · SceneWindow</text>
+
+        <rect x="250" y="85" width="150" height="50" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="325" y="106" fill="white" font-size="12" font-weight="600" text-anchor="middle">Editor</text>
+        <text x="325" y="122" fill="#94a3b8" font-size="9" text-anchor="middle">未來</text>
+
+        <rect x="430" y="85" width="180" height="50" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+        <text x="520" y="106" fill="white" font-size="12" font-weight="600" text-anchor="middle">你的遊戲</text>
+        <text x="520" y="122" fill="#94a3b8" font-size="9" text-anchor="middle">第一個 dogfood</text>
+
+        <!-- ============ VIEW LAYER ============ -->
+        <rect x="40" y="210" width="170" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="125" y="231" fill="white" font-size="12" font-weight="600" text-anchor="middle">Frame</text>
+        <text x="125" y="247" fill="#94a3b8" font-size="9" text-anchor="middle">渲染命令流 Cmd</text>
+
+        <rect x="40" y="280" width="170" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="125" y="301" fill="white" font-size="12" font-weight="600" text-anchor="middle">IFrameExecutor</text>
+        <text x="125" y="317" fill="#94a3b8" font-size="9" text-anchor="middle">Execute(Frame)</text>
+
+        <rect x="240" y="214" width="130" height="38" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="305" y="232" fill="white" font-size="11" font-weight="600" text-anchor="middle">Vulkan</text>
+        <text x="305" y="246" fill="#94a3b8" font-size="8" text-anchor="middle">executor</text>
+
+        <rect x="240" y="266" width="130" height="38" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="305" y="284" fill="white" font-size="11" font-weight="600" text-anchor="middle">DirectX</text>
+        <text x="305" y="298" fill="#94a3b8" font-size="8" text-anchor="middle">executor</text>
+
+        <rect x="240" y="318" width="130" height="38" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="305" y="336" fill="white" font-size="11" font-weight="600" text-anchor="middle">OpenGL</text>
+        <text x="305" y="350" fill="#94a3b8" font-size="8" text-anchor="middle">executor</text>
+
+        <rect x="400" y="210" width="150" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="475" y="231" fill="white" font-size="12" font-weight="600" text-anchor="middle">GUI 模組</text>
+        <text x="475" y="247" fill="#94a3b8" font-size="9" text-anchor="middle">GUILayer → Frame</text>
+
+        <rect x="400" y="280" width="150" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="475" y="301" fill="white" font-size="12" font-weight="600" text-anchor="middle">音訊模組</text>
+        <text x="475" y="317" fill="#94a3b8" font-size="9" text-anchor="middle">未來</text>
+
+        <!-- ============ SIM LAYER ============ -->
+        <rect x="40" y="420" width="200" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="140" y="441" fill="white" font-size="12" font-weight="600" text-anchor="middle">World (ECS)</text>
+        <text x="140" y="457" fill="#94a3b8" font-size="9" text-anchor="middle">EntityRegistry · ComponentPool</text>
+        <text x="140" y="471" fill="#a78bfa" font-size="8" text-anchor="middle">建在你的 Array/HashTable 上</text>
+
+        <rect x="270" y="420" width="160" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="350" y="441" fill="white" font-size="12" font-weight="600" text-anchor="middle">Systems</text>
+        <text x="350" y="457" fill="#94a3b8" font-size="9" text-anchor="middle">FixedUpdate 純函式</text>
+        <text x="350" y="471" fill="#a78bfa" font-size="8" text-anchor="middle">standalone 可測</text>
+
+        <rect x="460" y="420" width="140" height="60" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="530" y="441" fill="white" font-size="12" font-weight="600" text-anchor="middle">物理</text>
+        <text x="530" y="457" fill="#94a3b8" font-size="9" text-anchor="middle">未來</text>
+        <text x="530" y="471" fill="#a78bfa" font-size="8" text-anchor="middle">確定性優先</text>
+
+        <rect x="40" y="500" width="200" height="44" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="140" y="518" fill="white" font-size="11" font-weight="600" text-anchor="middle">輸入錄製 / Replay</text>
+        <text x="140" y="533" fill="#94a3b8" font-size="8" text-anchor="middle">重播 = 內建除錯</text>
+
+        <rect x="270" y="500" width="160" height="44" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="350" y="518" fill="white" font-size="11" font-weight="600" text-anchor="middle">FrameClock</text>
+        <text x="350" y="533" fill="#94a3b8" font-size="8" text-anchor="middle">固定步進 60Hz</text>
+
+        <rect x="460" y="500" width="140" height="44" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+        <text x="530" y="518" fill="white" font-size="11" font-weight="600" text-anchor="middle">確定性 RNG</text>
+        <text x="530" y="533" fill="#94a3b8" font-size="8" text-anchor="middle">splitmix64</text>
+
+        <!-- ============ FOUNDATION ============ -->
+        <rect x="40" y="605" width="150" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="115" y="620" fill="white" font-size="11" font-weight="600" text-anchor="middle">Data 容器</text>
+        <text x="115" y="633" fill="#94a3b8" font-size="8" text-anchor="middle">Array·HashTable·List</text>
+
+        <rect x="210" y="605" width="90" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="255" y="620" fill="white" font-size="11" font-weight="600" text-anchor="middle">Math</text>
+        <text x="255" y="633" fill="#94a3b8" font-size="8" text-anchor="middle">Types·IO·Debug</text>
+
+        <rect x="320" y="605" width="100" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="370" y="620" fill="white" font-size="11" font-weight="600" text-anchor="middle">Arena 記憶體</text>
+        <text x="370" y="633" fill="#94a3b8" font-size="8" text-anchor="middle">FrameArena</text>
+
+        <rect x="440" y="605" width="130" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="505" y="620" fill="white" font-size="11" font-weight="600" text-anchor="middle">AssetManager</text>
+        <text x="505" y="633" fill="#94a3b8" font-size="8" text-anchor="middle">內容定址</text>
+
+        <rect x="590" y="605" width="130" height="35" rx="6" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="655" y="620" fill="white" font-size="11" font-weight="600" text-anchor="middle">Job System</text>
+        <text x="655" y="633" fill="#94a3b8" font-size="8" text-anchor="middle">worker pool</text>
+
+        <!-- ============ PLATFORM ============ -->
+        <rect x="40" y="675" width="170" height="35" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="125" y="690" fill="white" font-size="11" font-weight="600" text-anchor="middle">Window</text>
+        <text x="125" y="703" fill="#94a3b8" font-size="8" text-anchor="middle">GLFW / Win32</text>
+
+        <rect x="230" y="675" width="140" height="35" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="300" y="690" fill="white" font-size="11" font-weight="600" text-anchor="middle">Input</text>
+        <text x="300" y="703" fill="#94a3b8" font-size="8" text-anchor="middle">Keyboard·Mouse</text>
+
+        <rect x="390" y="675" width="140" height="35" rx="6" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="460" y="690" fill="white" font-size="11" font-weight="600" text-anchor="middle">執行緒</text>
+        <text x="460" y="703" fill="#94a3b8" font-size="8" text-anchor="middle">std::thread</text>
+
+        <!-- ============ ARROWS ============ -->
+        <!-- App -> View -->
+        <line x1="600" y1="150" x2="600" y2="178" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="612" y="168" fill="#94a3b8" font-size="9">Render(Frame)</text>
+
+        <!-- Sim -> View (Frame flows up) -->
+        <line x1="700" y1="390" x2="700" y2="362" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="712" y="380" fill="#a78bfa" font-size="9">Frame</text>
+
+        <!-- channel: View -> Foundation -->
+        <line x1="755" y1="360" x2="755" y2="588" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="762" y="470" fill="#64748b" font-size="8" transform="rotate(90 762 470)">uses 容器/記憶體</text>
+
+        <!-- channel: Sim -> Foundation -->
+        <line x1="740" y1="560" x2="740" y2="588" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Bands -> Event Bus -->
+        <line x1="120" y1="150" x2="120" y2="743" stroke="#fb923c" stroke-width="1.2" marker-end="url(#arrowhead-orange)"/>
+        <line x1="480" y1="360" x2="480" y2="743" stroke="#fb923c" stroke-width="1.2" marker-end="url(#arrowhead-orange)"/>
+        <line x1="560" y1="560" x2="560" y2="743" stroke="#fb923c" stroke-width="1.2" marker-end="url(#arrowhead-orange)"/>
+        <line x1="300" y1="710" x2="300" y2="743" stroke="#fb923c" stroke-width="1.2" marker-end="url(#arrowhead-orange)"/>
+        <text x="132" y="460" fill="#fb923c" font-size="8">Subscribe / Notify</text>
+
+        <!-- ============ LEGEND ============ -->
+        <text x="800" y="80" fill="white" font-size="11" font-weight="600">Legend</text>
+
+        <rect x="800" y="94" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="822" y="102" fill="#94a3b8" font-size="9">App Layer</text>
+
+        <rect x="800" y="112" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="822" y="120" fill="#94a3b8" font-size="9">View Layer</text>
+
+        <rect x="800" y="130" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="822" y="138" fill="#94a3b8" font-size="9">Sim Layer</text>
+
+        <rect x="800" y="148" width="16" height="10" rx="2" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="822" y="156" fill="#94a3b8" font-size="9">Foundation</text>
+
+        <rect x="800" y="166" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="822" y="174" fill="#94a3b8" font-size="9">Platform</text>
+
+        <rect x="800" y="184" width="16" height="10" rx="2" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="822" y="192" fill="#94a3b8" font-size="9">Event Bus</text>
+
+        <line x1="800" y1="204" x2="816" y2="204" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <text x="822" y="208" fill="#94a3b8" font-size="9">資料流</text>
+
+        <rect x="800" y="216" width="16" height="10" rx="2" fill="transparent" stroke="#34d399" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="822" y="224" fill="#94a3b8" font-size="9">Layer 邊界</text>
+      </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>核心創意</h3>
+        </div>
+        <ul>
+          <li>• Sim/View 徹底分離,確定性可重播</li>
+          <li>• Frame 是兩層之間唯一的貨幣</li>
+          <li>• 一切皆 Module,遊戲也是 module</li>
+          <li>• Replay = 內建除錯 + 網路地基</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot orange"></div>
+          <h3>模組匯流排</h3>
+        </div>
+        <ul>
+          <li>• Event&lt;T(Args...)&gt; 型別安全事件</li>
+          <li>• EngineContext 服務註冊表</li>
+          <li>• 模組零直接耦合,可獨立測試</li>
+          <li>• 熱重載友善</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>Roadmap P1→P6</h3>
+        </div>
+        <ul>
+          <li>• P1 Bus &amp; Context · P2 Frame &amp; Executor</li>
+          <li>• P3 ECS Core(建在你的容器上)</li>
+          <li>• P4 Sim/View 分離 + Replay 測試</li>
+          <li>• P5 Assets &amp; Jobs · P6 ChiaApp 重構</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      ChiaEngine v2 · garychia · C++17 · docs/ARCHITECTURE.md · 設計:2026-08-02
+    </p>
+  </div>
+</body>
+</html>
