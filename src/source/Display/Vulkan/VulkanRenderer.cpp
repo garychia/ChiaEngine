@@ -725,6 +725,9 @@ void VulkanRenderer::Clear()
 
 bool VulkanRenderer::Execute(const Frame &frame)
 {
+    if (!device)
+        return true; // 未初始化(如子視窗從未 Show):跳過本幀,避免空指標崩潰
+
     for (size_t i = 0; i < frame.GetNumCommands(); i++)
     {
         const Frame::CommandData &command = frame.GetCommand(i);

@@ -49,7 +49,10 @@ bool Window::Show()
     info.title.ToUTF8(title, sizeof(title));
     handle = glfwCreateWindow(info.GetWidth(), info.GetHeight(), title,
                               info.fullScreen ? glfwGetPrimaryMonitor() : NULL, pParent ? pParent->GetHandle() : NULL);
-    return !!handle;
+    if (!handle)
+        return false;
+    // renderer 需要 GLFW window handle 才能建立 surface / swapchain
+    return renderer.Initialize(this);
 }
 
 void Window::Update()
