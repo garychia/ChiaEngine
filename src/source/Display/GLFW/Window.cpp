@@ -156,6 +156,10 @@ bool Window::Show()
     glfwSetCursorPosCallback(handle, ChiaCursorPosCallback);
     glfwSetMouseButtonCallback(handle, ChiaMouseButtonCallback);
     glfwSetScrollCallback(handle, ChiaScrollCallback);
+    // 以真實 handle 註冊進 WindowManager:Construct 階段 GetHandle() 還是 NULL,
+    // 缺這行任何輸入 callback 查 windowMap 都會缺 key 插入 null → 解引用崩潰
+    // (鼠標一進視窗就閃退,issue #38)
+    WindowManager::GetSingleton().RegisterWindow(this);
     // renderer 需要 GLFW window handle 才能建立 surface / swapchain
     if (!renderer.Initialize(this))
         return false;

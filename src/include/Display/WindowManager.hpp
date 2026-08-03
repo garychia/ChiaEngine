@@ -31,7 +31,7 @@ class WindowManager
         Window *pWindow = new WindowType(args...);
         if (pWindow->Initialize())
         {
-            windowMap[pWindow->GetHandle()] = pWindow;
+            RegisterWindow(pWindow);
             pWindows.Append(pWindow);
         }
         else
@@ -40,6 +40,14 @@ class WindowManager
             pWindow = nullptr;
         }
         return pWindow;
+    }
+
+    // 以「現行 OS handle」把 window 註冊進查找表(輸入/調整大小 dispatch 用)。
+    // 注意:GLFW 的 handle 在 Show() 才產生 — Construct*Window 階段 GetHandle()
+    // 還是 NULL,因此 GLFW 必須在 Show() 建立 handle 後再呼叫一次(見 Window::Show)。
+    void RegisterWindow(Window *pWindow)
+    {
+        windowMap[pWindow->GetHandle()] = pWindow;
     }
 
     template <class WindowType, class ...Args> Window *ConstructChildWindow(Window *pParent, Args ...args)
@@ -53,7 +61,7 @@ class WindowManager
         }
         if (!pParent->AddChild(pChild))
             return nullptr;
-        windowMap[pChild->GetHandle()] = pChild;
+        RegisterWindow(pChild);
         return pChild;
     }
 

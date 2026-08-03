@@ -50,12 +50,16 @@ void WindowManager::HandleResizing(const WindowHandle &handle, long newWidth, lo
 
 bool WindowManager::HandleKeyInput(const WindowHandle &handle, const KeyCombination &keys)
 {
+    if (!windowMap.Contains(handle))
+        return false;
     Window *pWindow = windowMap[handle];
     return pWindow->OnKeyboardInputReceived(keys);
 }
 
 bool WindowManager::HandleMouseInput(const WindowHandle &handle, const MouseInfo &mouseInfo)
 {
+    if (!windowMap.Contains(handle))
+        return false;
     Window *pWindow = windowMap[handle];
     return pWindow->OnMouseInputReceived(mouseInfo);
 }
