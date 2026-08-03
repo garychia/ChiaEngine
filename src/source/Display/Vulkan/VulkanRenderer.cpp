@@ -452,9 +452,22 @@ bool VulkanRenderer::CreateSyncObjects()
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // first vkWaitForFences won't block
 
-    if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphore) != VK_SUCCESS ||
-        vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphore) != VK_SUCCESS ||
-        vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
+    // 每 swapchain image 一組 semaphore:semaphore 重用若跨越「present 尚未
+    // 重新 acquire」的 image,validation 每幀報警(見 swapchain_semaphore_reuse)
+    imageAvailableSemaphores.RemoveAll();
+    renderFinishedSemaphores.RemoveAll();
+    imageAvailableSemaphores.Resize(swapchainImages.Length());
+    renderFinishedSemaphores.Resize(swapchainImages.Length());
+    for (size_t i = 0; i < swapchainImages.Length(); i++)
+    {
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS)
+        {
+            PRINTLN_ERR(L"VulkanRenderer: failed to create synchronization objects.");
+            return false;
+        }
+    }
+    if (vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
     {
         PRINTLN_ERR(L"VulkanRenderer: failed to create synchronization objects.");
         return false;
@@ -464,16 +477,21 @@ bool VulkanRenderer::CreateSyncObjects()
 
 void VulkanRenderer::CleanupSyncObjects()
 {
-    if (imageAvailableSemaphore)
+    for (size_t i = 0; i < imageAvailableSemaphores.Length(); i++)
     {
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
-        imageAvailableSemaphore = nullptr;
+        if (imageAvailableSemaphores[i])
+        {
+            vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+            imageAvailableSemaphores[i] = VK_NULL_HANDLE;
+        }
+        if (renderFinishedSemaphores[i])
+        {
+            vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
+            renderFinishedSemaphores[i] = VK_NULL_HANDLE;
+        }
     }
-    if (renderFinishedSemaphore)
-    {
-        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-        renderFinishedSemaphore = nullptr;
-    }
+    imageAvailableSemaphores.RemoveAll();
+    renderFinishedSemaphores.RemoveAll();
     if (inFlightFence)
     {
         vkDestroyFence(device, inFlightFence, nullptr);
@@ -740,10 +758,9 @@ VulkanRenderer::VulkanRenderer()
       swapchainImageViews(),
       commandPool(),
       commandBuffers(),
-      imageAvailableSemaphore(),
-      renderFinishedSemaphore(),
       inFlightFence(),
       currentImageIndex(0),
+      frameSemaphoreIndex(0),
       physicalDevice(),
       device(),
       graphicsQueue(),
@@ -767,6 +784,9 @@ VulkanRenderer::VulkanRenderer()
       textureImageView(),
       textureSampler(),
       textureReady(false),
+      depthImage(VK_NULL_HANDLE),
+      depthImageMemory(VK_NULL_HANDLE),
+      depthImageView(VK_NULL_HANDLE),
       renderableGpuMap()
 {
 }
@@ -1053,8 +1073,11 @@ bool VulkanRenderer::BeginFrame()
     vkResetFences(device, 1, &inFlightFence);
 
     uint32_t imageIndex = 0;
+    // 用上一幀 image 的 semaphore 組 acquire:該 image 的 present 已被
+    // vkWaitForFences 保證完成,組可安全重用
+    frameSemaphoreIndex = currentImageIndex;
     const VkResult acquireResult = vkAcquireNextImageKHR(
-        device, swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+        device, swapchain, UINT64_MAX, imageAvailableSemaphores[frameSemaphoreIndex], VK_NULL_HANDLE, &imageIndex);
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
         return false; // TODO: 觸發 swapchain 重建
     if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
@@ -1093,9 +1116,9 @@ bool VulkanRenderer::EndFrame()
     if (vkEndCommandBuffer(cmdBuffer) != VK_SUCCESS)
         return false;
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[frameSemaphoreIndex]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[frameSemaphoreIndex]};
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1285,12 +1308,13 @@ bool VulkanRenderer::CreateDepthResources()
 
 bool VulkanRenderer::CreateDescriptorSetLayout()
 {
-    // binding 0: UBO(vertex)
+    // binding 0: UBO(vertex + fragment — fragment shader 也讀 useTexture,
+    // 只設 VERTEX 會讓 pipeline 違反 spec,useTexture 變成未定義值)
     VkDescriptorSetLayoutBinding uboBinding = {};
     uboBinding.binding = 0;
     uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     uboBinding.descriptorCount = 1;
-    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
     // binding 1: 組合的取樣器(fragment)
     VkDescriptorSetLayoutBinding samplerBinding = {};
@@ -1609,11 +1633,11 @@ bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
     if (renderableGpuMap.Contains(id))
     {
         // 載入這顆 renderable 的貼圖(單一 slot,v1)
+        // Texture::loaded 從不為 true(Texture 只是路徑容器),renderer 自己負責
+        // 載入;LoadTextureImage 內部用 loadedTexturePath 去重
         const RenderInfo info = renderable.GetRenderInfo();
-        if (info.pTexture && !textureReady && info.pTexture->loaded)
-        {
-            // TODO: 多貼圖管理;v1 只有場景第一顆有貼圖才載入
-        }
+        if (info.pTexture && !textureReady)
+            LoadTextureImage(*info.pTexture);
         return true;
     }
 
@@ -1677,7 +1701,7 @@ bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
     renderableGpuMap.Insert(id, data);
 
     // 若這顆有貼圖,載入(場景裡通常只有一顆)
-    if (info.pTexture && info.pTexture->loaded)
+    if (info.pTexture)
         LoadTextureImage(*info.pTexture);
 
     return true;
