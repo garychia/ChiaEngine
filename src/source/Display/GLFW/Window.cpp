@@ -147,16 +147,26 @@ bool Window::Show()
     char title[1024];
     info.title.ToUTF8(title, sizeof(title));
     handle = glfwCreateWindow(info.GetWidth(), info.GetHeight(), title,
-                              info.fullScreen ? glfwGetPrimaryMonitor() : NULL, pParent ? pParent->GetHandle() : NULL);
+                              info.fullScreen ? glfwGetPrimaryMonitor() : NULL, NULL);
     if (!handle)
         return false;
+    glfwSetWindowPos(handle, static_cast<int>(info.border.xPos), static_cast<int>(info.border.yPos));
     // 輸入事件 → 既有輸入管線(GLFW 版原本缺這條,鍵盤/滑鼠都是死的)
     glfwSetKeyCallback(handle, ChiaKeyCallback);
     glfwSetCursorPosCallback(handle, ChiaCursorPosCallback);
     glfwSetMouseButtonCallback(handle, ChiaMouseButtonCallback);
     glfwSetScrollCallback(handle, ChiaScrollCallback);
     // renderer 需要 GLFW window handle 才能建立 surface / swapchain
-    return renderer.Initialize(this);
+    if (!renderer.Initialize(this))
+        return false;
+    // 子視窗(如 SceneWindow)需要自己的 GLFW window + renderer,否則 Execute 會
+    // 因 device 未初始化而跳過(畫面只剩父視窗的清色,場景永遠畫不出來)
+    for (size_t i = 0; i < pChildren.Length(); i++)
+    {
+        if (!pChildren[i]->Show())
+            return false;
+    }
+    return true;
 }
 
 void Window::Update()

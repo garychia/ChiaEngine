@@ -818,7 +818,10 @@ bool VulkanRenderer::Initialize(const Window *pWindow)
 #endif
 
     if (!CheckSupportedExtensions(&pRequiredExtensionNames))
+    {
+        PRINTLN_ERR("VulkanRenderer: required instance extensions not supported.");
         return false;
+    }
 
     // ── 2. Validation layers ───────────────────────────────────────────
     DynamicArray<const char *> validationLayers;
@@ -827,7 +830,12 @@ bool VulkanRenderer::Initialize(const Window *pWindow)
     validationLayers.Append("VK_LAYER_KHRONOS_validation");
     nValidationLayers = validationLayers.Length();
     if (!CheckSupportedValidationLayers(&validationLayers))
-        return false;
+    {
+        // validation layer 是可選的:沒有就警告並繼續(不讓 Debug build 卡死)
+        PRINTLN_ERR("VulkanRenderer: VK_LAYER_KHRONOS_validation not available — continuing without validation.");
+        validationLayers.RemoveAll();
+        nValidationLayers = 0;
+    }
 #endif
 
     // ── 3. Create instance ─────────────────────────────────────────────
@@ -840,14 +848,23 @@ bool VulkanRenderer::Initialize(const Window *pWindow)
                                       nValidationLayers,
                                       nValidationLayers ? &validationLayers[0] : NULL,
                                       NULL, &vulkanInstance))
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create instance.");
         return false;
+    }
 
     if (!SetupDebugMessenger())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to set up debug messenger.");
         return false;
+    }
 
     // ── 4. Create surface ──────────────────────────────────────────────
     if (!CreateSurface(pWindow))
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create window surface.");
         return false;
+    }
 
     // ── 5. Select physical device ──────────────────────────────────────
     if (!SelectPhysicalDevice(surface))
@@ -880,31 +897,40 @@ bool VulkanRenderer::Initialize(const Window *pWindow)
         return false;
     }
 
+    // ── 8b. Depth buffer(需要 swapchain extent)──────────────────────────
+    if (!CreateDepthResources())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create depth resources.");
+        return false;
+    }
+
     // ── 9. Create command pool + buffers ───────────────────────────────
     if (!CreateCommandPool())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create command pool.");
         return false;
+    }
     if (!CreateCommandBuffers())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create command buffers.");
         return false;
+    }
 
     // ── 10. Create sync objects (semaphores + fence) ───────────────────
     if (!CreateSyncObjects())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create synchronization objects.");
         return false;
+    }
 
     // ── 11. Render pass / framebuffers / pipeline ───────────────────────
-    if (!CreateRenderPass())
+    if (!CreateRenderPass() || !CreateFramebuffers() || !CreateDescriptorSetLayout() ||
+        !CreateDescriptorPool() || !CreateGraphicsPipeline() || !CreateUniformBuffer() ||
+        !CreateWhiteTexture())
+    {
+        PRINTLN_ERR("VulkanRenderer: failed to create pipeline resources.");
         return false;
-    if (!CreateFramebuffers())
-        return false;
-    if (!CreateDescriptorSetLayout())
-        return false;
-    if (!CreateDescriptorPool())
-        return false;
-    if (!CreateGraphicsPipeline())
-        return false;
-    if (!CreateUniformBuffer())
-        return false;
-    if (!CreateWhiteTexture()) // 也建立 sampler + descriptor set
-        return false;
+    }
 
     Debug::PrintLine(L"VulkanRenderer: initialized successfully.");
     return true;
@@ -953,12 +979,15 @@ void VulkanRenderer::OnWindowResized(long newWidth, long newHeight)
     (void)newWidth;
     (void)newHeight;
     // swapchain / framebuffer 依賴 surface 尺寸,resize 後重建
-    // framebuffer 參照 swapchain image view,必須先於 swapchain 銷毀
+    // framebuffer 參照 swapchain image view,必須先於 swapchain 銷毀;
+    // depth buffer 依附 extent,一併重建
     vkDeviceWaitIdle(device);
     CleanupFramebuffers();
+    CleanupDepthResources();
     CleanupSwapchain();
     CreateSwapchain();
     CreateSwapchainImageViews();
+    CreateDepthResources();
     CreateFramebuffers();
 }
 
@@ -1048,9 +1077,11 @@ bool VulkanRenderer::BeginFrame()
     renderPassInfo.framebuffer = swapchainFramebuffers[imageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
     renderPassInfo.renderArea.extent = swapchainExtent;
-    VkClearValue clearColor = {{{0.02f, 0.04f, 0.08f, 1.0f}}};
-    renderPassInfo.clearValueCount = 1;
-    renderPassInfo.pClearValues = &clearColor;
+    VkClearValue clearValues[2] = {};
+    clearValues[0].color = {{0.02f, 0.04f, 0.08f, 1.0f}};
+    clearValues[1].depthStencil = {1.0f, 0};
+    renderPassInfo.clearValueCount = 2;
+    renderPassInfo.pClearValues = clearValues;
     vkCmdBeginRenderPass(cmdBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
     return true;
 }
@@ -1112,10 +1143,26 @@ bool VulkanRenderer::CreateRenderPass()
     colorAttachmentRef.attachment = 0;
     colorAttachmentRef.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // depth attachment(深度測試 / 寫入)
+    VkAttachmentDescription depthAttachment = {};
+    depthAttachment.format = VK_FORMAT_D32_SFLOAT;
+    depthAttachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    depthAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    depthAttachment.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+    VkAttachmentReference depthAttachmentRef = {};
+    depthAttachmentRef.attachment = 1;
+    depthAttachmentRef.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass = {};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &colorAttachmentRef;
+    subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
     // extern → 子通道開頭:wait color attachment(等待 clear prepare)
     VkSubpassDependency dependency = {};
@@ -1126,10 +1173,12 @@ bool VulkanRenderer::CreateRenderPass()
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+    VkAttachmentDescription attachments[2] = {colorAttachment, depthAttachment};
+
     VkRenderPassCreateInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    renderPassInfo.attachmentCount = 1;
-    renderPassInfo.pAttachments = &colorAttachment;
+    renderPassInfo.attachmentCount = 2;
+    renderPassInfo.pAttachments = attachments;
     renderPassInfo.subpassCount = 1;
     renderPassInfo.pSubpasses = &subpass;
     renderPassInfo.dependencyCount = 1;
@@ -1149,11 +1198,11 @@ bool VulkanRenderer::CreateFramebuffers()
     VkExtent2D extent = swapchainExtent;
     for (size_t i = 0; i < swapchainImageViews.Length(); i++)
     {
-        VkImageView attachments[] = {swapchainImageViews[i]};
+        VkImageView attachments[] = {swapchainImageViews[i], depthImageView};
         VkFramebufferCreateInfo fbInfo = {};
         fbInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         fbInfo.renderPass = renderPass;
-        fbInfo.attachmentCount = 1;
+        fbInfo.attachmentCount = 2;
         fbInfo.pAttachments = attachments;
         fbInfo.width = extent.width;
         fbInfo.height = extent.height;
@@ -1171,6 +1220,67 @@ void VulkanRenderer::CleanupFramebuffers()
     for (size_t i = 0; i < swapchainFramebuffers.Length(); i++)
         vkDestroyFramebuffer(device, swapchainFramebuffers[i], nullptr);
     swapchainFramebuffers.RemoveAll();
+}
+
+void VulkanRenderer::CleanupDepthResources()
+{
+    if (!device)
+        return;
+    if (depthImageView)
+        vkDestroyImageView(device, depthImageView, nullptr);
+    if (depthImage)
+        vkDestroyImage(device, depthImage, nullptr);
+    if (depthImageMemory)
+        vkFreeMemory(device, depthImageMemory, nullptr);
+    depthImageView = VK_NULL_HANDLE;
+    depthImage = VK_NULL_HANDLE;
+    depthImageMemory = VK_NULL_HANDLE;
+}
+
+bool VulkanRenderer::CreateDepthResources()
+{
+    // D32_SFLOAT:Pascal(GT 1030)必支援;深度不需要 stencil
+    const VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent = {swapchainExtent.width, swapchainExtent.height, 1};
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = depthFormat;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (vkCreateImage(device, &imageInfo, nullptr, &depthImage) != VK_SUCCESS)
+        return false;
+
+    VkMemoryRequirements memReq;
+    vkGetImageMemoryRequirements(device, depthImage, &memReq);
+    const uint32_t memType = FindMemoryType(physicalDevice, memReq.memoryTypeBits,
+                                            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    if (memType == UINT32_MAX)
+        return false;
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReq.size;
+    allocInfo.memoryTypeIndex = memType;
+    if (vkAllocateMemory(device, &allocInfo, nullptr, &depthImageMemory) != VK_SUCCESS)
+        return false;
+    if (vkBindImageMemory(device, depthImage, depthImageMemory, 0) != VK_SUCCESS)
+        return false;
+
+    VkImageViewCreateInfo viewInfo = {};
+    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    viewInfo.image = depthImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = depthFormat;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
+    return vkCreateImageView(device, &viewInfo, nullptr, &depthImageView) == VK_SUCCESS;
 }
 
 bool VulkanRenderer::CreateDescriptorSetLayout()
@@ -1335,8 +1445,17 @@ bool VulkanRenderer::CreateGraphicsPipeline()
     pipelineInfo.pInputAssemblyState = &inputAssembly;
     pipelineInfo.pViewportState = &viewportState;
     pipelineInfo.pRasterizationState = &rasterizer;
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+    depthStencil.depthBoundsTestEnable = VK_FALSE;
+    depthStencil.stencilTestEnable = VK_FALSE;
+
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDepthStencilState = &depthStencil;
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.layout = pipelineLayout;
     pipelineInfo.renderPass = renderPass;
@@ -1449,6 +1568,7 @@ void VulkanRenderer::CleanupPipelineResources()
     if (renderPass)
         vkDestroyRenderPass(device, renderPass, nullptr);
     CleanupFramebuffers();
+    CleanupDepthResources();
     if (descriptorSetLayout)
         vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
     if (descriptorPool)
@@ -1504,11 +1624,14 @@ bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
 
     // 建 interleaved vertex array(與 OpenGL 版 CreateInputBuffer 相同慣例)
     const bool useIndex = info.vertexIndexBuffer && info.numOfVertexIndices > 0;
+    // 有 index buffer 時展開成 numOfVertexIndices 個頂點:vkCmdDraw 是非 indexed,
+    // 展開後才畫得到完整網格(cube 24 頂點 / 36 index → 36 展開頂點 = 12 三角形)。
+    const unsigned int drawCount = useIndex ? info.numOfVertexIndices : nVertices;
     DynamicArray<VulkanVertex> vertices;
-    vertices.Resize(nVertices);
-    for (unsigned int i = 0; i < nVertices; i++)
+    vertices.Resize(drawCount);
+    for (unsigned int i = 0; i < drawCount; i++)
     {
-        size_t srcIdx = useIndex && i < info.numOfVertexIndices ? info.vertexIndexBuffer[i] : i;
+        size_t srcIdx = useIndex ? info.vertexIndexBuffer[i] : i;
         if (srcIdx >= info.numOfVertices)
             srcIdx = i;
 
@@ -1540,15 +1663,15 @@ bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
     }
 
     RenderableGpuData data;
-    data.vertexCount = nVertices;
-    if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(nVertices) * sizeof(VulkanVertex),
+    data.vertexCount = drawCount;
+    if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(drawCount) * sizeof(VulkanVertex),
                       VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                       data.vertexBuffer, data.vertexMemory))
         return false;
     void *pMapped = nullptr;
-    vkMapMemory(device, data.vertexMemory, 0, static_cast<VkDeviceSize>(nVertices) * sizeof(VulkanVertex), 0, &pMapped);
-    memcpy(pMapped, &vertices[0], nVertices * sizeof(VulkanVertex));
+    vkMapMemory(device, data.vertexMemory, 0, static_cast<VkDeviceSize>(drawCount) * sizeof(VulkanVertex), 0, &pMapped);
+    memcpy(pMapped, &vertices[0], drawCount * sizeof(VulkanVertex));
     vkUnmapMemory(device, data.vertexMemory);
 
     renderableGpuMap.Insert(id, data);

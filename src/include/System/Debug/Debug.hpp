@@ -25,7 +25,10 @@ class Debug
 
     template <class T> static void Print(const T &msg)
     {
-        Print(msg);
+        // fallback:轉成 String 走非模板 overload。
+        // 直接 Print(msg) 會讓 T=Str<char16_t> 時無限自遞迴(String 是它的子類,
+        // 非模板 Print(const String&) 接不住 base ref,模板自己勝出)。
+        Print(String(msg));
     }
 
     template <class T, class... Strings> static void Print(const T &msg, const Strings &...args)
@@ -40,7 +43,7 @@ class Debug
 
     template <class T> static void PrintLine(const T &msg)
     {
-        PrintLine(msg);
+        PrintLine(String(msg));
     }
 
     template <class T, class... Strings> static void PrintLine(const T &msg, const Strings &...args)

@@ -72,6 +72,11 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
         bool textureReady;
     std::string loadedTexturePath; // 目前載入的真實貼圖路徑(空 = fallback 白色)
 
+    // ── Depth buffer(依附 swapchain extent,resize 時重建)────────────────────
+    VkImage depthImage;
+    VkDeviceMemory depthImageMemory;
+    VkImageView depthImageView;
+
         // ── Renderable GPU 資料快取(以 identifier 為 key)─────────────────────────
         struct RenderableGpuData
         {
@@ -117,6 +122,8 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool CreateRenderPass();
     bool CreateFramebuffers();
     void CleanupFramebuffers();
+    bool CreateDepthResources();
+    void CleanupDepthResources();
     bool CreateDescriptorSetLayout();
     bool CreateDescriptorPool();
     bool CreateGraphicsPipeline();
