@@ -5,6 +5,8 @@
 #include "Data/Pointers.hpp"
 #include "SceneWindow.hpp"
 #include "Components/PanelLayout.hpp"
+#include "System/Module/CameraController.hpp"
+#include "System/Module/SimRecorder.hpp"
 
 class Panel : public Window
 {
@@ -15,7 +17,11 @@ class Panel : public Window
 
     PanelLayout layout;
 
-    Panel(const WindowInfo &info);
+    SimRecorder *pSimRecorder;
+
+    CameraController *pCameraController;
+
+    Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController);
 
   public:
     virtual bool Initialize(Window *pParent = nullptr) override;

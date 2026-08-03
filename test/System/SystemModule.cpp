@@ -1,4 +1,5 @@
 #include "SystemModule.hpp"
+#include "CameraControllerTest.hpp"
 #include "IO/IOTest.hpp"
 #include "ModuleTest.hpp"
 #include "ReplayTest.hpp"
@@ -11,4 +12,5 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
     AddTest<replaytest::ReplayTest>();
+    AddTest<CameraControllerTest>();
 }

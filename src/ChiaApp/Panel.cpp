@@ -3,9 +3,10 @@
 #include "Display/WindowManager.hpp"
 #include "System/Input/InputHandler.hpp"
 
-Panel::Panel(const WindowInfo &info)
+Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController)
     : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
-      layout(Point2D(info.GetWidth(), info.GetHeight()))
+      layout(Point2D(info.GetWidth(), info.GetHeight())), pSimRecorder(pSimRecorder),
+      pCameraController(pCameraController)
 {
 }
 
@@ -18,7 +19,8 @@ bool Panel::Initialize(Window *pParent)
     WindowInfo childWndInfo(info.pAppInfo, String(), false, sceneWindowWidth, sceneAreaHeight,
                             GetWindowInfo().GetHeight() - sceneAreaHeight, sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
-        WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo));
+        WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
+                                                                        pSimRecorder, pCameraController));
     return pSceneWindow && this->renderer.LoadGUILayout(layout);
 }
 

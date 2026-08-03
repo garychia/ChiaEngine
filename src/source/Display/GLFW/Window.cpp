@@ -1,7 +1,106 @@
 #include "Display/Window.hpp"
+#include "Display/WindowManager.hpp"
 
 #include "System/Debug/Debug.hpp"
+#include "System/Input/KeyCodes.hpp"
+#include "System/Input/KeyboardHandler.hpp"
+#include "System/Input/MouseInput.hpp"
 #include "pch.hpp"
+
+namespace
+{
+// GLFW key → 引擎 KeyCode(對應 Windows 版 WinKeyCode.hpp 的 ConvertToKeyCode)
+KeyCode ConvertGlfwKeyToKeyCode(int key)
+{
+    if (key >= GLFW_KEY_A && key <= GLFW_KEY_Z)
+        return static_cast<KeyCode>(KeyCodeA + (key - GLFW_KEY_A));
+    if (key >= GLFW_KEY_0 && key <= GLFW_KEY_9)
+        return static_cast<KeyCode>(KeyCodeZero + (key - GLFW_KEY_0));
+    if (key >= GLFW_KEY_F1 && key <= GLFW_KEY_F12)
+        return static_cast<KeyCode>(KeyCodeF1 + (key - GLFW_KEY_F1));
+    switch (key)
+    {
+    case GLFW_KEY_ESCAPE:
+        return KeyCodeEscape;
+    case GLFW_KEY_SPACE:
+        return KeyCodeSpace;
+    case GLFW_KEY_ENTER:
+        return KeyCodeReturn;
+    case GLFW_KEY_TAB:
+        return KeyCodeTab;
+    case GLFW_KEY_BACKSPACE:
+        return KeyCodeBackspace;
+    case GLFW_KEY_LEFT:
+        return KeyCodeLeftArrow;
+    case GLFW_KEY_RIGHT:
+        return KeyCodeRightArrow;
+    case GLFW_KEY_UP:
+        return KeyCodeUpArrow;
+    case GLFW_KEY_DOWN:
+        return KeyCodeDownArrow;
+    case GLFW_KEY_LEFT_SHIFT:
+    case GLFW_KEY_RIGHT_SHIFT:
+        return KeyCodeShift;
+    case GLFW_KEY_LEFT_CONTROL:
+    case GLFW_KEY_RIGHT_CONTROL:
+        return KeyCodeControl;
+    case GLFW_KEY_LEFT_ALT:
+    case GLFW_KEY_RIGHT_ALT:
+        return KeyCodeALT;
+    default:
+        return KeyCodeUndefined;
+    }
+}
+
+// GLFW 輸入事件 → 既有輸入管線(KeyboardHandler / MouseInput → WindowManager::Handle*Input)
+void ChiaKeyCallback(GLFWwindow *pWindow, int key, int /*scancode*/, int action, int /*mods*/)
+{
+    const KeyCode code = ConvertGlfwKeyToKeyCode(key);
+    KeyboardHandler &handler = KeyboardHandler::GetSingleton();
+    if (action == GLFW_PRESS || action == GLFW_REPEAT)
+        handler.ProcessKeyDown(code);
+    else if (action == GLFW_RELEASE)
+        handler.ProcessKeyUp(code);
+    if (code != KeyCodeUndefined)
+        WindowManager::GetSingleton().HandleKeyInput(pWindow, handler.GetKeyCombination());
+}
+
+void ChiaCursorPosCallback(GLFWwindow *pWindow, double x, double y)
+{
+    MouseInput &mouse = MouseInput::GetSingleton();
+    mouse.OnMouseMove(static_cast<float>(x), static_cast<float>(y));
+    WindowManager::GetSingleton().HandleMouseInput(pWindow, mouse.GetMouseInfo());
+}
+
+void ChiaMouseButtonCallback(GLFWwindow *pWindow, int button, int action, int /*mods*/)
+{
+    double x = 0.0, y = 0.0;
+    glfwGetCursorPos(pWindow, &x, &y);
+    MouseInput &mouse = MouseInput::GetSingleton();
+    if (button == GLFW_MOUSE_BUTTON_LEFT)
+    {
+        if (action == GLFW_PRESS)
+            mouse.OnMouseLeftButtonDown(static_cast<float>(x), static_cast<float>(y));
+        else if (action == GLFW_RELEASE)
+            mouse.OnMouseLeftButtonUp(static_cast<float>(x), static_cast<float>(y));
+    }
+    else if (button == GLFW_MOUSE_BUTTON_RIGHT)
+    {
+        if (action == GLFW_PRESS)
+            mouse.OnMouseRightButtonDown(static_cast<float>(x), static_cast<float>(y));
+        else if (action == GLFW_RELEASE)
+            mouse.OnMouseRightButtonUp(static_cast<float>(x), static_cast<float>(y));
+    }
+    WindowManager::GetSingleton().HandleMouseInput(pWindow, mouse.GetMouseInfo());
+}
+
+void ChiaScrollCallback(GLFWwindow *pWindow, double /*xOffset*/, double yOffset)
+{
+    MouseInput &mouse = MouseInput::GetSingleton();
+    mouse.OnWheelRotated(static_cast<int>(yOffset * 120)); // 對齊 Windows WHEEL_DELTA
+    WindowManager::GetSingleton().HandleMouseInput(pWindow, mouse.GetMouseInfo());
+}
+} // namespace
 
 Window::Window(const WindowInfo &info)
     : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren()
@@ -51,6 +150,11 @@ bool Window::Show()
                               info.fullScreen ? glfwGetPrimaryMonitor() : NULL, pParent ? pParent->GetHandle() : NULL);
     if (!handle)
         return false;
+    // 輸入事件 → 既有輸入管線(GLFW 版原本缺這條,鍵盤/滑鼠都是死的)
+    glfwSetKeyCallback(handle, ChiaKeyCallback);
+    glfwSetCursorPosCallback(handle, ChiaCursorPosCallback);
+    glfwSetMouseButtonCallback(handle, ChiaMouseButtonCallback);
+    glfwSetScrollCallback(handle, ChiaScrollCallback);
     // renderer 需要 GLFW window handle 才能建立 surface / swapchain
     return renderer.Initialize(this);
 }

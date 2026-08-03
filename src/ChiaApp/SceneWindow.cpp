@@ -2,9 +2,10 @@
 #include "Paths.hpp"
 #include "Geometry/Primitives.hpp"
 
-SceneWindow::SceneWindow(const WindowInfo &info) : Window(info), pTextures()
+SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController)
+    : Window(info), pTextures(), pMainScene(), pRecorder(pRecorder), pController(pController),
+      replayKeyDown(false)
 {
-    pMainCamera = SharedPtr<Camera>::Construct(Point3D(1.5f, 1.5f, 1.5f), Point3D(-45.f, -135.f));
     pMainScene = SharedPtr<Scene>::Construct();
 }
 
@@ -21,74 +22,77 @@ bool SceneWindow::Initialize(Window *pParent)
     pTextures.Append(pTexture);
     cube->SetTexture(pTexture.GetRaw());
     pMainScene->AddRenderable(cube);
-    pMainScene->ApplyCamera(pMainCamera);
+    // 相機是 Sim 擁有的狀態(CameraController),View 只拿 WeakPtr 來渲染
+    if (pController)
+        pMainScene->ApplyCamera(pController->GetCamera());
     return LoadScene(*pMainScene);
 }
 
 bool SceneWindow::OnKeyboardInputReceived(const KeyCombination &combination)
 {
-    if (combination.keys.Length() == 1)
+    if (!pRecorder)
+        return false;
+    SimInput &input = pRecorder->GetLiveInput();
+
+    // 從「目前按住的按鍵集合」直接推導 actionBits(stateless — 不需追蹤 press/release)
+    input.actionBits = 0;
+    bool hasF5 = false, hasF6 = false;
+    for (size_t i = 0; i < combination.keys.Length(); i++)
     {
-        auto keyPressed = combination.keys[0];
-        switch (keyPressed)
+        switch (combination.keys[i])
         {
-        case KeyCode::KeyCodeA: {
-            const auto up = pMainCamera->GetUpVector();
-            const auto front = pMainCamera->GetFrontVector();
-            const auto left = up.Cross(front);
-            pMainCamera->Translate(left * 0.5f);
-            return true;
-        }
-        case KeyCode::KeyCodeD: {
-            const auto up = pMainCamera->GetUpVector();
-            const auto front = pMainCamera->GetFrontVector();
-            const auto left = up.Cross(front);
-            pMainCamera->Translate(-left * 0.5f);
-            return true;
-        }
-        case KeyCode::KeyCodeW: {
-            const auto front = pMainCamera->GetFrontVector();
-            pMainCamera->Translate(front * 0.5f);
-            return true;
-        }
-        case KeyCode::KeyCodeS: {
-            const auto front = pMainCamera->GetFrontVector();
-            pMainCamera->Translate(-front * 0.5f);
-            return true;
-        }
+        case KeyCode::KeyCodeW:
+            input.actionBits |= CameraController::BitMoveForward;
+            break;
+        case KeyCode::KeyCodeS:
+            input.actionBits |= CameraController::BitMoveBack;
+            break;
+        case KeyCode::KeyCodeA:
+            input.actionBits |= CameraController::BitMoveLeft;
+            break;
+        case KeyCode::KeyCodeD:
+            input.actionBits |= CameraController::BitMoveRight;
+            break;
+        case KeyCode::KeyCodeF5:
+            hasF5 = true;
+            break;
+        case KeyCode::KeyCodeF6:
+            hasF6 = true;
+            break;
         default:
             break;
         }
     }
-    return false;
+
+    // F5 邊緣:combination 含 F5 = 按下(ProcessKeyUp 已先移除 → 放開時不含)
+    if (hasF5 && !replayKeyDown)
+    {
+        replayKeyDown = true;
+        if (pController)
+            pController->Reset();
+        pRecorder->BeginReplay();
+    }
+    else if (!hasF5 && replayKeyDown)
+    {
+        replayKeyDown = false;
+    }
+    if (hasF6)
+        pRecorder->SetReplaying(false);
+
+    return input.actionBits != 0 || hasF5 || hasF6;
 }
 
 bool SceneWindow::OnMouseInputReceived(const MouseInfo &mouseInfo)
 {
+    if (!pRecorder)
+        return false;
     if (mouseInfo.leftButtonDown)
     {
-        const auto &lastMousePos = mouseInfo.lastMousePosition;
-        const auto &currentMousePos = mouseInfo.currentPosition;
-        float xOffset = currentMousePos.x - lastMousePos.x;
-        float yOffset = currentMousePos.y - lastMousePos.y;
-        const float rotateAmount = 0.1f;
-        xOffset *= rotateAmount;
-        yOffset *= rotateAmount;
-        pMainCamera->Rotate(-yOffset, -xOffset);
+        // look delta 累進 SimInput;CameraController 每 tick 讀完即消耗歸零
+        SimInput &input = pRecorder->GetLiveInput();
+        input.axisX += mouseInfo.currentPosition.x - mouseInfo.lastMousePosition.x;
+        input.axisY += mouseInfo.currentPosition.y - mouseInfo.lastMousePosition.y;
         return true;
-    }
-    switch (mouseInfo.status)
-    {
-    case MouseStatus::LeftButtonDown: {
-        break;
-    }
-    case MouseStatus::WheelRotated: {
-        const auto frontVector = pMainCamera->GetFrontVector();
-        pMainCamera->Translate(frontVector * mouseInfo.wheelDistance * 0.005f);
-        return true;
-    }
-    default:
-        break;
     }
     return false;
 }

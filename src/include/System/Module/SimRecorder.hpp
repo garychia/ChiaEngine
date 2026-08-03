@@ -10,9 +10,10 @@
 //
 // - 擁有 SimInput 並註冊為 EngineContext 服務:Sim 系統在 FixedUpdate 裡
 //   ResolveService<SimInput>() 讀輸入,不直接耦合輸入來源。
-// - Live 模式:每 tick 把目前輸入複製進 log[tickIndex]。
-// - Replay 模式:每 tick 用 log[tickIndex] 覆寫服務 — 系統讀到與 live 完全
+// - Live 模式:每 tick 把目前輸入複製進 log。
+// - Replay 模式:用 log[replayCursor] 覆寫服務 — 系統讀到與 live 完全
 //   相同的輸入序列,配合 World::Hash() 即可驗證確定性重播。
+//   BeginReplay() 把游標歸零,可從頭重播(錄音比執行短 → 之後空白輸入)。
 //
 // 執行順序 = 附著順序:SimRecorder 必須在所有讀輸入的模組之前 Attach,
 // 這樣它先寫/還原輸入,系統後讀。這個順序本身是確定性契約的一部分。
@@ -22,9 +23,10 @@ class SimRecorder : public IModule
     SimInput input;             // 註冊為 context service(live 的寫入點)
     DynamicArray<SimInput> log; // 每 tick 一筆
     bool replaying;
+    size_t replayCursor;        // replay 模式的 log 游標
 
   public:
-    SimRecorder() : input(), log(), replaying(false)
+    SimRecorder() : input(), log(), replaying(false), replayCursor(0)
     {
     }
 
@@ -42,6 +44,13 @@ class SimRecorder : public IModule
     bool IsReplaying() const
     {
         return replaying;
+    }
+
+    // 從頭開始重播(游標歸零)
+    void BeginReplay()
+    {
+        replaying = true;
+        replayCursor = 0;
     }
 
     // 錄製結果存取(序列化 / 餵給另一個 recorder)
@@ -83,11 +92,12 @@ class SimRecorder : public IModule
 
     void FixedUpdate(const FrameClock &clock) override
     {
+        (void)clock;
         if (replaying)
         {
             // 重播:還原該 tick 的輸入。錄音比執行短 → 用空白輸入(保持確定性)。
-            const size_t tick = static_cast<size_t>(clock.tickIndex);
-            input = (tick < log.GetNElements()) ? log[tick] : SimInput();
+            const size_t idx = replayCursor++;
+            input = (idx < log.GetNElements()) ? log[idx] : SimInput();
         }
         else
         {

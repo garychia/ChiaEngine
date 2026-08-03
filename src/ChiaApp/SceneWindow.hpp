@@ -2,17 +2,26 @@
 #define SCENE_WINDOW_HPP
 
 #include "Display/Window.hpp"
+#include "System/Module/CameraController.hpp"
+#include "System/Module/SimRecorder.hpp"
 
+// 3D viewport 視窗 — View 層:
+// 真實鍵盤/滑鼠事件 → SimInput(錄進 SimRecorder),相機是 Sim 擁有的狀態
+// (CameraController),這裡不再直接改相機。F5 = 從頭重播錄音,F6 = 回到 live。
 class SceneWindow : public Window
 {
   private:
     DynamicArray<SharedPtr<Texture>> pTextures;
 
-    SharedPtr<Camera> pMainCamera;
-
     SharedPtr<Scene> pMainScene;
 
-    SceneWindow(const WindowInfo &info);
+    SimRecorder *pRecorder;
+
+    CameraController *pController;
+
+    bool replayKeyDown; // F5 邊緣偵測(按下觸發一次)
+
+    SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController);
 
   public:
     ~SceneWindow();
