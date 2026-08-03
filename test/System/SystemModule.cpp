@@ -1,4 +1,5 @@
 #include "SystemModule.hpp"
+#include "AssetTest.hpp"
 #include "CameraControllerTest.hpp"
 #include "IO/IOTest.hpp"
 #include "ModuleTest.hpp"
@@ -7,6 +8,7 @@
 
 SystemModule::SystemModule(const String &ioTestPath)
 {
+    AddTest<assettest::AssetTest>();
     AddTest<IOTest>(ioTestPath);
     AddTest<SystemOperationTest>();
     AddTest<ModuleTest>();

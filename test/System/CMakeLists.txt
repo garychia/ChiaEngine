@@ -9,4 +9,6 @@ target_include_directories(SystemTest PUBLIC
     ${CMAKE_SOURCE_DIR}/src/include
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/src/include>
 )
-target_link_libraries(SystemTest PUBLIC IOTest)
+# JobSystem/AssetManager 用 std::thread (SystemModule → AssetTest)
+find_package(Threads REQUIRED)
+target_link_libraries(SystemTest PUBLIC IOTest Threads::Threads)
