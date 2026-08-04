@@ -453,25 +453,39 @@ bool VulkanRenderer::CreateSyncObjects()
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;  // first vkWaitForFences won't block
 
-    // 每 swapchain image 一組 semaphore:semaphore 重用若跨越「present 尚未
-    // 重新 acquire」的 image,validation 每幀報警(見 swapchain_semaphore_reuse)
+    // 同步策略(滿足 swapchain_semaphore_reuse validation):
+    //  - imageAvailableSemaphores / inFlightFences:每 frame-in-flight slot 一組。
+    //    acquire 用 slot 的 semaphore,submit wait 它;fence 保證該 slot 上次
+    //    submit(含 wait)已完成,slot 資源可重用。
+    //  - renderFinishedSemaphores:每 swapchain IMAGE 一組,索引 = 本幀 acquire
+    //    到的 image index。present 只能等 submit signal 的 renderFinished;
+    //    而 image 在被重新 acquire 之前不會再被 present — image 自身的週期
+    //    保證該 semaphore 不會在仍被 presentation engine 使用時被重用。
+    //    (不能用 frame-slot 索引:present 完成不被 fence 保證,2 幀後重用
+    //     可能撞上還在排隊的 present → VUID-vkQueueSubmit-pSignalSemaphores-00067)
+    const uint32_t maxFramesInFlight = 2;
     imageAvailableSemaphores.RemoveAll();
     renderFinishedSemaphores.RemoveAll();
-    imageAvailableSemaphores.Resize(swapchainImages.Length());
+    inFlightFences.RemoveAll();
+    imageAvailableSemaphores.Resize(maxFramesInFlight);
+    inFlightFences.Resize(maxFramesInFlight);
     renderFinishedSemaphores.Resize(swapchainImages.Length());
-    for (size_t i = 0; i < swapchainImages.Length(); i++)
+    for (size_t i = 0; i < imageAvailableSemaphores.Length(); i++)
     {
         if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS)
+            vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS)
         {
             PRINTLN_ERR(L"VulkanRenderer: failed to create synchronization objects.");
             return false;
         }
     }
-    if (vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence) != VK_SUCCESS)
+    for (size_t i = 0; i < renderFinishedSemaphores.Length(); i++)
     {
-        PRINTLN_ERR(L"VulkanRenderer: failed to create synchronization objects.");
-        return false;
+        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS)
+        {
+            PRINTLN_ERR(L"VulkanRenderer: failed to create synchronization objects.");
+            return false;
+        }
     }
     return true;
 }
@@ -485,6 +499,14 @@ void VulkanRenderer::CleanupSyncObjects()
             vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
             imageAvailableSemaphores[i] = VK_NULL_HANDLE;
         }
+        if (inFlightFences[i])
+        {
+            vkDestroyFence(device, inFlightFences[i], nullptr);
+            inFlightFences[i] = VK_NULL_HANDLE;
+        }
+    }
+    for (size_t i = 0; i < renderFinishedSemaphores.Length(); i++)
+    {
         if (renderFinishedSemaphores[i])
         {
             vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
@@ -493,11 +515,7 @@ void VulkanRenderer::CleanupSyncObjects()
     }
     imageAvailableSemaphores.RemoveAll();
     renderFinishedSemaphores.RemoveAll();
-    if (inFlightFence)
-    {
-        vkDestroyFence(device, inFlightFence, nullptr);
-        inFlightFence = nullptr;
-    }
+    inFlightFences.RemoveAll();
 
     if (commandPool)
     {
@@ -759,9 +777,9 @@ VulkanRenderer::VulkanRenderer()
       swapchainImageViews(),
       commandPool(),
       commandBuffers(),
-      inFlightFence(),
+      inFlightFences(),
       currentImageIndex(0),
-      frameSemaphoreIndex(0),
+      currentFrameIndex(0),
       physicalDevice(),
       device(),
       graphicsQueue(),
@@ -1010,6 +1028,16 @@ void VulkanRenderer::OnWindowResized(long newWidth, long newHeight)
     CreateSwapchainImageViews();
     CreateDepthResources();
     CreateFramebuffers();
+    // ── resize 後徹底重排 GPU 佇列狀態 ──────────────────────────────
+    // swapchain image 數量改變 → command buffers(依 image 數)要重建;
+    // sync objects(frame-in-flight slot)一併重建並重設 frame counter,免得
+    // 舊 slot 的 fence/semaphore 與新 swapchain 錯位(#41)。
+    CleanupSyncObjects();
+    CreateCommandPool();
+    CreateCommandBuffers();
+    CreateSyncObjects();
+    currentFrameIndex = 0;
+    currentImageIndex = 0;
 }
 
 void VulkanRenderer::Update()
@@ -1087,15 +1115,16 @@ bool VulkanRenderer::Execute(const Frame &frame)
 
 bool VulkanRenderer::BeginFrame()
 {
-    vkWaitForFences(device, 1, &inFlightFence, VK_TRUE, UINT64_MAX);
-    vkResetFences(device, 1, &inFlightFence);
+    // 等本 frame-in-flight slot 的 fence:保證該 slot 上一輪的 submit 完成、
+    // present 已消費 renderFinished semaphore,此 slot 的資源可安全重用。
+    // (MaxFramesInFlight 輪轉,而非「上一幀 image index」— 見 CreateSyncObjects)
+    const VkFence &frameFence = inFlightFences[currentFrameIndex];
+    vkWaitForFences(device, 1, &frameFence, VK_TRUE, UINT64_MAX);
+    vkResetFences(device, 1, &frameFence);
 
     uint32_t imageIndex = 0;
-    // 用上一幀 image 的 semaphore 組 acquire:該 image 的 present 已被
-    // vkWaitForFences 保證完成,組可安全重用
-    frameSemaphoreIndex = currentImageIndex;
     const VkResult acquireResult = vkAcquireNextImageKHR(
-        device, swapchain, UINT64_MAX, imageAvailableSemaphores[frameSemaphoreIndex], VK_NULL_HANDLE, &imageIndex);
+        device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
     if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
         return false; // TODO: 觸發 swapchain 重建
     if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
@@ -1134,9 +1163,12 @@ bool VulkanRenderer::EndFrame()
     if (vkEndCommandBuffer(cmdBuffer) != VK_SUCCESS)
         return false;
 
-    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[frameSemaphoreIndex]};
+    const uint32_t slot = currentFrameIndex;
+    VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[slot]};
     VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[frameSemaphoreIndex]};
+    // renderFinished 以「本幀 image index」索引(per-image,非 per-slot):
+    // image 在被重新 acquire 前不會再被 present,該 semaphore 必已可重用。
+    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentImageIndex]};
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1148,7 +1180,7 @@ bool VulkanRenderer::EndFrame()
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS)
+    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[slot]) != VK_SUCCESS)
         return false;
 
     VkSwapchainKHR swapchains[] = {swapchain};
@@ -1161,6 +1193,9 @@ bool VulkanRenderer::EndFrame()
     presentInfo.pImageIndices = &currentImageIndex;
 
     const VkResult presentResult = vkQueuePresentKHR(presentQueue, &presentInfo);
+
+    // 輪轉到下一 frame-in-flight slot(下幀 BeginFrame 會等它的 fence)
+    currentFrameIndex = (currentFrameIndex + 1) % inFlightFences.Length();
     return presentResult == VK_SUCCESS || presentResult == VK_SUBOPTIMAL_KHR;
 }
 

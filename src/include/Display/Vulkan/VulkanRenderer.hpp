@@ -33,11 +33,11 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     // Command pool / buffers / sync
     VkCommandPool commandPool;
     DynamicArray<VkCommandBuffer> commandBuffers;
-    DynamicArray<VkSemaphore> imageAvailableSemaphores;  // 每 swapchain image 一組
-    DynamicArray<VkSemaphore> renderFinishedSemaphores;
-    VkFence inFlightFence;
-    uint32_t currentImageIndex; // 本幀正在使用的 swapchain image
-    uint32_t frameSemaphoreIndex; // 本幀 acquire 用的 semaphore 組(= 上一幀的 image index)
+    DynamicArray<VkSemaphore> imageAvailableSemaphores;  // 每 frame-in-flight 一組
+    DynamicArray<VkSemaphore> renderFinishedSemaphores; // 每 swapchain image 一組
+    DynamicArray<VkFence> inFlightFences;                // 每 frame-in-flight 一 fence
+    uint32_t currentImageIndex;    // 本幀正在使用的 swapchain image
+    uint32_t currentFrameIndex;    // 本幀使用的 frame-in-flight slot(MaxFramesInFlight 輪轉)
 
     // Device
     VkPhysicalDevice physicalDevice;

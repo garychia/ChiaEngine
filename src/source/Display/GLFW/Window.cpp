@@ -101,6 +101,13 @@ void ChiaScrollCallback(GLFWwindow *pWindow, double /*xOffset*/, double yOffset)
     mouse.OnWheelRotated(static_cast<int>(yOffset * 120)); // 對齊 Windows WHEEL_DELTA
     WindowManager::GetSingleton().HandleMouseInput(pWindow, mouse.GetMouseInfo());
 }
+
+// 視窗 resize(最大化 / 拖邊框 / 改尺寸):把新尺寸路由進既有 resize 管線,
+// 觸發 swapchain 重建 + GUI 重排。此前 GLFW 從未註冊這個 callback — 全熒幕永遠不更新。
+void ChiaWindowSizeCallback(GLFWwindow *pWindow, int width, int height)
+{
+    WindowManager::GetSingleton().HandleResizing(pWindow, width, height);
+}
 } // namespace
 
 Window::Window(const WindowInfo &info)
@@ -158,6 +165,9 @@ bool Window::Show()
     glfwSetCursorPosCallback(handle, ChiaCursorPosCallback);
     glfwSetMouseButtonCallback(handle, ChiaMouseButtonCallback);
     glfwSetScrollCallback(handle, ChiaScrollCallback);
+    // resize(最大化/拖邊框)→ 既有 HandleResizing 管線(swapchain 重建 + GUI 重排)。
+    // 之前漏註冊 → 最大化後內容不更新(#41)。
+    glfwSetWindowSizeCallback(handle, ChiaWindowSizeCallback);
     // 以真實 handle 註冊進 WindowManager:Construct 階段 GetHandle() 還是 NULL,
     // 缺這行任何輸入 callback 查 windowMap 都會缺 key 插入 null → 解引用崩潰
     // (鼠標一進視窗就閃退,issue #38)
