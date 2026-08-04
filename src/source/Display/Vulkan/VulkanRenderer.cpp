@@ -1729,8 +1729,11 @@ bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
             vert.color = glm::vec4(1.0f);
         }
 
-        if (info.textureCoordinates && i < info.numOfTextureCoordinates)
-            vert.texCoord = glm::vec2(info.textureCoordinates[i].x, info.textureCoordinates[i].y);
+        // UV 也必須用 srcIdx(展開後的 i 不等於原始 vertex 序號):
+        // cube 24 UV / 36 展開頂點,若用 i,第二個三角形的 UV 全錯位,
+        // 貼圖被切成兩半且其中一半顛倒(#42)。
+        if (info.textureCoordinates && srcIdx < info.numOfTextureCoordinates)
+            vert.texCoord = glm::vec2(info.textureCoordinates[srcIdx].x, info.textureCoordinates[srcIdx].y);
         else
             vert.texCoord = glm::vec2(0.0f);
 
