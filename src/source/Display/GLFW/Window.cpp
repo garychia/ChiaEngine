@@ -1,5 +1,6 @@
 #include "Display/Window.hpp"
 #include "Display/WindowManager.hpp"
+#include "Display/GUI/GUILayout.hpp"
 
 #include "System/Debug/Debug.hpp"
 #include "System/Input/KeyCodes.hpp"
@@ -103,7 +104,8 @@ void ChiaScrollCallback(GLFWwindow *pWindow, double /*xOffset*/, double yOffset)
 } // namespace
 
 Window::Window(const WindowInfo &info)
-    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren()
+    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), pGUILayout(nullptr),
+      renderer(), pChildren()
 {
 }
 
@@ -186,6 +188,7 @@ void Window::Render()
         pChildren[i]->Render();
 
     // Frame 驅動的渲染:錄製命令 → executor 執行
+    // P6:場景與 GUI 都走 Frame(唯一貨幣)— GUI 由 SetGUILayout 掛上的佈局錄進命令流。
     Frame frame;
     frame.BeginFrame();
     if (pScene)
@@ -195,8 +198,15 @@ void Window::Render()
         for (size_t i = 0; i < renderables.GetNElements(); i++)
             frame.DrawRenderable(*renderables[i]);
     }
+    if (pGUILayout)
+        frame.DrawGUILayout(*pGUILayout);
     frame.EndFrame();
     renderer.Execute(frame);
+}
+
+void Window::SetGUILayout(GUILayout *pLayout)
+{
+    this->pGUILayout = pLayout;
 }
 
 WindowHandle Window::GetHandle() const

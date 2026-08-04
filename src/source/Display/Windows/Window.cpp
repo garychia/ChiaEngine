@@ -4,7 +4,8 @@
 #include "pch.hpp"
 
 Window::Window(const WindowInfo &info)
-    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), renderer(), pChildren()
+    : handle(NULL), pParent(nullptr), info(info), pScene(nullptr), pGUILayout(nullptr),
+      renderer(), pChildren()
 {
 }
 
@@ -103,6 +104,8 @@ void Window::Render()
         pChildren[i]->Render();
     if (pScene)
         renderer.Render(*pScene);
+    if (pGUILayout)
+        renderer.Render(*pGUILayout); // DX legacy 直繪;Vulkan 走 Frame(pGUILayout 僅在此後端接地)
 }
 
 WindowHandle Window::GetHandle() const

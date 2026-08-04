@@ -9,6 +9,8 @@
 #include "WindowInfo.hpp"
 #include "pch.hpp"
 
+class GUILayout;
+
 class Window
 {
   protected:
@@ -19,6 +21,8 @@ class Window
     WindowInfo info;
 
     Scene *pScene;
+
+    GUILayout *pGUILayout; // 走 Frame 的 GUI 佈局(P6:Frame 是唯一渲染貨幣)
 
     Renderer renderer;
 
@@ -44,6 +48,9 @@ class Window
     virtual void Update();
 
     virtual void Render();
+
+    // 設定本視窗要經由 Frame 命令流繪製的 GUI 佈局(取代 legacy renderer.Render(layout))。
+    void SetGUILayout(GUILayout *pLayout);
 
     WindowHandle GetHandle() const;
 

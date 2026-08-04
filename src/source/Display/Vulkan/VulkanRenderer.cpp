@@ -8,6 +8,7 @@
 #include "Display/Window.hpp"
 #include "Display/Texture.hpp"
 #include "Display/IRenderable.hpp"
+#include "Display/GUI/GUILayer.hpp"
 #include "System/Debug/Debug.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -1056,7 +1057,24 @@ bool VulkanRenderer::Execute(const Frame &frame)
                 }
                 break;
             case Frame::Command::DrawGUILayout:
-                // TODO(P2.5): GUI 走 Frame 命令
+                if (command.pLayout)
+                {
+                    // P6(a):GUI 走 Frame — 佈局 = layers + 各自 components,全都是
+                    // Rectangle(IRenderable),走與 DrawRenderable 相同的 renderable 管線。
+                    // 正交投影的實際像素填充留待 P6(b)(需桌面人工驗收)。
+                    const DynamicArray<SharedPtr<GUILayer>> &layers = command.pLayout->GetLayers();
+                    for (size_t li = 0; li < layers.GetNElements(); li++)
+                    {
+                        LoadRenderable(*layers[li]);
+                        RecordDrawCommands(commandBuffers[currentImageIndex], *layers[li]);
+                        const DynamicArray<SharedPtr<IGUI>> &components = layers[li]->GetComponents();
+                        for (size_t ci = 0; ci < components.GetNElements(); ci++)
+                        {
+                            LoadRenderable(*components[ci]);
+                            RecordDrawCommands(commandBuffers[currentImageIndex], *components[ci]);
+                        }
+                    }
+                }
                 break;
             case Frame::Command::EndFrame:
                 if (!EndFrame())

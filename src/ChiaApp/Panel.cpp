@@ -21,13 +21,19 @@ bool Panel::Initialize(Window *pParent)
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
                                                                         pSimRecorder, pCameraController));
-    return pSceneWindow && this->renderer.LoadGUILayout(layout);
+    // P6:GUI 走 Frame — 佈局掛上視窗,由 Window::Render 錄成 DrawGUILayout 命令。
+    // (取代 legacy renderer.LoadGUILayout/Render(layout),該路徑在 Vulkan 下是空實作,
+    //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)
+    if (!pSceneWindow)
+        return false;
+    SetGUILayout(&layout);
+    return true;
 }
 
 void Panel::Render()
 {
+    // 佈局經 Window::Render 的 Frame 命令流繪製(DrawGUILayout),不再走 legacy 死路。
     Window::Render();
-    this->renderer.Render(layout);
 }
 
 void Panel::OnWindowResized(long newWidth, long newHeight)
