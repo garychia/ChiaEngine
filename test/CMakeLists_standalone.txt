@@ -19,6 +19,7 @@ add_executable(DataTest
     AllModules.hpp
     System/SystemModule.hpp
     System/SystemModule.cpp
+    System/FrameCounterTest.hpp
     System/IO/IOTest.hpp
     System/IO/IOTest.cpp
 )

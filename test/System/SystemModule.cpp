@@ -1,6 +1,7 @@
 #include "SystemModule.hpp"
 #include "AssetTest.hpp"
 #include "CameraControllerTest.hpp"
+#include "FrameCounterTest.hpp"
 #include "IO/IOTest.hpp"
 #include "ModuleTest.hpp"
 #include "ReplayTest.hpp"
@@ -13,6 +14,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<SystemOperationTest>();
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
+    AddTest<framecountertest::FrameCounterTest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
 }
