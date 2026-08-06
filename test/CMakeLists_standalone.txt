@@ -19,6 +19,8 @@ add_executable(DataTest
     AllModules.hpp
     System/SystemModule.hpp
     System/SystemModule.cpp
+    System/AssetTest.hpp
+    System/TextureAssetViewTest.hpp
     System/FrameCounterTest.hpp
     System/PhysicsOverlapTest.hpp
     System/PhysicsSystemTest.hpp

@@ -27,6 +27,7 @@ set(DISPLAY_SOURCE_FILES
     source/Display/Renderer.cpp
     include/Display/Scene.hpp
     source/Display/Scene.cpp
+    include/Display/Asset/TextureAssetView.hpp
     include/Display/Shader.hpp
     source/Display/Shader.cpp
     include/Display/Texture.hpp

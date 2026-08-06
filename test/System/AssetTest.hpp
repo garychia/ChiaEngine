@@ -93,6 +93,45 @@ class AssetTest : public Test
         EXPECT_TRUE(nEvents2 == 1, "copy fired exactly 1 completion event", true);
         EXPECT_TRUE(observer.eventCount == 3, "observer saw 3 total events", true);
 
+        // ── P7c:引用計數(§5.3)──
+        // 內容層:兩顆不同 key 指向同一 content → block refCount 應為 2。
+        EXPECT_TRUE(manager.GetBlockRefCount(hA->pBlock) == 2, "shared block refcount == 2 (A + copy)", true);
+        // key 層:每個 LoadAsync 是一個消費方引用。
+        EXPECT_TRUE(manager.GetAssetRefCount(hA) == 2, "A requested twice → asset refcount == 2", true);
+        EXPECT_TRUE(manager.GetAssetRefCount(hCopy) == 1, "copy requested once → asset refcount == 1", true);
+
+        // 釋放 hCopy:block 還剩 A 指向 → 仍 live,refCount 降為 1。
+        manager.Release(hCopy);
+        EXPECT_TRUE(manager.GetBlockRefCount(hA->pBlock) == 1, "after releasing copy, block refcount == 1", true);
+        EXPECT_TRUE(manager.GetNumSharedBlocks() == 2, "block still alive (A keeps it)", true);
+        EXPECT_TRUE(manager.GetNumLiveAssets() == 2, "copy asset evicted but A/B still live", true);
+
+        // 釋放 hA 一次(refCount 2 → 1):A 仍在、block 仍在。
+        manager.Release(hA);
+        EXPECT_TRUE(manager.GetBlockRefCount(hA->pBlock) == 1, "A still references block", true);
+
+        // 釋放 hA2(hA 的第二次引用 → 0):A 卸載,且是最後一個指向 block 的 asset → block unload。
+        manager.Release(hA2);
+        EXPECT_TRUE(manager.GetNumSharedBlocks() == 1, "last release of A unloads its block (only B remains)", true);
+        EXPECT_TRUE(manager.GetNumLiveAssets() == 1, "only B remains live", true);
+
+        // 非同步完成前就被釋放:不發事件、完成時直接 evict。
+        {
+            JobSystem jobsB(1);
+            AssetManager managerB(jobsB);
+            AssetObserver obsB;
+            managerB.LoadedEvent.Subscribe(&obsB, &AssetObserver::OnLoaded);
+            SharedPtr<Asset> hEarly = managerB.LoadAsync(pathB);
+            managerB.Release(hEarly); // 載入完成前就釋放
+            jobsB.WaitForIdle();
+            const size_t nEarly = managerB.DispatchCompletedEvents();
+            EXPECT_TRUE(nEarly == 0, "released-before-load asset fires no event", true);
+            EXPECT_TRUE(obsB.eventCount == 0, "observer saw no event for early-released asset", true);
+            EXPECT_TRUE(managerB.GetNumLiveAssets() == 0, "early-released asset evicted at dispatch", true);
+            EXPECT_TRUE(managerB.GetNumSharedBlocks() == 0, "early-released content not retained", true);
+            managerB.LoadedEvent.Unsubscribe(&obsB);
+        }
+
         manager.LoadedEvent.Unsubscribe(&observer);
         std::remove(pathA);
         std::remove(pathB);

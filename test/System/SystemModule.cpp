@@ -8,11 +8,13 @@
 #include "PhysicsSystemTest.hpp"
 #include "SceneSystemTest.hpp"
 #include "ReplayTest.hpp"
+#include "TextureAssetViewTest.hpp"
 #include "WorldTest.hpp"
 
 SystemModule::SystemModule(const String &ioTestPath)
 {
     AddTest<assettest::AssetTest>();
+    AddTest<textureviewtest::TextureAssetViewTest>();
     AddTest<IOTest>(ioTestPath);
     AddTest<SystemOperationTest>();
     AddTest<ModuleTest>();

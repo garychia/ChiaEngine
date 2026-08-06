@@ -16,15 +16,18 @@
 #include "System/Operation/Event.hpp"
 #include "Types/Types.hpp"
 
-// 共享內容區塊:同一個 contentHash(FNV-1a over bytes)的所有 Asset 共用同一份記憶體。
-// 由 SharedPtr refcount 管理,最後一個持有者釋放。TextTexture/Shader 直接吃 block.bytes。
+// 共享內容區塊:同一顆 contentHash(FNV-1a over bytes)的所有 Asset 共用同一份記憶體。
+// `refCount` = 目前「指向這顆 block」的已載入 Asset 數(§5.3 引用計數)。
+// 由 AssetManager 在把 block 綁給 asset 時 ++、在 asset 被釋放時 --;
+// 當它歸零(也就是「最後一個指向它的 asset 離開」)→ 從 blocks 表移除 → 真正 unload。
 struct AssetBlock
 {
     DynamicArray<unsigned char> bytes;
     uint64_t contentHash;
+    uint32_t refCount;
 
     AssetBlock(const DynamicArray<unsigned char> &inBytes, uint64_t hash)
-        : bytes(inBytes), contentHash(hash)
+        : bytes(inBytes), contentHash(hash), refCount(0)
     {
     }
 };
@@ -38,9 +41,11 @@ struct Asset
     uint64_t keyHash;     // key 的 FNV-1a(HashTable 只支援整數 key → 內容定址)
     SharedPtr<AssetBlock> pBlock; // 內容區塊(可為 null = 尚未載入/載入失敗)
     bool loaded;
+    uint32_t refCount;    // 消費方引用計數:LoadAsync 建立時 = 1,每次 Release 遞減。歸零才卸載。
+    bool released;        // 已在載入完成前被 Release(等 Dispatch 時真正 unload)
 
     Asset(const String &key, uint64_t keyHash)
-        : key(key), keyHash(keyHash), pBlock(), loaded(false)
+        : key(key), keyHash(keyHash), pBlock(), loaded(false), refCount(1), released(false)
     {
     }
 
@@ -81,12 +86,17 @@ class AssetManager
     Event<void(AssetId)> LoadedEvent;
 
     // 非同步請求載入:已載入/載入中 → 回傳既有 id(依 key 去重,不重複讀檔、不重複發事件)。
+    // 每一次呼叫都是一個「消費方引用」:呼叫者要在不再使用時呼叫 Release。
     AssetId LoadAsync(const String &key)
     {
         const uint64_t keyHash = HashKey(key);
         typename HashTable<uint64_t, AssetId>::Iterator itr = assets.Find(keyHash);
         if (itr != assets.Last())
+        {
+            // key 已存在(載入中或已載入):回傳同一 handle,並為這個新消費方 +1。
+            itr->Value()->refCount++;
             return itr->Value();
+        }
 
         AssetId id = SharedPtr<Asset>::Construct(key, keyHash);
         assets.Insert(keyHash, id);
@@ -97,7 +107,24 @@ class AssetManager
         return id;
     }
 
-    // 主執行緒:把完成佇列裡的資產依序廣播 LoadedEvent。回傳本批事件數。
+    // 消費方釋放引用:refCount 歸零時才卸載。
+    //  - 已載入 → 立即從 assets 表移除、並把 block 的引用還回去。
+    //  - 載入中 → 標記 released,由 DispatchCompletedEvents 在完成時真正 evict。
+    void Release(AssetId id)
+    {
+        if (!id || id->refCount == 0)
+            return;
+        id->refCount--;
+        if (id->refCount > 0)
+            return;
+
+        id->released = true;
+        if (id->loaded && id->pBlock)
+            UnloadAsset(id);
+    }
+
+    // 主執行緒:把完成佇列裡的資產依序廣播 LoadedEvent。
+    // 載入完成前已被釋放的資產不發事件,直接 evict。回傳本批事件數。
     size_t DispatchCompletedEvents()
     {
         size_t n = 0;
@@ -111,8 +138,13 @@ class AssetManager
                 id = completedJobs[completedCursor];
                 completedCursor++;
             }
-            LoadedEvent.Invoke(id);
-            n++;
+            if (id->released && id->refCount == 0)
+                UnloadAsset(id); // 已在載入完成前被釋放 → 不廣播,直接卸載
+            else
+            {
+                LoadedEvent.Invoke(id);
+                n++;
+            }
         }
         // 捨棄已讀的 slot(避免佇列無限長)
         {
@@ -126,13 +158,38 @@ class AssetManager
         return n;
     }
 
+    // 目前存活的(未釋放的)key 數。
+    size_t GetNumLiveAssets() const
+    {
+        return numAssets;
+    }
+
     size_t GetNumAssets() const
     {
         return numAssets;
     }
 
+    // 某個 asset 目前的消費方引用數。
+    uint32_t GetAssetRefCount(const AssetId &id) const
+    {
+        return id ? id->refCount : 0;
+    }
+
+    // 某顆共享內容區塊目前被多少個已載入 asset 引用(§5.3 引用計數)。
+    uint32_t GetBlockRefCount(const BlockId &block) const
+    {
+        return block ? block->refCount : 0;
+    }
+
     // 跨 key 共享的內容區塊數(不同 contentHash 的個數)。供測試驗證「相同內容只存一份」。
     size_t GetNumSharedBlocks()
+    {
+        std::lock_guard<std::mutex> lock(blocksMutex);
+        return numSharedBlocks;
+    }
+
+    // 目前仍 live 的共享內容區塊數(= GetNumSharedBlocks 的別名,語意上「尚未卸載的內容」)。
+    size_t GetNumLiveBlocks()
     {
         std::lock_guard<std::mutex> lock(blocksMutex);
         return numSharedBlocks;
@@ -195,12 +252,14 @@ class AssetManager
                     if (BytesEqual(existing->bytes, rawBytes))
                     {
                         id->pBlock = existing;
+                        existing->refCount++; // 這顆 content 多一個已載入 asset 指向
                         id->loaded = true;
                     }
                 }
                 if (!id->pBlock)
                 {
                     id->pBlock = SharedPtr<AssetBlock>::Construct(rawBytes, contentHash);
+                    id->pBlock->refCount = 1; // 新內容:第一個指向它的 asset
                     blocks.Insert(contentHash, id->pBlock);
                     numSharedBlocks++;
                     id->loaded = true;
@@ -212,6 +271,41 @@ class AssetManager
             std::lock_guard<std::mutex> lock(completedJobsMutex);
             completedJobs.Append(id);
         }
+    }
+
+    // 真正卸載:從 assets 表移除(釋放 key)、把 block 引用還回去。
+    // block 引用歸零 → 從 blocks 表移除(釋放 bytes)——§5.3「最後一個 release 才真正 unload」。
+    // 呼叫端必須持有 id 的某份 strong ref(caller 的 SharedPtr 或 completedJobs)。
+    void UnloadAsset(AssetId id)
+    {
+        if (!id)
+            return;
+
+        // 1) 移除 assets 表的 key(避免被 LoadAsync 去重命中、不再被 GetLoadedBytes 查得)
+        typename HashTable<uint64_t, AssetId>::Iterator itr = assets.Find(id->keyHash);
+        if (itr != assets.Last())
+        {
+            assets.Remove(id->keyHash);
+            numAssets--;
+        }
+
+        // 2) 釋放指向的共享 block 的引用;最後一個引用離開才把 block 從表移除
+        {
+            std::lock_guard<std::mutex> lock(blocksMutex);
+            if (id->pBlock)
+            {
+                if (id->pBlock->refCount > 0)
+                    id->pBlock->refCount--;
+                if (id->pBlock->refCount == 0)
+                {
+                    blocks.Remove(id->pBlock->contentHash);
+                    numSharedBlocks--;
+                    id->pBlock = BlockId(); // 釋放 SharedPtr,真正 unload bytes
+                }
+            }
+        }
+
+        id->released = true;
     }
 
     static bool BytesEqual(const DynamicArray<unsigned char> &lhs, const DynamicArray<unsigned char> &rhs)
