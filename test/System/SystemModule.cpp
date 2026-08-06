@@ -6,6 +6,7 @@
 #include "ModuleTest.hpp"
 #include "PhysicsOverlapTest.hpp"
 #include "PhysicsSystemTest.hpp"
+#include "SceneSystemTest.hpp"
 #include "ReplayTest.hpp"
 #include "WorldTest.hpp"
 
@@ -21,4 +22,5 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<CameraControllerTest>();
     AddTest<overlap_test::PhysicsOverlapTest>();
     AddTest<physicssystemtest::PhysicsSystemTest>();
+    AddTest<scenesystemtest::SceneSystemTest>();
 }

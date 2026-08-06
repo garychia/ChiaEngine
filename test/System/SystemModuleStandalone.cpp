@@ -1,3 +1,4 @@
+#include "SceneSystemTest.hpp"
 #include "SystemModuleStandalone.hpp"
 #include "FrameCounterTest.hpp"
 #include "PhysicsOverlapTest.hpp"
@@ -9,4 +10,5 @@ SystemModuleStandalone::SystemModuleStandalone() : Module()
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<overlap_test::PhysicsOverlapTest>();
     AddTest<physicssystemtest::PhysicsSystemTest>();
+    AddTest<scenesystemtest::SceneSystemTest>();
 }
