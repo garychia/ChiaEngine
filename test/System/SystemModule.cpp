@@ -4,6 +4,8 @@
 #include "FrameCounterTest.hpp"
 #include "IO/IOTest.hpp"
 #include "ModuleTest.hpp"
+#include "PhysicsOverlapTest.hpp"
+#include "PhysicsSystemTest.hpp"
 #include "ReplayTest.hpp"
 #include "WorldTest.hpp"
 
@@ -17,4 +19,6 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
+    AddTest<overlap_test::PhysicsOverlapTest>();
+    AddTest<physicssystemtest::PhysicsSystemTest>();
 }

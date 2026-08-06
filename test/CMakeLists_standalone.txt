@@ -20,6 +20,8 @@ add_executable(DataTest
     System/SystemModule.hpp
     System/SystemModule.cpp
     System/FrameCounterTest.hpp
+    System/PhysicsOverlapTest.hpp
+    System/PhysicsSystemTest.hpp
     System/IO/IOTest.hpp
     System/IO/IOTest.cpp
 )
