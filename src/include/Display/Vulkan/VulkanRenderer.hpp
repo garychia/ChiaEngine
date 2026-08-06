@@ -88,6 +88,19 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
 
         HashTable<size_t, RenderableGpuData> renderableGpuMap;
 
+    // ── P7d:Frame 新命令狀態───────────────────────────────────────────────
+    static constexpr uint32_t MaxTransformStackDepth = 64; // PushTransform 深度上限(防 Sim bug 溢出)
+    DynamicArray<glm::mat4> transformStack;                // PushTransform 推入的 world 矩陣
+    uint64_t currentMaterialId = 0;                        // BindMaterial 記錄的材質 id(材質管線留待資產票)
+
+    struct GpuMesh
+    {
+        VkBuffer vertexBuffer;
+        VkDeviceMemory vertexMemory;
+        uint32_t vertexCount;
+    };
+    HashTable<uint64_t, GpuMesh> meshCache; // 以 meshId(content-hash)為 key 的幾何快取
+
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
     bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
@@ -134,12 +147,14 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     VkImageView CreateImageView(VkImage image, VkFormat format);
     void CleanupPipelineResources();
     void CleanupRenderableGpuMap();
+    void CleanupMeshCache();
 
     // ── Renderable 繪製 ─────────────────────────────────────────────────────
     bool LoadRenderable(const IRenderable &renderable);       // RenderInfo → GPU buffer
     bool LoadTextureImage(const Texture &texture);            // 載入真實貼圖(單一 slot)
     void UpdateTextureDescriptor();                           // 重新寫 UBO + sampler 描述子
     void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable);
+    void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world);
     void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
                              const glm::mat4 &projection, bool useTexture);
 
@@ -188,6 +203,9 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
 
     // IFrameExecutor
     virtual bool Execute(const Frame &frame) override;
+
+    // ── P7d:mesh 幾何註冊(由 View 側把 renderable 幾何登記成 content-hash meshId)──
+    bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info);
 };
 
 #endif

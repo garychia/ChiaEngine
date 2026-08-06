@@ -32,3 +32,33 @@ target_include_directories(DataTest PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/../src/include
 )
+
+# ── FrameStandaloneTest:P7d 無 GPU 序列化/命令流測試(驗收 1、2)────────────
+# 只連結 Display 的純資料 .cpp(Camera/GUILayout/…) 與 Geometry/Math,
+# 不依賴 Vulkan/OpenGL/DirectX SDK,整個 target 可無頭編譯 + 執行。
+add_executable(FrameStandaloneTest
+    FrameStandaloneMain.cpp
+    Module.hpp
+    Test.hpp
+    System/FrameTest.hpp
+    System/FrameSerializationTest.hpp
+    # Display 純資料源(無 GPU)
+    ../src/source/Display/IRenderable.cpp
+    ../src/source/Display/Camera.cpp
+    ../src/source/Display/Color.cpp
+    ../src/source/Display/Texture.cpp
+    ../src/source/Display/Shader.cpp
+    ../src/source/Display/GUI/GUILayout.cpp
+    ../src/source/Display/GUI/GUILayer.cpp
+    ../src/source/Display/GUI/IGUI.cpp
+    ../src/source/Display/GUI/Border.cpp
+    # Geometry / Math
+    ../src/source/Geometry/Primitives.cpp
+    ../src/source/Geometry/2D/Point2D.cpp
+    ../src/source/Geometry/3D/Point3D.cpp
+    ../src/source/Math/Math.cpp
+)
+target_include_directories(FrameStandaloneTest PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/../src/include
+)

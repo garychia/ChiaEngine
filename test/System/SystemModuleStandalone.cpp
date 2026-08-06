@@ -5,6 +5,8 @@
 #include "SceneSystemTest.hpp"
 #include "AssetTest.hpp"
 #include "TextureAssetViewTest.hpp"
+#include "FrameTest.hpp"
+#include "FrameSerializationTest.hpp"
 
 SystemModuleStandalone::SystemModuleStandalone() : Module()
 {
@@ -15,4 +17,6 @@ SystemModuleStandalone::SystemModuleStandalone() : Module()
     AddTest<overlap_test::PhysicsOverlapTest>();
     AddTest<physicssystemtest::PhysicsSystemTest>();
     AddTest<scenesystemtest::SceneSystemTest>();
+    AddTest<FrameTest>();
+    AddTest<FrameSerializationTest>();
 }

@@ -86,6 +86,69 @@ class FrameTest : public Test
             EXPECT_TRUE(frame.GetNumCommands() == 2, "Clear 後可重複錄製.", true);
         }
 
+        TEST_MESSAGE("New value commands append");
+        {
+            Frame frame;
+            frame.BeginFrame();
+            frame.PushTransform(Point3D(1, 2, 3), Point3D(0, 45, 0), Point3D(1, 2, 1));
+            frame.BindMaterial(0xABCULL);
+            frame.DrawMesh(0x1234ULL);
+            frame.SetViewport(0, 0, 1920, 1080);
+            frame.DrawText(7, String(u"Hello"), 16.0f, Color(1, 0.5f, 0.25f, 1));
+            frame.PopTransform();
+            frame.EndFrame();
+            EXPECT_TRUE(frame.GetNumCommands() == 8, "8 條命令(5 保留 + 6 條新增中的 6:Begin/Push/Bind/DrawMesh/Viewport/Text/Pop/End = 8).", true);
+            EXPECT_TRUE(frame.GetCommand(1).command == Frame::Command::PushTransform, "PushTransform.", true);
+            EXPECT_TRUE(frame.GetCommand(1).transform.position.x == 1 && frame.GetCommand(1).transform.position.y == 2 &&
+                            frame.GetCommand(1).transform.position.z == 3,
+                        "position.", true);
+        }
+
+        TEST_MESSAGE("Frame serialize determinism (same scene -> same stream)");
+        {
+            Frame a, b;
+            a.BeginFrame();
+            a.PushTransform(Point3D(1, 2, 3), Point3D(0, 45, 0), Point3D(1, 2, 1));
+            a.BindMaterial(1234567ULL);
+            a.DrawMesh(99ULL);
+            a.SetViewport(0, 0, 1920, 1080);
+            a.DrawText(7, String(u"Hello World"), 16.0f, Color(1, 0.5f, 0.25f, 1));
+            a.PopTransform();
+            a.EndFrame();
+            b.BeginFrame();
+            b.PushTransform(Point3D(1, 2, 3), Point3D(0, 45, 0), Point3D(1, 2, 1));
+            b.BindMaterial(1234567ULL);
+            b.DrawMesh(99ULL);
+            b.SetViewport(0, 0, 1920, 1080);
+            b.DrawText(7, String(u"Hello World"), 16.0f, Color(1, 0.5f, 0.25f, 1));
+            b.PopTransform();
+            b.EndFrame();
+            EXPECT_TRUE(a.Serialize() == b.Serialize(), "相同場景 → 相同命令流字串.", true);
+        }
+
+        TEST_MESSAGE("Frame serialize round-trip (new commands)");
+        {
+            Frame a;
+            a.BeginFrame();
+            a.PushTransform(Point3D(1, 2, 3), Point3D(0, 45, 0), Point3D(1, 2, 1));
+            a.BindMaterial(0xABCDEF123456ULL);
+            a.DrawMesh(0x1234ULL);
+            a.SetViewport(10, 20, 800, 600);
+            a.DrawText(7, String(u"Hello World"), 16.0f, Color(0.25f, 0.5f, 0.75f, 1));
+            a.PopTransform();
+            a.EndFrame();
+
+            Frame b = Frame::Deserialize(a.Serialize());
+            EXPECT_TRUE(a.Serialize() == b.Serialize(), "序列化 → 反序列化 → 再序列化一致.", true);
+            EXPECT_TRUE(b.GetNumCommands() == a.GetNumCommands(), "命令數一致.", true);
+            const Frame::CommandData &text = b.GetCommand(5);
+            EXPECT_TRUE(text.command == Frame::Command::DrawText && text.fontId == 7, "DrawText 重建 fontId.", true);
+            EXPECT_TRUE(text.text == String(u"Hello World"), "DrawText 重建 text.", true);
+            EXPECT_TRUE(text.textSize == 16.0f, "DrawText 重建 size.", true);
+            EXPECT_TRUE(text.textColor.R == 0.25f && text.textColor.G == 0.5f && text.textColor.B == 0.75f,
+                        "DrawText 重建 color.", true);
+        }
+
         SUCCESS_MESSAGE("DisplayFrame");
         return true;
     }

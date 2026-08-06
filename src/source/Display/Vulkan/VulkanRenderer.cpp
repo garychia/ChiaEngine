@@ -806,13 +806,17 @@ VulkanRenderer::VulkanRenderer()
       depthImage(VK_NULL_HANDLE),
       depthImageMemory(VK_NULL_HANDLE),
       depthImageView(VK_NULL_HANDLE),
-      renderableGpuMap()
+      renderableGpuMap(),
+      transformStack(),
+      currentMaterialId(0),
+      meshCache()
 {
 }
 
 VulkanRenderer::~VulkanRenderer()
 {
     CleanupRenderableGpuMap();
+    CleanupMeshCache();
     CleanupPipelineResources();
     CleanupSyncObjects();
     CleanupSwapchain();
@@ -1073,6 +1077,9 @@ bool VulkanRenderer::Execute(const Frame &frame)
             case Frame::Command::BeginFrame:
                 if (!BeginFrame())
                     return false;
+                // 幀起點重設 transform stack / material,避免上幀殘留狀態洩入本幀。
+                transformStack.RemoveAll();
+                currentMaterialId = 0;
                 break;
             case Frame::Command::SetCamera:
                 pActiveCamera = command.pCamera;
@@ -1107,6 +1114,57 @@ bool VulkanRenderer::Execute(const Frame &frame)
             case Frame::Command::EndFrame:
                 if (!EndFrame())
                     return false;
+                break;
+            // ── P7d:新增命令──────────────────────────────────────
+            case Frame::Command::PushTransform:
+            {
+                const Point3D &pos = command.transform.position;
+                const Point3D &rot = command.transform.rotation;
+                const Point3D &scale = command.transform.scale;
+                const glm::mat4 world = BuildWorldMatrix(pos, rot, scale);
+                // 深度上限 64:溢出即 push 失敗/忽略,不讓 Sim bug 拖垮執行器。
+                if (transformStack.GetNElements() < VulkanRenderer::MaxTransformStackDepth)
+                    transformStack.Append(world);
+                break;
+            }
+            case Frame::Command::PopTransform:
+                if (!transformStack.IsEmpty())
+                    transformStack.RemoveLast();
+                break;
+            case Frame::Command::BindMaterial:
+                currentMaterialId = command.materialId;
+                // TODO(P7d):材質管線/descriptor 綁定。目前單一 graphicsPipeline,
+                // materialId 先記錄,真正的材質 cache 留待獨立 material 資產票。
+                break;
+            case Frame::Command::DrawMesh:
+            {
+                const glm::mat4 world = transformStack.IsEmpty() ? glm::mat4(1.0f) : transformStack.GetLast();
+                RecordMeshDrawCommands(commandBuffers[currentImageIndex], command.meshId, world);
+                break;
+            }
+            case Frame::Command::SetViewport:
+            {
+                VkCommandBuffer cmdBuffer = commandBuffers[currentImageIndex];
+                VkViewport viewport = {};
+                viewport.x = command.viewport.x;
+                viewport.y = command.viewport.y;
+                viewport.width = command.viewport.width;
+                viewport.height = command.viewport.height;
+                viewport.minDepth = 0.0f;
+                viewport.maxDepth = 1.0f;
+                vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+                VkRect2D scissor = {};
+                scissor.offset.x = static_cast<int32_t>(command.viewport.x);
+                scissor.offset.y = static_cast<int32_t>(command.viewport.y);
+                scissor.extent.width = static_cast<uint32_t>(command.viewport.width);
+                scissor.extent.height = static_cast<uint32_t>(command.viewport.height);
+                vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+                break;
+            }
+            case Frame::Command::DrawText:
+                // MVP 為明確 stub:記錄命令但無 GPU 成品。文字渲染(字型 atlas + 著色器)
+                // 留待後續專票,不在本票範圍(驗收 #3 只要求 PushTransform 目視生效)。
                 break;
         }
     }
@@ -1676,6 +1734,18 @@ void VulkanRenderer::CleanupRenderableGpuMap()
     renderableGpuMap.Clear();
 }
 
+void VulkanRenderer::CleanupMeshCache()
+{
+    if (!device)
+        return;
+    for (auto itr = meshCache.First(); itr != meshCache.Last(); itr++)
+    {
+        vkDestroyBuffer(device, itr->Value().vertexBuffer, nullptr);
+        vkFreeMemory(device, itr->Value().vertexMemory, nullptr);
+    }
+    meshCache.Clear();
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 //  Renderable → GPU buffer / 繪製
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1874,4 +1944,100 @@ void VulkanRenderer::UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4
     vkMapMemory(device, uniformBufferMemory, 0, sizeof(MatrixBuffer), 0, &pData);
     memcpy(pData, &matrices, sizeof(MatrixBuffer));
     vkUnmapMemory(device, uniformBufferMemory);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  P7d:mesh 註冊 / DrawMesh 繪製
+// ══════════════════════════════════════════════════════════════════════════════
+
+bool VulkanRenderer::RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info)
+{
+    if (meshCache.Contains(meshId))
+        return true; // 已註冊 → 去重,同 AssetManager 內容定址精神
+
+    const unsigned int nVertices = info.numOfVertices;
+    if (!nVertices)
+        return true;
+
+    const bool useIndex = info.vertexIndexBuffer && info.numOfVertexIndices > 0;
+    const unsigned int drawCount = useIndex ? info.numOfVertexIndices : nVertices;
+    DynamicArray<VulkanVertex> vertices;
+    vertices.Resize(drawCount);
+    for (unsigned int i = 0; i < drawCount; i++)
+    {
+        size_t srcIdx = useIndex ? info.vertexIndexBuffer[i] : i;
+        if (srcIdx >= info.numOfVertices)
+            srcIdx = i;
+
+        VulkanVertex vert;
+        vert.position = glm::vec4(info.vertexBuffer[srcIdx].x, info.vertexBuffer[srcIdx].y,
+                                  info.vertexBuffer[srcIdx].z, 1.0f);
+        if (info.colorBuffer && info.numOfColors > 0)
+        {
+            size_t cIdx = info.colorIndexBuffer && i < info.numOfColorIndices ? info.colorIndexBuffer[i] : srcIdx;
+            if (cIdx >= info.numOfColors)
+                cIdx = 0;
+            vert.color = glm::vec4(info.colorBuffer[cIdx].R, info.colorBuffer[cIdx].G,
+                                   info.colorBuffer[cIdx].B, info.colorBuffer[cIdx].A);
+        }
+        else
+        {
+            vert.color = glm::vec4(1.0f);
+        }
+        if (info.textureCoordinates && srcIdx < info.numOfTextureCoordinates)
+            vert.texCoord = glm::vec2(info.textureCoordinates[srcIdx].x, info.textureCoordinates[srcIdx].y);
+        else
+            vert.texCoord = glm::vec2(0.0f);
+        vert.cmode = 1;
+        vert.gui = 0;
+        vertices[i] = vert;
+    }
+
+    GpuMesh mesh;
+    mesh.vertexCount = drawCount;
+    if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(drawCount) * sizeof(VulkanVertex),
+                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                      mesh.vertexBuffer, mesh.vertexMemory))
+        return false;
+    void *pMapped = nullptr;
+    vkMapMemory(device, mesh.vertexMemory, 0, static_cast<VkDeviceSize>(drawCount) * sizeof(VulkanVertex), 0, &pMapped);
+    memcpy(pMapped, &vertices[0], drawCount * sizeof(VulkanVertex));
+    vkUnmapMemory(device, mesh.vertexMemory);
+
+    meshCache.Insert(meshId, mesh);
+    return true;
+}
+
+void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world)
+{
+    HashTable<uint64_t, GpuMesh>::Iterator itr = meshCache.Find(meshId);
+    if (itr == meshCache.Last())
+        return; // meshId 未註冊(幾何來源尚未由 View 提供)→ 略過
+
+    const GpuMesh &mesh = itr->Value();
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &descriptorSet, 0, nullptr);
+
+    glm::mat4 view = glm::mat4(1.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
+                                             static_cast<float>(swapchainExtent.width) /
+                                                 static_cast<float>(swapchainExtent.height),
+                                             0.001f, 100.0f);
+    if (pActiveCamera)
+    {
+        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
+        const float aspect = static_cast<float>(swapchainExtent.width) /
+                             static_cast<float>(swapchainExtent.height);
+        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
+                                     pActiveCamera->GetDistanceToNearPlane(),
+                                     pActiveCamera->GetDistanceToFarPlane());
+    }
+    UpdateUniformBuffer(world, view, projection, false);
+
+    VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdDraw(cmdBuffer, mesh.vertexCount, 1, 0, 0);
 }
