@@ -13,9 +13,9 @@ class GUILayer : public IGUI
   public:
     GUILayer(const Point2D &windowSize, const Border &border);
 
-    template <class GUIType, class... Args> SharedPtr<IGUI> AddComponent(Args... args)
+    template <class GUIType, class... Args> SharedPtr<GUIType> AddComponent(Args... args)
     {
-        auto pComponent = SharedPtr<IGUI>::Construct<GUIType>(args...);
+        auto pComponent = SharedPtr<GUIType>::Construct(args...);
         pComponents.Append(pComponent);
         return pComponent;
     }

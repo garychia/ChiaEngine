@@ -42,6 +42,7 @@ add_executable(FrameStandaloneTest
     Test.hpp
     System/FrameTest.hpp
     System/FrameSerializationTest.hpp
+    System/TextRenderingTest.hpp
     # Display 純資料源(無 GPU)
     ../src/source/Display/IRenderable.cpp
     ../src/source/Display/Camera.cpp
@@ -51,7 +52,12 @@ add_executable(FrameStandaloneTest
     ../src/source/Display/GUI/GUILayout.cpp
     ../src/source/Display/GUI/GUILayer.cpp
     ../src/source/Display/GUI/IGUI.cpp
+    ../src/source/Display/GUI/IInteractable.cpp
     ../src/source/Display/GUI/Border.cpp
+    ../src/source/Display/GUI/Button.cpp
+    ../src/source/Display/GUI/GUIFrameProjector.cpp
+    ../src/source/Display/Text/GlyphAtlas.cpp
+    ../src/source/Display/Text/TextLayout.cpp
     # Geometry / Math
     ../src/source/Geometry/Primitives.cpp
     ../src/source/Geometry/2D/Point2D.cpp

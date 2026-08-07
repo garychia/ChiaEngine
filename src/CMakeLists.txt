@@ -50,6 +50,12 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/IGUI.cpp
     include/Display/GUI/IInteractable.hpp
     source/Display/GUI/IInteractable.cpp
+    include/Display/GUI/GUIFrameProjector.hpp
+    source/Display/GUI/GUIFrameProjector.cpp
+    include/Display/Text/GlyphAtlas.hpp
+    source/Display/Text/GlyphAtlas.cpp
+    include/Display/Text/TextLayout.hpp
+    source/Display/Text/TextLayout.cpp
 )
 if (DIRECTX_ENABLED)
     list(APPEND DISPLAY_SOURCE_FILES

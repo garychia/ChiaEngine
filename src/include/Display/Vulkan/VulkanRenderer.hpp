@@ -3,6 +3,8 @@
 
 #include "Display/IRenderer.hpp"
 #include "Display/IFrameExecutor.hpp"
+#include "Display/Color.hpp"
+#include "Display/Text/GlyphAtlas.hpp"
 #include "Data/HashTable.hpp"
 #include "pch.hpp"
 
@@ -101,6 +103,22 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     };
     HashTable<uint64_t, GpuMesh> meshCache; // 以 meshId(content-hash)為 key 的幾何快取
 
+    // ── P7e:文字渲染───────────────────────────────────────────────
+    struct FontAtlasGpuData
+    {
+        VkImage image;
+        VkDeviceMemory memory;
+        VkImageView imageView;
+        VkSampler sampler;
+    };
+    HashTable<uint64_t, FontAtlasGpuData> fontAtlasCache; // 以 fontId(content-hash)為 key 的字型圖集
+    VkDescriptorSet textDescriptorSet;                    // 文字用的描述子集(UBO + 字型圖集 sampler)
+    VkSampler textSampler;                                // 字型圖集共用的 nearest sampler
+    uint64_t boundTextFontId = 0;                       // 目前綁進 textDescriptorSet 的 fontId
+    VkBuffer textVertexBuffer;
+    VkDeviceMemory textVertexMemory;
+    uint32_t textVertexCapacity = 0;
+
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
     bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
@@ -157,6 +175,14 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world);
     void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
                              const glm::mat4 &projection, bool useTexture);
+
+    // ── P7e:文字渲染 helpers ─────────────────────────────────────────
+    bool CreateTextSampler();
+    void UpdateTextDescriptor(const VkImageView &imageView, VkSampler sampler);
+    bool CreateFontAtlasTexture(uint64_t fontId, const GlyphAtlas &atlas);
+    void RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t fontId, const char16_t *text,
+                                float size, const Color &color, const glm::mat4 &world);
+    void CleanupFontAtlasCache();
 
     // ── Device helpers ────────────────────────────────────────────────────
     struct QueueFamilyIndices

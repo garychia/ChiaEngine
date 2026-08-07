@@ -9,6 +9,8 @@
 #include "Display/Texture.hpp"
 #include "Display/IRenderable.hpp"
 #include "Display/GUI/GUILayer.hpp"
+#include "Display/Text/GlyphAtlas.hpp"
+#include "Display/Text/TextLayout.hpp"
 #include "System/Debug/Debug.hpp"
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -809,7 +811,13 @@ VulkanRenderer::VulkanRenderer()
       renderableGpuMap(),
       transformStack(),
       currentMaterialId(0),
-      meshCache()
+      meshCache(),
+      textDescriptorSet(VK_NULL_HANDLE),
+      textSampler(VK_NULL_HANDLE),
+      boundTextFontId(0),
+      textVertexBuffer(VK_NULL_HANDLE),
+      textVertexMemory(VK_NULL_HANDLE),
+      textVertexCapacity(0)
 {
 }
 
@@ -1163,9 +1171,14 @@ bool VulkanRenderer::Execute(const Frame &frame)
                 break;
             }
             case Frame::Command::DrawText:
-                // MVP 為明確 stub:記錄命令但無 GPU 成品。文字渲染(字型 atlas + 著色器)
-                // 留待後續專票,不在本票範圍(驗收 #3 只要求 PushTransform 目視生效)。
+            {
+                // P7e:字型圖集 + TextLayout quad 序列 + 文字 vertex buffer。
+                // 以 transform stack top 的 world 矩陣繪製(與 DrawMesh 同構)。
+                const glm::mat4 world = transformStack.IsEmpty() ? glm::mat4(1.0f) : transformStack.GetLast();
+                RecordTextDrawCommands(commandBuffers[currentImageIndex], command.fontId,
+                                       command.text.CStr(), command.textSize, command.textColor, world);
                 break;
+            }
         }
     }
     return true;
@@ -1446,15 +1459,16 @@ bool VulkanRenderer::CreateDescriptorSetLayout()
 
 bool VulkanRenderer::CreateDescriptorPool()
 {
+    // 2 組描述子集:場景主 set + 文字 set;兩者都綁同一個 uniformBuffer 與各自的 sampler。
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2}
     };
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 1;
+    poolInfo.maxSets = 2;
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
         return false;
     return true;
@@ -1657,7 +1671,64 @@ bool VulkanRenderer::CreateWhiteTexture()
     vkAllocateDescriptorSets(device, &allocInfo, &descriptorSet);
 
     UpdateTextureDescriptor();
+
+    // ── P7e:文字描述子集(UBO + 字型圖集)──────────────────────────
+    if (!CreateTextSampler())
+        return false;
+    // 字型圖集可能尚未建立(第一次 DrawText 才建);先綁白色 fallback,
+    // DrawText 首次執行時會以 UpdateTextDescriptor 換成真正的字型圖集。
+    if (vkAllocateDescriptorSets(device, &allocInfo, &textDescriptorSet) != VK_SUCCESS)
+        return false;
+    UpdateTextDescriptor(textureImageView, textureSampler);
+    boundTextFontId = 0;
+
     return true;
+}
+
+bool VulkanRenderer::CreateTextSampler()
+{
+    // 點陣字型:nearest 取樣,避免 LINEAR 在格間 padding 上產生漏色。
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_NEAREST;
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    samplerInfo.maxLod = 1.0f;
+    if (vkCreateSampler(device, &samplerInfo, nullptr, &textSampler) != VK_SUCCESS)
+        return false;
+    return true;
+}
+
+void VulkanRenderer::UpdateTextDescriptor(const VkImageView &imageView, VkSampler sampler)
+{
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = uniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(MatrixBuffer);
+
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+
+    VkWriteDescriptorSet writes[2] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = textDescriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &bufferInfo;
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = textDescriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].pImageInfo = &imageInfo;
+    vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
 }
 
 void VulkanRenderer::UpdateTextureDescriptor()
@@ -1720,6 +1791,17 @@ void VulkanRenderer::CleanupPipelineResources()
         vkDestroyImage(device, textureImage, nullptr);
     if (textureImageMemory)
         vkFreeMemory(device, textureImageMemory, nullptr);
+    CleanupFontAtlasCache();
+    if (textVertexBuffer)
+        vkDestroyBuffer(device, textVertexBuffer, nullptr);
+    if (textVertexMemory)
+        vkFreeMemory(device, textVertexMemory, nullptr);
+    textVertexBuffer = VK_NULL_HANDLE;
+    textVertexMemory = VK_NULL_HANDLE;
+    textVertexCapacity = 0;
+    if (textSampler)
+        vkDestroySampler(device, textSampler, nullptr);
+    textSampler = VK_NULL_HANDLE;
 }
 
 void VulkanRenderer::CleanupRenderableGpuMap()
@@ -2040,4 +2122,162 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdDraw(cmdBuffer, mesh.vertexCount, 1, 0, 0);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+//  P7e:文字渲染(DrawText)
+// ══════════════════════════════════════════════════════════════════════════════
+
+void VulkanRenderer::CleanupFontAtlasCache()
+{
+    if (!device)
+        return;
+    for (auto itr = fontAtlasCache.First(); itr != fontAtlasCache.Last(); itr++)
+    {
+        vkDestroyImageView(device, itr->Value().imageView, nullptr);
+        vkDestroyImage(device, itr->Value().image, nullptr);
+        vkFreeMemory(device, itr->Value().memory, nullptr);
+    }
+    fontAtlasCache.Clear();
+}
+
+bool VulkanRenderer::CreateFontAtlasTexture(uint64_t fontId, const GlyphAtlas &atlas)
+{
+    if (fontAtlasCache.Contains(fontId))
+        return true; // 已存在 → 去重(內容定址)
+
+    FontAtlasGpuData data = {};
+    data.image = VK_NULL_HANDLE;
+    data.memory = VK_NULL_HANDLE;
+    data.imageView = VK_NULL_HANDLE;
+    data.sampler = textSampler;
+
+    const uint32_t width = atlas.GetAtlasWidth();
+    const uint32_t height = atlas.GetAtlasHeight();
+    if (!CreateImageWithData(device, physicalDevice, graphicsQueue, commandPool,
+                             width, height, atlas.GetRGBA(), data.image, data.memory))
+        return false;
+    data.imageView = CreateImageView(data.image, VK_FORMAT_R8G8B8A8_SRGB);
+    fontAtlasCache.Insert(fontId, data);
+    return true;
+}
+
+void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t fontId, const char16_t *text,
+                                            float size, const Color &color, const glm::mat4 &world)
+{
+    // 目前只有預設內建字型;未知 fontId → fallback 到預設圖集(內容定址語彙不變)。
+    const GlyphAtlas &atlas = GlyphAtlas::GetDefault();
+    const uint64_t resolvedFontId = GlyphAtlas::DefaultFontId();
+    if (!CreateFontAtlasTexture(resolvedFontId, atlas))
+        return;
+
+    // 綁上字型圖集(換圖集時才重寫描述子,節省 write)
+    if (boundTextFontId != resolvedFontId)
+    {
+        auto itr = fontAtlasCache.Find(resolvedFontId);
+        if (itr != fontAtlasCache.Last())
+        {
+            UpdateTextDescriptor(itr->Value().imageView, itr->Value().sampler);
+            boundTextFontId = resolvedFontId;
+        }
+    }
+
+    DynamicArray<TextQuad> quads;
+    TextLayout::Layout(atlas, text, size, 0.0f, quads);
+    if (quads.IsEmpty())
+        return;
+
+    const uint32_t vertexCount = static_cast<uint32_t>(quads.GetNElements()) * 6; // 每 quad 兩個三角形
+    if (textVertexCapacity < vertexCount)
+    {
+        if (textVertexBuffer)
+            vkDestroyBuffer(device, textVertexBuffer, nullptr);
+        if (textVertexMemory)
+            vkFreeMemory(device, textVertexMemory, nullptr);
+        textVertexBuffer = VK_NULL_HANDLE;
+        textVertexMemory = VK_NULL_HANDLE;
+        if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(vertexCount) * sizeof(VulkanVertex),
+                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                          textVertexBuffer, textVertexMemory))
+            return;
+        textVertexCapacity = vertexCount;
+    }
+
+    DynamicArray<VulkanVertex> vertices;
+    vertices.Resize(vertexCount);
+    const glm::vec4 textColor(color.R, color.G, color.B, color.A);
+    uint32_t vi = 0;
+    for (size_t qi = 0; qi < quads.GetNElements(); qi++)
+    {
+        const TextQuad &q = quads[qi];
+        VulkanVertex tri[6];
+        // 兩三角形、各頂點帶字形 UV、cmode=1(alpha modulate)、gui=1。
+        const float x0 = q.x0, y0 = q.y0, x1 = q.x1, y1 = q.y1;
+        tri[0].position = glm::vec4(x0, y0, 0.0f, 1.0f);
+        tri[0].texCoord = glm::vec2(q.u0, q.v0);
+        tri[1].position = glm::vec4(x1, y0, 0.0f, 1.0f);
+        tri[1].texCoord = glm::vec2(q.u1, q.v0);
+        tri[2].position = glm::vec4(x1, y1, 0.0f, 1.0f);
+        tri[2].texCoord = glm::vec2(q.u1, q.v1);
+        tri[3].position = glm::vec4(x0, y0, 0.0f, 1.0f);
+        tri[3].texCoord = glm::vec2(q.u0, q.v0);
+        tri[4].position = glm::vec4(x1, y1, 0.0f, 1.0f);
+        tri[4].texCoord = glm::vec2(q.u1, q.v1);
+        tri[5].position = glm::vec4(x0, y1, 0.0f, 1.0f);
+        tri[5].texCoord = glm::vec2(q.u0, q.v1);
+        for (int k = 0; k < 6; k++)
+        {
+            tri[k].color = textColor;
+            tri[k].cmode = 1;
+            tri[k].gui = 1;
+            vertices[vi++] = tri[k];
+        }
+    }
+
+    void *pMapped = nullptr;
+    vkMapMemory(device, textVertexMemory, 0, static_cast<VkDeviceSize>(vertexCount) * sizeof(VulkanVertex), 0, &pMapped);
+    memcpy(pMapped, &vertices[0], vertexCount * sizeof(VulkanVertex));
+    vkUnmapMemory(device, textVertexMemory);
+
+    vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
+    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &textDescriptorSet, 0, nullptr);
+
+    // 與按鈕矩形同一投影(RFC R1:label 須以矩形同投影繪製,否則視覺對不齊)。
+    glm::mat4 view = glm::mat4(1.0f);
+    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
+                                             static_cast<float>(swapchainExtent.width) /
+                                                 static_cast<float>(swapchainExtent.height),
+                                             0.001f, 100.0f);
+    if (pActiveCamera)
+    {
+        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
+        const float aspect = static_cast<float>(swapchainExtent.width) /
+                             static_cast<float>(swapchainExtent.height);
+        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
+                                     pActiveCamera->GetDistanceToNearPlane(),
+                                     pActiveCamera->GetDistanceToFarPlane());
+    }
+    // 字形圖集:白字透明底,shader 以 useTexture>0 + cmode=1 乘上 textColor。
+    UpdateUniformBuffer(world, view, projection, true);
+
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapchainExtent.width);
+    viewport.height = static_cast<float>(swapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchainExtent;
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
+    VkBuffer vertexBuffers[] = {textVertexBuffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdDraw(cmdBuffer, vertexCount, 1, 0, 0);
 }

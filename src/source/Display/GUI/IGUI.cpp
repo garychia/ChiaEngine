@@ -106,6 +106,11 @@ float IGUI::GetHeight() const
     return border.height.IsRelative() ? border.height * windowSize.y : static_cast<float>(border.height);
 }
 
+Point2D IGUI::GetWindowSize() const
+{
+    return windowSize;
+}
+
 void IGUI::OnWindowResized()
 {
     SetTopLeftPosition(border.xPos, border.yPos);

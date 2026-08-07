@@ -1,6 +1,8 @@
 #include "Display/Window.hpp"
 #include "Display/WindowManager.hpp"
+#include "Display/GUI/GUIFrameProjector.hpp"
 #include "Display/GUI/GUILayout.hpp"
+#include "Display/Text/GlyphAtlas.hpp"
 
 #include "System/Debug/Debug.hpp"
 #include "System/Input/KeyCodes.hpp"
@@ -209,7 +211,11 @@ void Window::Render()
             frame.DrawRenderable(*renderables[i]);
     }
     if (pGUILayout)
+    {
         frame.DrawGUILayout(*pGUILayout);
+        // P7e:label 以 DrawText 命令進入同一份 Frame(按鈕幾何仍走 DrawGUILayout)。
+        GUIFrameProjector::ProjectLabels(*pGUILayout, GlyphAtlas::GetDefault(), GlyphAtlas::DefaultFontId(), frame);
+    }
     frame.EndFrame();
     renderer.Execute(frame);
 }

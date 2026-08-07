@@ -5,6 +5,7 @@
 #include "Test.hpp"
 #include "System/FrameTest.hpp"
 #include "System/FrameSerializationTest.hpp"
+#include "System/TextRenderingTest.hpp"
 
 class FrameStandaloneModule : public Module
 {
@@ -13,6 +14,7 @@ class FrameStandaloneModule : public Module
     {
         AddTest<FrameTest>();
         AddTest<FrameSerializationTest>();
+        AddTest<TextRenderingTest>();
     }
 };
 

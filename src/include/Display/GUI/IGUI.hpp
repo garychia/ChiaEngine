@@ -49,6 +49,8 @@ class IGUI : public Rectangle
 
     virtual float GetHeight() const;
 
+    virtual Point2D GetWindowSize() const;
+
     virtual void OnWindowResized();
 };
 
