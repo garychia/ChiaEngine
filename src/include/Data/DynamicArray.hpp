@@ -116,6 +116,7 @@ template <class T> class DynamicArray : public Array<T>
         nElements = 0;
         delete[] this->data;
         this->data = nullptr;
+        this->length = 0; // 容量一起歸零,否則 Append 看 length>nElements 以為還有空間 → 寫 null
     }
 
     inline void Resize(size_t newSize) noexcept
