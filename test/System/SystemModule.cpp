@@ -4,6 +4,7 @@
 #include "CameraControllerTest.hpp"
 #include "FrameCounterTest.hpp"
 #include "IO/IOTest.hpp"
+#include "InputSystemTest.hpp"
 #include "ModuleTest.hpp"
 #include "PhysicsOverlapTest.hpp"
 #include "PhysicsSystemTest.hpp"
@@ -26,6 +27,11 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
+    AddTest<inputtest::KeyCombinationTest>();
+    AddTest<inputtest::KeyboardHandlerTest>();
+    AddTest<inputtest::MouseInputTest>();
+    AddTest<inputtest::InputHandlerTest>();
+    AddTest<inputtest::WindowManagerTest>();
     AddTest<overlap_test::PhysicsOverlapTest>();
     AddTest<physicssystemtest::PhysicsSystemTest>();
     AddTest<scenesystemtest::SceneSystemTest>();
