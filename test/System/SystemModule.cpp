@@ -1,4 +1,5 @@
 #include "SystemModule.hpp"
+#include "AssetFormatValidationTest.hpp"
 #include "AssetTest.hpp"
 #include "CameraControllerTest.hpp"
 #include "FrameCounterTest.hpp"
@@ -14,6 +15,9 @@
 SystemModule::SystemModule(const String &ioTestPath)
 {
     AddTest<assettest::AssetTest>();
+    AddTest<assetfmt::MalformedCorpusTest>();
+    AddTest<assetfmt::AssetRoundtripTest>();
+    AddTest<assetfmt::TextureViewHookTest>();
     AddTest<textureviewtest::TextureAssetViewTest>();
     AddTest<IOTest>(ioTestPath);
     AddTest<SystemOperationTest>();
