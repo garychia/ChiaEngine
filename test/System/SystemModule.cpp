@@ -3,6 +3,7 @@
 #include "AssetTest.hpp"
 #include "CameraControllerTest.hpp"
 #include "FrameCounterTest.hpp"
+#include "GUITest.hpp"
 #include "IO/IOTest.hpp"
 #include "InputSystemTest.hpp"
 #include "ModuleTest.hpp"
@@ -26,6 +27,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
     AddTest<framecountertest::FrameCounterTest>();
+    AddTest<guitest::GUITest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();

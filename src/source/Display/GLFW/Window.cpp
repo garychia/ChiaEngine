@@ -297,5 +297,21 @@ bool Window::OnMouseInputReceived(const MouseInfo &mouseInfo)
         if (pChildren[i]->OnMouseInputReceived(mouseInfo))
             return true;
     }
+    // #64:GUI hit-test 派發 — 命中互動元件即消費(事件不繼續漏給場景);
+    // 未命中回傳 false,維持原有行為。
+    if (pGUILayout)
+    {
+        switch (mouseInfo.status)
+        {
+        case MouseStatus::LeftButtonDown:
+            return pGUILayout->DispatchMouseDown(mouseInfo.currentPosition);
+        case MouseStatus::LeftButtonUp:
+            return pGUILayout->DispatchMouseUp(mouseInfo.currentPosition);
+        case MouseStatus::Move:
+            return pGUILayout->DispatchMouseMove(mouseInfo.currentPosition);
+        default:
+            break;
+        }
+    }
     return false;
 }

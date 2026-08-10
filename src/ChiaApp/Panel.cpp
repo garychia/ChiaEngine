@@ -53,5 +53,7 @@ bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)
 
 bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
 {
-    return false;
+    // #64:轉發給 base — children(場景)先處理,GUI hit-test 最後;
+    // 點到 toolbar 元件即消費,點到場景空白處維持原本 return false。
+    return Window::OnMouseInputReceived(mouseInfo);
 }
