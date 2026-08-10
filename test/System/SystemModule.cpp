@@ -10,6 +10,7 @@
 #include "PhysicsSystemTest.hpp"
 #include "SceneSystemTest.hpp"
 #include "ReplayTest.hpp"
+#include "RendererContractTest.hpp"
 #include "TextureAssetViewTest.hpp"
 #include "WorldTest.hpp"
 
@@ -35,4 +36,6 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<overlap_test::PhysicsOverlapTest>();
     AddTest<physicssystemtest::PhysicsSystemTest>();
     AddTest<scenesystemtest::SceneSystemTest>();
+    AddTest<renderercontracttest::RendererContractTest>();
+    AddTest<renderercontracttest::VulkanRendererTest>();
 }

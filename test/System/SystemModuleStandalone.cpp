@@ -7,6 +7,7 @@
 #include "TextureAssetViewTest.hpp"
 #include "FrameTest.hpp"
 #include "FrameSerializationTest.hpp"
+#include "RendererContractTest.hpp"
 #include "TextRenderingTest.hpp"
 
 SystemModuleStandalone::SystemModuleStandalone() : Module()
@@ -21,4 +22,6 @@ SystemModuleStandalone::SystemModuleStandalone() : Module()
     AddTest<FrameTest>();
     AddTest<FrameSerializationTest>();
     AddTest<TextRenderingTest>();
+    AddTest<renderercontracttest::RendererContractTest>();
+    AddTest<renderercontracttest::VulkanRendererTest>();
 }
