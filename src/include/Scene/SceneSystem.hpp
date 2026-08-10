@@ -129,6 +129,16 @@ class SceneSystem : public IModule
             TraverseSubtree(roots[i], callback);
     }
 
+    // pre-order 扁平化(editor #60 step 1):out[i] = 節點、depths[i] = 深度
+    // (root = 0)。順序與 Traverse 相同 — roots 依 index、children 依 index,
+    // 確定性,可無頭測試。
+    void GetHierarchy(DynamicArray<Entity> &out, DynamicArray<uint32_t> &depths) const
+    {
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); i++)
+            GetHierarchySubtree(roots[i], 0, out, depths);
+    }
+
     // recursive destroy:先 DFS 蒐集 descendants,再由淺到深摧毀。
     void DestroyNode(Entity e)
     {
@@ -173,6 +183,16 @@ class SceneSystem : public IModule
         DynamicArray<Entity> children = GetChildren(e);
         for (size_t i = 0; i < children.GetNElements(); i++)
             TraverseSubtree(children[i], callback);
+    }
+
+    void GetHierarchySubtree(Entity e, uint32_t depth, DynamicArray<Entity> &out,
+                             DynamicArray<uint32_t> &depths) const
+    {
+        out.Append(e);
+        depths.Append(depth);
+        DynamicArray<Entity> children = GetChildren(e);
+        for (size_t i = 0; i < children.GetNElements(); i++)
+            GetHierarchySubtree(children[i], depth + 1, out, depths);
     }
 
     void CollectSubtree(Entity e, DynamicArray<Entity> &out) const

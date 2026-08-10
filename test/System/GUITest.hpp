@@ -6,6 +6,7 @@
 #include "Display/GUI/Button.hpp"
 #include "Display/GUI/GUILayout.hpp"
 #include "Display/GUI/GUILayer.hpp"
+#include "Display/GUI/HierarchyRow.hpp"
 #include "Geometry/2D/Point2D.hpp"
 #include "Types/Types.hpp"
 
@@ -122,6 +123,61 @@ class GUITest : public Test
         EXPECT_TRUE(hoverCountA == 1, "hover inside should fire once", true);
         EXPECT_TRUE(!layout.DispatchMouseMove(Point2D(10.f, 10.f)), "move outside should not hover", true);
         EXPECT_TRUE(hoverCountA == 1, "hover count unchanged outside", true);
+
+        SUCCESS_MESSAGE(GetName());
+        return true;
+    }
+};
+
+// HierarchyRowTest(issue #60 step 1 — editor 側欄列):
+// HierarchyRow(Button 子類)把點擊帶上綁定的 Entity — Button::clickEvent 無參數,
+// 無法表達「哪一列被點」,rowClicked(Entity) 讓 Panel 一個 handler 接所有列。
+class HierarchyRowTest : public Test
+{
+  private:
+    GUILayout layout;
+
+    SharedPtr<HierarchyRow> pRow;
+
+    Entity expectedEntity;
+
+    Entity clickedEntity;
+
+    int clickCount = 0;
+
+  public:
+    HierarchyRowTest()
+        : Test("GUIHierarchyRow"), layout(), pRow(), expectedEntity(Entity::FromRaw(7)),
+          clickedEntity(), clickCount(0)
+    {
+        Point2D windowSize(400.f, 300.f);
+        auto pLayer = SharedPtr<GUILayer>::Construct(windowSize, Border(0.f, 0.f, 400.f, 300.f));
+        pRow = pLayer->AddComponent<HierarchyRow>(windowSize, Border(10.f, 10.f, 150.f, 22.f),
+                                                  expectedEntity);
+        pRow->rowClicked.Subscribe(this, &HierarchyRowTest::OnRowClicked);
+        layout.AddLayer(pLayer);
+    }
+
+    void OnRowClicked(Entity entity)
+    {
+        clickedEntity = entity;
+        clickCount++;
+    }
+
+    bool Run() noexcept override
+    {
+        TEST_MESSAGE(GetName());
+
+        // 1. 列內 down+up → rowClicked 帶正確 entity
+        EXPECT_TRUE(layout.DispatchMouseDown(Point2D(50.f, 20.f)), "down on row should hit", true);
+        EXPECT_TRUE(layout.DispatchMouseUp(Point2D(50.f, 20.f)), "up on row should complete click", true);
+        EXPECT_TRUE(clickCount == 1, "row click should fire once", true);
+        EXPECT_TRUE(clickedEntity == expectedEntity, "rowClicked carries the row's entity", true);
+
+        // 2. 列外 → 不觸發 rowClicked
+        EXPECT_TRUE(!layout.DispatchMouseDown(Point2D(300.f, 200.f)), "down outside row should miss", true);
+        EXPECT_TRUE(!layout.DispatchMouseUp(Point2D(300.f, 200.f)), "up outside row should miss", true);
+        EXPECT_TRUE(clickCount == 1, "outside click should not fire rowClicked", true);
 
         SUCCESS_MESSAGE(GetName());
         return true;

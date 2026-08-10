@@ -2,9 +2,10 @@
 #include "Paths.hpp"
 #include "Geometry/Primitives.hpp"
 
-SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController)
+SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
+                         SceneSystem *pSceneSystem)
     : Window(info), pTextures(), pMainScene(), pRecorder(pRecorder), pController(pController),
-      replayKeyDown(false)
+      pSceneSystem(pSceneSystem), replayKeyDown(false)
 {
     pMainScene = SharedPtr<Scene>::Construct();
 }
@@ -25,6 +26,15 @@ bool SceneWindow::Initialize(Window *pParent)
     // 相機是 Sim 擁有的狀態(CameraController),View 只拿 WeakPtr 來渲染
     if (pController)
         pMainScene->ApplyCamera(pController->GetCamera());
+    // #60 step 1 demo:建立節點階層(Sim 側)供 hierarchy 側欄顯示。
+    // 純 editor 演示資料 — 之後的 step 2/3 才把節點綁到 renderable。
+    if (pSceneSystem)
+    {
+        Entity root = pSceneSystem->CreateNode();
+        Entity childA = pSceneSystem->CreateNode(root);
+        pSceneSystem->CreateNode(root);
+        pSceneSystem->CreateNode(childA);
+    }
     return LoadScene(*pMainScene);
 }
 

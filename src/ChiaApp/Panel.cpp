@@ -3,10 +3,11 @@
 #include "Display/WindowManager.hpp"
 #include "System/Input/InputHandler.hpp"
 
-Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController)
+Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,
+             SceneSystem *pSceneSystem)
     : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
       layout(Point2D(info.GetWidth(), info.GetHeight())), pSimRecorder(pSimRecorder),
-      pCameraController(pCameraController)
+      pCameraController(pCameraController), pSceneSystem(pSceneSystem), selectedEntity()
 {
 }
 
@@ -20,12 +21,18 @@ bool Panel::Initialize(Window *pParent)
                             GetWindowInfo().GetHeight() - sceneAreaHeight, sceneWindowWidth / 2);
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
-                                                                        pSimRecorder, pCameraController));
+                                                                        pSimRecorder, pCameraController,
+                                                                        pSceneSystem));
     // P6:GUI 走 Frame — 佈局掛上視窗,由 Window::Render 錄成 DrawGUILayout 命令。
     // (取代 legacy renderer.LoadGUILayout/Render(layout),該路徑在 Vulkan 下是空實作,
     //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)
     if (!pSceneWindow)
         return false;
+    // #60 step 1:SceneWindow::Initialize 已建立 demo 節點,這裡重建側欄並接選取事件。
+    layout.BuildHierarchy(*pSceneSystem);
+    auto &rows = layout.GetHierarchyRows();
+    for (size_t i = 0; i < rows.GetNElements(); i++)
+        rows[i]->rowClicked.Subscribe(this, &Panel::OnHierarchyRowClicked);
     SetGUILayout(&layout);
     return true;
 }
@@ -56,4 +63,22 @@ bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
     // #64:轉發給 base — children(場景)先處理,GUI hit-test 最後;
     // 點到 toolbar 元件即消費,點到場景空白處維持原本 return false。
     return Window::OnMouseInputReceived(mouseInfo);
+}
+
+void Panel::OnHierarchyRowClicked(Entity entity)
+{
+    selectedEntity = entity;
+    RefreshHierarchyHighlight();
+}
+
+void Panel::RefreshHierarchyHighlight()
+{
+    auto &rows = layout.GetHierarchyRows();
+    for (size_t i = 0; i < rows.GetNElements(); i++)
+    {
+        if (rows[i]->GetEntity() == selectedEntity)
+            rows[i]->SetColor(Color(0.35f, 0.45f, 0.85f)); // 選取高亮
+        else
+            rows[i]->SetColor(Color(0.22f, 0.22f, 0.25f));
+    }
 }

@@ -52,6 +52,8 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/IInteractable.cpp
     include/Display/GUI/GUIFrameProjector.hpp
     source/Display/GUI/GUIFrameProjector.cpp
+    include/Display/GUI/HierarchyRow.hpp
+    source/Display/GUI/HierarchyRow.cpp
     include/Display/Text/GlyphAtlas.hpp
     source/Display/Text/GlyphAtlas.cpp
     include/Display/Text/TextLayout.hpp

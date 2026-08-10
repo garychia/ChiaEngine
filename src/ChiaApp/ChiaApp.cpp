@@ -6,9 +6,10 @@
 #define DEFAULT_MAIN_WINDOW_HEIGHT 800
 
 ChiaApp::ChiaApp(const AppInfo &info)
-    : App(info), engine(1), simRecorder(), cameraController()
+    : App(info), engine(1), simRecorder(), sceneSystem(), cameraController()
 {
     engine.Attach(&simRecorder); // 先附著:輸入先寫,sim 後讀
+    engine.Attach(&sceneSystem);
     engine.Attach(&cameraController);
 }
 
@@ -17,7 +18,7 @@ int ChiaApp::Execute()
     WindowInfo winInfo(&info, String("Chia Engine"), false, DEFAULT_MAIN_WINDOW_WIDTH,
                        DEFAULT_MAIN_WINDOW_HEIGHT);
     pMainWindow = WindowManager::GetSingleton().ConstructWindow<Panel>(winInfo, &simRecorder,
-                                                                       &cameraController);
+                                                                       &cameraController, &sceneSystem);
     if (!pMainWindow)
         return EXIT_FAILURE;
     if (!pMainWindow->Show())

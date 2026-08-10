@@ -28,6 +28,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<WorldTest>();
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<guitest::GUITest>();
+    AddTest<guitest::HierarchyRowTest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();

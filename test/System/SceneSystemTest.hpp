@@ -123,6 +123,29 @@ class SceneSystemTest : public Test
             EXPECT_TRUE(order.GetNElements() >= 2, "走訪了至少 2 節點(r 及其下).", true);
         }
 
+        // ---- AC4:GetHierarchy pre-order 扁平化(editor #60 step 1)----
+        {
+            SceneSystem system;
+            Entity root = system.CreateNode();
+            Entity childA = system.CreateNode(root);
+            Entity childB = system.CreateNode(root);
+            Entity grand = system.CreateNode(childA);
+
+            DynamicArray<Entity> nodes;
+            DynamicArray<uint32_t> depths;
+            system.GetHierarchy(nodes, depths);
+
+            EXPECT_TRUE(nodes.GetNElements() == 4, "root + 2 children + 1 grandchild = 4 節點.", true);
+            EXPECT_TRUE(depths.GetNElements() == 4, "depths 與 nodes 等長.", true);
+            EXPECT_TRUE(nodes[0] == root, "pre-order 首位是 root.", true);
+            EXPECT_TRUE(depths[0] == 0, "root 深度 0.", true);
+            // pre-order DFS:root → childA → grand(childA 子樹)→ childB;
+            // siblings 依 entity index 升序(childA index < childB index)
+            EXPECT_TRUE(nodes[1] == childA && depths[1] == 1, "childA 深度 1.", true);
+            EXPECT_TRUE(nodes[2] == grand && depths[2] == 2, "grand 在 childA 子樹中(pre-order).", true);
+            EXPECT_TRUE(nodes[3] == childB && depths[3] == 1, "childB 在 childA 子樹後.", true);
+        }
+
         // ---- 驗證:SceneSystem 透過 EngineContext RegisterService 可被 Resolve ----
         {
             Engine engine(1);

@@ -7,6 +7,7 @@
 #include "Components/PanelLayout.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
+#include "System/World/Entity.hpp"
 
 class Panel : public Window
 {
@@ -21,7 +22,18 @@ class Panel : public Window
 
     CameraController *pCameraController;
 
-    Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController);
+    // #60 step 1:hierarchy 側欄的資料源(Sim 側場景圖)
+    SceneSystem *pSceneSystem;
+
+    // editor 選取狀態 — step 2 的 Inspector 消費
+    Entity selectedEntity;
+
+    Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,
+          SceneSystem *pSceneSystem);
+
+    void OnHierarchyRowClicked(Entity entity);
+
+    void RefreshHierarchyHighlight();
 
   public:
     virtual bool Initialize(Window *pParent = nullptr) override;
