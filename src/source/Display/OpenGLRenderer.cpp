@@ -1,3 +1,8 @@
+// DEPRECATED — OpenGL backend. See OpenGLRenderer.hpp: not wired into the
+// Frame/IFrameExecutor architecture, kept only as the non-Vulkan CMake
+// fallback. GUI TODOs (:212 LoadGUILayout, :309 Render(GUILayout&)) are
+// intentionally NOT implemented — the GLFW window path is Frame-driven and
+// cannot reach them; see docs/agents/opengl-backend-assessment.md.
 #include "Display/OpenGLRenderer.hpp"
 #include "Display/Window.hpp"
 #include "System/Debug/Debug.hpp"

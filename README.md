@@ -4,15 +4,15 @@ A cross-platform 3D game engine built from scratch in modern C++ (C++17).
 
 ## Overview
 
-ChiaEngine is a modular game engine supporting **DirectX**, **Vulkan**, and **OpenGL** rendering backends. It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
+ChiaEngine is a modular game engine supporting **DirectX**, **Vulkan**, and **OpenGL** rendering backends (OpenGL is **deprecated** — Vulkan is the supported backend). It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
 
 | Backend | Windows | Linux | macOS |
 |---------|---------|-------|-------|
 | DirectX | ✅ | — | — |
 | Vulkan | ✅ | ✅ | ✅ |
-| OpenGL | ✅ | ✅ | ✅ |
+| OpenGL | ⚠️ deprecated | ⚠️ deprecated | ⚠️ deprecated |
 
-> **Note:** Currently only the DirectX backend has a working OpenGL implementation; Vulkan and OpenGL backends are stubs awaiting implementation.
+> **Note:** Vulkan is the working reference backend. DirectX is the Windows-only legacy backend. The OpenGL backend is **deprecated** — not wired into the Frame/IFrameExecutor architecture, not compiled by default, and requires a manually generated GLAD loader (see [assessment](docs/agents/opengl-backend-assessment.md)).
 
 ## Requirements
 
@@ -29,7 +29,7 @@ ChiaEngine is a modular game engine supporting **DirectX**, **Vulkan**, and **Op
 sudo apt install libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
 ```
 
-### OpenGL Backend Setup
+### OpenGL Backend Setup (deprecated)
 
 When building with the OpenGL backend (default on non-Windows without Vulkan SDK), you need **GLAD** (OpenGL function loader). Generate the files at [glad.dav1d.de](https://glad.dav1d.de/) with:
 
@@ -56,7 +56,7 @@ cmake --build build -j$(nproc)
 |--------|---------|-------------|
 | `DIRECTX_ENABLED` | ON (Windows) | Use DirectX rendering backend |
 | `VULKAN_ENABLED` | ON (non-Windows) | Use Vulkan rendering backend |
-| `OPENGL_ENABLED` | OFF | Use OpenGL rendering backend |
+| `OPENGL_ENABLED` | OFF | Use OpenGL rendering backend **(DEPRECATED — Vulkan is the supported backend; see assessment)** |
 
 ## Project Structure
 

@@ -1,6 +1,10 @@
 #ifndef OPENGL_HELPER_HPP
 #define OPENGL_HELPER_HPP
 
+// DEPRECATED — OpenGL backend helper. Used only by OpenGLRenderer (itself
+// deprecated); kept as the legacy non-Vulkan CMake fallback. See
+// docs/agents/opengl-backend-assessment.md.
+
 #include "Data/String.hpp"
 #include "Data/DynamicArray.hpp"
 #include "Display/Color.hpp"

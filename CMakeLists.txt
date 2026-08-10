@@ -25,7 +25,7 @@ cmake_dependent_option(
 )
 cmake_dependent_option(
     OPENGL_ENABLED
-    "Use OpenGL as the rendering engine."
+    "Use OpenGL as the rendering engine. (DEPRECATED — Vulkan is the supported backend; see docs/agents/opengl-backend-assessment.md)"
     ON "NOT DIRECTX_ENABLED;NOT VULKAN_ENABLED" OFF
 )
 
@@ -53,6 +53,7 @@ elseif(VULKAN_ENABLED)
     find_package(Vulkan REQUIRED)
     add_compile_definitions(VULKAN_ENABLED)
 else()
+    message(WARNING "OPENGL_ENABLED is DEPRECATED — the OpenGL backend is not wired into the Frame/IFrameExecutor architecture (Renderer.hpp has no OpenGL branch) and needs a manually generated GLAD loader (src/include/3rdparty/glad/). Vulkan is the supported backend. See docs/agents/opengl-backend-assessment.md.")
     find_package(OpenGL REQUIRED)
     add_compile_definitions(OPENGL_ENABLED)
     list(APPEND CHIA_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include/3rdparty)

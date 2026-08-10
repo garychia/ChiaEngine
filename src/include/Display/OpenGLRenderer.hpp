@@ -1,6 +1,13 @@
 #ifndef OPENGL_RENDERER_HPP
 #define OPENGL_RENDERER_HPP
 
+// DEPRECATED — OpenGL backend. Not wired into the Frame/IFrameExecutor
+// architecture (Renderer.hpp has no OPENGL_ENABLED branch), not compiled by
+// default (selected only as the non-Vulkan CMake fallback), and cannot compile
+// without a manually generated GLAD loader (src/include/3rdparty/glad/).
+// Kept only as the legacy non-Vulkan fallback; see
+// docs/agents/opengl-backend-assessment.md.
+
 #include "Display/IRenderer.hpp"
 #include "Display/Camera.hpp"
 #include "Display/Scene.hpp"

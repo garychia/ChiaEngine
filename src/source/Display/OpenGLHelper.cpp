@@ -1,3 +1,5 @@
+// DEPRECATED — OpenGL backend helper. See OpenGLHelper.hpp: used only by the
+// deprecated OpenGLRenderer; kept as the legacy non-Vulkan CMake fallback.
 #include "Display/OpenGLHelper.hpp"
 #include "System/Debug/Debug.hpp"
 #include "System/IO/IO.hpp"
