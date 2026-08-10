@@ -2188,21 +2188,21 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
         return;
 
     const uint32_t vertexCount = static_cast<uint32_t>(quads.GetNElements()) * 6; // 每 quad 兩個三角形
-    if (textVertexCapacity < vertexCount)
+    // #66:固定容量 — 首次使用時 lazy 建立(之前沒有 command buffer 參照過它,
+    // 建立安全);resize 後的 CleanupPipelineResources 也是 device idle 才 destroy,
+    // 下次幀再 lazy 重建。單一 label 超過上限(≈682 字形)就不畫 —
+    // TextLayout 依佈局寬度截斷,正常不會發生。
+    if (!textVertexBuffer)
     {
-        if (textVertexBuffer)
-            vkDestroyBuffer(device, textVertexBuffer, nullptr);
-        if (textVertexMemory)
-            vkFreeMemory(device, textVertexMemory, nullptr);
-        textVertexBuffer = VK_NULL_HANDLE;
-        textVertexMemory = VK_NULL_HANDLE;
-        if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(vertexCount) * sizeof(VulkanVertex),
+        if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(MaxTextVertices) * sizeof(VulkanVertex),
                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                           textVertexBuffer, textVertexMemory))
             return;
-        textVertexCapacity = vertexCount;
+        textVertexCapacity = MaxTextVertices;
     }
+    if (vertexCount > textVertexCapacity)
+        return;
 
     DynamicArray<VulkanVertex> vertices;
     vertices.Resize(vertexCount);

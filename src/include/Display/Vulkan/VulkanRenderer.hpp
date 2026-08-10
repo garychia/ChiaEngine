@@ -119,6 +119,11 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     VkDeviceMemory textVertexMemory;
     uint32_t textVertexCapacity = 0;
 
+    // #66:文字 vertex buffer 固定容量(≈682 字形/單一 label)。
+    // 執行期擴容會 destroy 仍被 in-flight command buffer 參照的舊 buffer
+    // (VUID 錯誤);TextLayout 已依佈局寬度截斷 label,固定容量綽綽有餘。
+    static constexpr uint32_t MaxTextVertices = 4096;
+
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
     bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
