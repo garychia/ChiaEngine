@@ -139,7 +139,7 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool LoadRenderable(const IRenderable &renderable);       // RenderInfo → GPU buffer
     bool LoadTextureImage(const Texture &texture);            // 載入真實貼圖(單一 slot)
     void UpdateTextureDescriptor();                           // 重新寫 UBO + sampler 描述子
-    void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable);
+    void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace = false);
     void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
                              const glm::mat4 &projection, bool useTexture);
 

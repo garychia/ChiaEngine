@@ -1094,12 +1094,12 @@ bool VulkanRenderer::Execute(const Frame &frame)
                     for (size_t li = 0; li < layers.GetNElements(); li++)
                     {
                         LoadRenderable(*layers[li]);
-                        RecordDrawCommands(commandBuffers[currentImageIndex], *layers[li]);
+                        RecordDrawCommands(commandBuffers[currentImageIndex], *layers[li], true);
                         const DynamicArray<SharedPtr<IGUI>> &components = layers[li]->GetComponents();
                         for (size_t ci = 0; ci < components.GetNElements(); ci++)
                         {
                             LoadRenderable(*components[ci]);
-                            RecordDrawCommands(commandBuffers[currentImageIndex], *components[ci]);
+                            RecordDrawCommands(commandBuffers[currentImageIndex], *components[ci], true);
                         }
                     }
                 }
@@ -1806,7 +1806,7 @@ bool VulkanRenderer::LoadTextureImage(const Texture &texture)
     return true;
 }
 
-void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable)
+void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace)
 {
     const size_t id = renderable.GetIdentifier();
     HashTable<size_t, RenderableGpuData>::Iterator itr = renderableGpuMap.Find(id);
@@ -1819,24 +1819,40 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
                              0, 1, &descriptorSet, 0, nullptr);
 
     // UBO:逐 drawable 更新(world / view / proj)
-    const Point3D &pos = renderable.GetPosition();
-    const Point3D &rot = renderable.GetRotation();
-    const Point3D &scale = renderable.GetScale();
-    const glm::mat4 world = BuildWorldMatrix(pos, rot, scale);
-
-    glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
-                                             static_cast<float>(swapchainExtent.width) /
-                                                 static_cast<float>(swapchainExtent.height),
-                                             0.001f, 100.0f);
-    if (pActiveCamera)
+    glm::mat4 world;
+    glm::mat4 view;
+    glm::mat4 projection;
+    if (guiSpace)
     {
-        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                     pActiveCamera->GetDistanceToNearPlane(),
-                                     pActiveCamera->GetDistanceToFarPlane());
+        // GUI uses orthographic projection with y-flip and correct depth range
+        // NDC space: x in [-1,1], y in [-1,1] (but GUI provides y-up NDC, so we flip y)
+        // We want: left=-1, right=1, bottom=1, top=-1, near=-1, far=1
+        // This matches: orthoRH_ZO(-1, 1, 1, -1, -1, 1)
+        world = glm::mat4(1.0f);
+        view = glm::mat4(1.0f);
+        projection = glm::orthoRH_ZO(-1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f);
+    }
+    else
+    {
+        const Point3D &pos = renderable.GetPosition();
+        const Point3D &rot = renderable.GetRotation();
+        const Point3D &scale = renderable.GetScale();
+        world = BuildWorldMatrix(pos, rot, scale);
+
+        view = glm::mat4(1.0f);
+        projection = glm::perspective(glm::radians(70.0f),
+                                     static_cast<float>(swapchainExtent.width) /
+                                         static_cast<float>(swapchainExtent.height),
+                                     0.001f, 100.0f);
+        if (pActiveCamera)
+        {
+            view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
+            const float aspect = static_cast<float>(swapchainExtent.width) /
+                                 static_cast<float>(swapchainExtent.height);
+            projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
+                                         pActiveCamera->GetDistanceToNearPlane(),
+                                         pActiveCamera->GetDistanceToFarPlane());
+        }
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
     UpdateUniformBuffer(world, view, projection, useTexture);
