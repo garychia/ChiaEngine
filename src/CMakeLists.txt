@@ -6,14 +6,14 @@ if(VULKAN_ENABLED)
     list(APPEND CHIA_INCLUDE_DIRS ${Vulkan_INCLUDE_DIRS})
 endif()
 
+add_subdirectory(System/Audio)
+
 set(APP_SOURCE_FILES
     include/App/App.hpp
     include/App/MainLoop.hpp
     source/App/App.cpp
     source/App/MainLoop.cpp
 )
-
-add_subdirectory(include/Data)
 
 set(DISPLAY_SOURCE_FILES
     include/Display/Camera.hpp
@@ -74,7 +74,7 @@ else()
     if(EXISTS ${CMAKE_SOURCE_DIR}/src/include/3rdparty/glad/glad.c)
         list(APPEND DISPLAY_SOURCE_FILES ${CMAKE_SOURCE_DIR}/src/include/3rdparty/glad/glad.c)
     else()
-        message(WARNING "glad.c not found — generate it from https://glad.dav1d.de/ (OpenGL 3.3 Core, Generate a loader) and place in src/include/3rdparty/glad/")
+        message(WARNING \"glad.c not found — generate it from https://glad.dav1d.de/ (OpenGL 3.3 Core, Generate a loader) and place in src/include/3rdparty/glad/\")
     endif()
     list(APPEND DISPLAY_SOURCE_FILES
         include/Display/OpenGLHelper.hpp
@@ -143,20 +143,10 @@ add_library(ChiaEngineLib STATIC ${CHIA_ENGINE_SOURCE_FILES})
 target_include_directories(ChiaEngineLib PUBLIC ${CHIA_INCLUDE_DIRS})
 target_precompile_headers(ChiaEngineLib PUBLIC include/pch.hpp)
 if(DIRECTX_ENABLED)
-    target_link_libraries(ChiaEngineLib
-        d3d11.lib
-        dxgi.lib
-        d3dcompiler.lib
-        Windowscodecs.lib
-    )
+target_link_libraries(ChiaEngineLib PRIVATE d3d11.lib dxgi.lib d3dcompiler.lib Windowscodecs.lib)
 elseif(VULKAN_ENABLED)
-    target_link_libraries(ChiaEngineLib
-        "Vulkan::Vulkan"
-        glfw
-    )
+target_link_libraries(ChiaEngineLib PRIVATE Vulkan::Vulkan glfw)
 else()
-    target_link_libraries(ChiaEngineLib
-        OpenGL::GL
-        glfw
-    )
+target_link_libraries(ChiaEngineLib PRIVATE OpenGL::GL glfw)
 endif()
+target_link_libraries(ChiaEngineLib PRIVATE ChiaEngineAudio)
