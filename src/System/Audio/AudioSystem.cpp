@@ -2,6 +2,7 @@
 #include <mutex>
 #include <unordered_map>
 #include <memory>
+#include <string>
 
 namespace ChiaEngine {
 namespace System {
@@ -18,7 +19,9 @@ public:
         if (m_isInitialized) {
             return true;
         }
-        // Stub initialization - always succeed
+        
+        // In a real implementation, initialize audio backend here
+        // For now, we just mark as initialized
         m_isInitialized = true;
         return true;
     }
@@ -48,7 +51,8 @@ public:
             return it->second;
         }
 
-        // Stub: just return a dummy shared_ptr
+        // In a real implementation, load the sound file here
+        // For now, we just return a dummy shared_ptr to indicate success
         auto dummy = std::make_shared<int>(0);
         m_soundEffects[filePath] = dummy;
         return dummy;
@@ -56,6 +60,11 @@ public:
 
     virtual void PlaySoundEffect(std::shared_ptr<void> soundHandle, bool loop, float volume) override {
         // Stub: do nothing
+        // In a real implementation, you would:
+        // 1. Cast soundHandle to your sound data type
+        // 2. Create a voice/instance to play the sound
+        // 3. Apply volume and looping
+        // 4. Start playback
         (void)soundHandle;
         (void)loop;
         (void)volume;
@@ -63,16 +72,23 @@ public:
 
     virtual void StopSoundEffect(std::shared_ptr<void> soundHandle) override {
         // Stub: do nothing
+        // In a real implementation, you would stop the specific sound instance
         (void)soundHandle;
     }
 
     virtual std::shared_ptr<void> LoadMusic(const std::string& filePath) override {
-        // Stub: same as sound effect
+        // For music, we might want to stream rather than load entirely
+        // For now, same as sound effect
         return LoadSoundEffect(filePath);
     }
 
     virtual void PlayMusic(std::shared_ptr<void> musicHandle, bool loop, float volume) override {
         // Stub: do nothing
+        // In a real implementation, you would:
+        // 1. Cast musicHandle to your music data type
+        // 2. Create a music instance
+        // 3. Apply volume and looping
+        // 4. Start playback
         (void)musicHandle;
         (void)loop;
         (void)volume;
@@ -80,20 +96,23 @@ public:
 
     virtual void StopMusic() override {
         // Stub: do nothing
+        // In a real implementation, stop the currently playing music
     }
 
     virtual void PauseMusic() override {
         // Stub: do nothing
+        // In a real implementation, pause the currently playing music
     }
 
     virtual void ResumeMusic() override {
         // Stub: do nothing
+        // In a real implementation, resume the currently paused music
     }
 
     virtual void SetMasterVolume(float volume) override {
-        m_masterVolume = volume;
-        if (m_masterVolume > 1.0f) m_masterVolume = 1.0f;
-        if (m_masterVolume < 0.0f) m_masterVolume = 0.0f;
+        // Clamp volume to [0, 1]
+        m_masterVolume = std::max(0.0f, std::min(1.0f, volume));
+        // In a real implementation, apply this to your audio backend
     }
 
     virtual float GetMasterVolume() const override {
@@ -104,7 +123,8 @@ private:
     float m_masterVolume;
     bool m_isInitialized;
     
-    // Simple cache for loaded sounds (stub)
+    // Simple cache for loaded sounds
+    // Key: file path, Value: handle to the loaded sound data
     std::unordered_map<std::string, std::shared_ptr<void>> m_soundEffects;
     std::unordered_map<std::string, std::shared_ptr<void>> m_musicTracks;
     std::mutex m_mutex;
