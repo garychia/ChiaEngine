@@ -128,7 +128,14 @@ set(SYSTEM_SOURCE_FILES
     source/System/Input/MouseInput.cpp
     include/System/IO/IO.hpp
     source/System/IO/IO.cpp
+    include/System/Audio/IAudioSystem.hpp
+    include/System/Audio/AudioSystem.hpp
+    include/System/Audio/Wav.hpp
+    source/System/Audio/AudioSystem.cpp
 )
+
+# miniaudio 標頭路徑(單檔函式庫,MA_IMPLEMENTATION 在 AudioSystem.cpp 內定義)
+list(APPEND CHIA_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/include/System/Audio)
 
 if(WIN32)
     list(APPEND SYSTEM_SOURCE_FILES source/System/Debug/Windows/Debug.cpp)
@@ -167,5 +174,14 @@ else()
     target_link_libraries(ChiaEngineLib
         OpenGL::GL
         glfw
+    )
+endif()
+
+# miniaudio 後端依賴(dl/pthread/m 在 Linux 上提供 ALSA/PulseAudio 完整支援)
+if(NOT WIN32)
+    target_link_libraries(ChiaEngineLib
+        ${CMAKE_DL_LIBS}
+        pthread
+        m
     )
 endif()

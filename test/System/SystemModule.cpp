@@ -14,6 +14,7 @@
 #include "RendererContractTest.hpp"
 #include "TextureAssetViewTest.hpp"
 #include "WorldTest.hpp"
+#include "AudioSystemTest.hpp"
 
 SystemModule::SystemModule(const String &ioTestPath)
 {
@@ -41,4 +42,6 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<scenesystemtest::SceneSystemTest>();
     AddTest<renderercontracttest::RendererContractTest>();
     AddTest<renderercontracttest::VulkanRendererTest>();
+    AddTest<audiotest::AudioSystemTest>();
+    AddTest<audiotest::AudioPlaybackTest>();
 }
