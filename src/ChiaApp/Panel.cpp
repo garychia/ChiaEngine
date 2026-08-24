@@ -33,6 +33,8 @@ bool Panel::Initialize(Window *pParent)
     auto &rows = layout.GetHierarchyRows();
     for (size_t i = 0; i < rows.GetNElements(); i++)
         rows[i]->rowClicked.Subscribe(this, &Panel::OnHierarchyRowClicked);
+    // #60 step 2:建立右側 Inspector(消費選取的 entity)。
+    layout.CreateInspector(*pSceneSystem);
     SetGUILayout(&layout);
     return true;
 }
@@ -40,6 +42,9 @@ bool Panel::Initialize(Window *pParent)
 void Panel::Render()
 {
     // 佈局經 Window::Render 的 Frame 命令流繪製(DrawGUILayout),不再走 legacy 死路。
+    // Inspector 每幀重畫選取 entity 的目前值(反映外部 transform 改動)。
+    if (InspectorLayer *pInspector = layout.GetInspector())
+        pInspector->Update();
     Window::Render();
 }
 
@@ -68,6 +73,8 @@ bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
 void Panel::OnHierarchyRowClicked(Entity entity)
 {
     selectedEntity = entity;
+    if (InspectorLayer *pInspector = layout.GetInspector())
+        pInspector->SelectEntity(entity.GetIndex());
     RefreshHierarchyHighlight();
 }
 

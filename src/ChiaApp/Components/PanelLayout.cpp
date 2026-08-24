@@ -43,6 +43,25 @@ void PanelLayout::BuildHierarchy(SceneSystem &scene)
         pRow->SetTextColor(Color(0.9f, 0.9f, 0.92f));
         pHierarchyRows.Append(pRow);
     }
+
+    // #67:rows 在 AddLayer 之後才加入 → z 全 0。重排深度才能維持重疊順序。
+    RefreshDepths();
+}
+
+void PanelLayout::CreateInspector(SceneSystem &scene)
+{
+    const Point2D windowSize = GetLayers().GetNElements() > 0 ? GetLayers()[0]->GetWindowSize() : Point2D(1000, 800);
+    const float inspectorWidth = 200.f;
+    const float x = windowSize.x - inspectorWidth;
+    pInspector = SharedPtr<InspectorLayer>::Construct<InspectorLayer>(
+        windowSize, Border(x, PanelLayout::TopBarHeight, inspectorWidth, 400.f), &scene);
+    SharedPtr<GUILayer> pLayer = pInspector;
+    AddLayer(pLayer);
+}
+
+InspectorLayer *PanelLayout::GetInspector()
+{
+    return pInspector.GetRaw();
 }
 
 DynamicArray<SharedPtr<HierarchyRow>> &PanelLayout::GetHierarchyRows()

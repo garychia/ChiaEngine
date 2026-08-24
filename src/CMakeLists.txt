@@ -54,6 +54,10 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/GUIFrameProjector.cpp
     include/Display/GUI/HierarchyRow.hpp
     source/Display/GUI/HierarchyRow.cpp
+    include/Display/GUI/InspectorButton.hpp
+    source/Display/GUI/InspectorButton.cpp
+    include/Display/GUI/InspectorLayer.hpp
+    source/Display/GUI/InspectorLayer.cpp
     include/Display/Text/GlyphAtlas.hpp
     source/Display/Text/GlyphAtlas.cpp
     include/Display/Text/TextLayout.hpp

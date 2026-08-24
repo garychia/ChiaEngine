@@ -5,6 +5,7 @@
 #include "Data/Pointers.hpp"
 #include "SceneWindow.hpp"
 #include "Components/PanelLayout.hpp"
+#include "Display/GUI/InspectorLayer.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
 #include "System/World/Entity.hpp"

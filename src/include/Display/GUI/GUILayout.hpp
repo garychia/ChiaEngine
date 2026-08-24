@@ -25,6 +25,11 @@ class GUILayout
 
     void AddLayer(SharedPtr<GUILayer> &pNewLayer);
 
+    // #67:CalculateComponentDepths 原本只在 AddLayer 裡跑,動態加 components
+    // (editor BuildHierarchy 重build列)後 z 永遠停留 0 → 重疊元件深度錯。
+    // 新增 public wrapper,佈局內容變動後重排深度。
+    void RefreshDepths();
+
     void SetWindowSize(const Point2D &newSize);
 
     DynamicArray<SharedPtr<GUILayer>> &GetLayers();

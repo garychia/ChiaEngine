@@ -29,6 +29,11 @@ void GUILayout::AddLayer(SharedPtr<GUILayer> &pNewLayer)
     CalculateComponentDepths();
 }
 
+void GUILayout::RefreshDepths()
+{
+    CalculateComponentDepths();
+}
+
 void GUILayout::SetWindowSize(const Point2D &newSize)
 {
     for (size_t i = 0; i < pLayers.Length(); i++)
