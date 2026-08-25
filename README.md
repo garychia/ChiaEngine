@@ -4,7 +4,7 @@ A cross-platform 3D game engine built from scratch in modern C++ (C++17).
 
 ## Overview
 
-ChiaEngine is a modular game engine supporting **DirectX**, **Vulkan**, and **OpenGL** rendering backends (OpenGL is **deprecated** — Vulkan is the supported backend). It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
+ChiaEngine is a modular game engine. **Vulkan** is the only fully working rendering backend (runs ChiaApp, real draw + GUI + text). **DirectX** is a Windows-only legacy backend with ~52 stubs (Frame-broken build, see #53/#63). **OpenGL** is **deprecated** (not wired into the Frame/IFrameExecutor architecture). It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
 
 | Backend | Windows | Linux | macOS |
 |---------|---------|-------|-------|
@@ -79,7 +79,7 @@ ChiaEngine/
 │   │   │   └── Pair.hpp         # Key-value pair
 │   │   ├── Display/         # Rendering & windowing
 │   │   │   ├── DirectX/         # DirectX 11 backend
-│   │   │   ├── Vulkan/          # Vulkan backend (stub)
+│   │   │   ├── Vulkan/          # Vulkan backend (working reference backend, only fully implemented)
 │   │   │   ├── GLFW/            # GLFW window support
 │   │   │   ├── GUI/             # GUI system
 │   │   │   └── Images/          # Image assets
