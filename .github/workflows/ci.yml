@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache
+
+      - name: Cache FetchContent deps + ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            build/_deps
+          key: chiaengine-ci-${{ hashFiles('CMakeLists.txt', 'src/CMakeLists.txt') }}
+          restore-keys: |
+            chiaengine-ci-
+
+      - name: Configure
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_EXAMPLES=OFF \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build TestMain
+        run: cmake --build build -j"$(nproc)" --target TestMain
+
+      - name: Run headless test suite
+        run: ./build/bin/TestMain
+
+      - name: Build ChiaApp (full src/ link check)
+        run: cmake --build build -j"$(nproc)" --target ChiaApp
