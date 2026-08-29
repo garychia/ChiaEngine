@@ -6,6 +6,7 @@
 #include "SceneWindow.hpp"
 #include "Components/PanelLayout.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
+#include "Display/GUI/Selection.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
 #include "System/World/Entity.hpp"
@@ -26,8 +27,8 @@ class Panel : public Window
     // #60 step 1:hierarchy 側欄的資料源(Sim 側場景圖)
     SceneSystem *pSceneSystem;
 
-    // editor 選取狀態 — step 2 的 Inspector 消費
-    Entity selectedEntity;
+    // editor 選取狀態(ADR-0001 D2:單一真相來源,InspectorLayer 只讀此)。
+    Selection selection;
 
     Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,
           SceneSystem *pSceneSystem);

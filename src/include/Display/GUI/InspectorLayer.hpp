@@ -4,6 +4,7 @@
 #include "Display/GUI/GUILayer.hpp"
 #include "Display/GUI/Button.hpp"
 #include "Display/GUI/InspectorButton.hpp"
+#include "Display/GUI/Selection.hpp"
 #include "Scene/SceneSystem.hpp"
 
 // Editor inspector(#68 step 2):右側面板,顯示並編輯目前選取 entity 的
@@ -21,8 +22,7 @@ class InspectorLayer : public GUILayer
     static const float BtnWidth;
 
     SceneSystem *pScene;
-    uint32_t selectedEntityIndex;
-    bool pendingRefresh;
+    const Selection *pSelection; // ADR-0001 D2:由 Panel 擁有,Inspector 只讀
 
     // 9 個 field row(只顯示文字):index 0..8 對應 InspectorAxis 順序。
     SharedPtr<Button> pFieldRows[9];
@@ -36,7 +36,8 @@ class InspectorLayer : public GUILayer
     InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene);
 
     // 設定目前選取的 entity(由 Panel 在點擊 hierarchy 列時呼叫)。
-    void SelectEntity(uint32_t entityIndex);
+    // ADR-0001 D2:直接引用 Panel 擁有的 Selection,避免雙份狀態。
+    void SetSelection(const Selection *pSelection);
 
     // 每幀由 Panel::Render 呼叫:反映 selectedEntity / 外部 transform 改動。
     void Update();

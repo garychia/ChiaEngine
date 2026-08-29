@@ -26,7 +26,7 @@ const char16_t *InspectorLayer::AxisLabel(InspectorAxis axis)
 }
 
 InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene)
-    : GUILayer(windowSize, border), pScene(pScene), selectedEntityIndex(0), pendingRefresh(true)
+    : GUILayer(windowSize, border), pScene(pScene), pSelection(nullptr)
 {
     SetColor(Color(0.10f, 0.10f, 0.12f));
     for (size_t i = 0; i < 9; i++)
@@ -41,15 +41,15 @@ InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, 
         pRow->SetTextColor(Color(0.9f, 0.9f, 0.92f));
         pFieldRows[i] = pRow;
 
-        // - / + 鈕(初始 target = 0,SelectEntity 會刷新)。
+        // - / + 鈕(初始 target = 0;SetSelection 會以 Selection.entityIndex 刷新)。
         auto pMinus = AddComponent<InspectorButton>(windowSize,
                                                      Border(ColLabelWidth + 6.f, y, BtnWidth, RowHeight - 2.f), pScene,
-                                                     selectedEntityIndex, axis, -1.f);
+                                                     0, axis, -1.f);
         pMinus->SetLabel(String(u"-"));
         pMinus->SetFontSize(12.f);
         auto pPlus = AddComponent<InspectorButton>(windowSize,
                                                    Border(ColLabelWidth + 6.f + BtnWidth, y, BtnWidth, RowHeight - 2.f),
-                                                   pScene, selectedEntityIndex, axis, +1.f);
+                                                   pScene, 0, axis, +1.f);
         pPlus->SetLabel(String(u"+"));
         pPlus->SetFontSize(12.f);
         pButtons[i * 2] = pMinus;
@@ -63,38 +63,38 @@ SharedPtr<Button> *InspectorLayer::GetFieldRows()
     return pFieldRows;
 }
 
-void InspectorLayer::SelectEntity(uint32_t entityIndex)
+void InspectorLayer::SetSelection(const Selection *pNewSelection)
 {
-    selectedEntityIndex = entityIndex;
+    pSelection = pNewSelection;
     for (size_t i = 0; i < 9; i++)
     {
-        pButtons[i * 2]->SetTarget(entityIndex);
-        pButtons[i * 2 + 1]->SetTarget(entityIndex);
+        pButtons[i * 2]->SetTarget(pSelection->entityIndex);
+        pButtons[i * 2 + 1]->SetTarget(pSelection->entityIndex);
     }
-    pendingRefresh = true;
-    RebuildValueLabels();
+    RebuildValueLabels(); // 選取變更立即刷新(非每幀 churn)
 }
 
 void InspectorLayer::Update()
 {
-    if (pScene && pendingRefresh)
-    {
-        RebuildValueLabels();
-        pendingRefresh = false;
-    }
+    RebuildValueLabels();
 }
 
 void InspectorLayer::ApplyEdit(uint32_t entityIndex, InspectorAxis axis, float sign)
 {
     EditTransformComponent(pScene, entityIndex, axis, sign);
-    pendingRefresh = true;
 }
 
 void InspectorLayer::RebuildValueLabels()
 {
-    if (!pScene)
+    if (!pScene || !pSelection || !pSelection->hasSelection)
+    {
+        // ADR-0001 D2:無選取 → 清空欄位(不顯示舊值、不崩)。
+        for (size_t i = 0; i < 9; i++)
+            pFieldRows[i]->SetLabel(String());
         return;
-    Entity e = pScene->world.GetEntityByIndex(selectedEntityIndex);
+    }
+    const uint32_t idx = pSelection->entityIndex;
+    Entity e = pScene->world.GetEntityByIndex(idx);
     if (!pScene->world.Alive(e))
         return;
     TransformComponent *pT = pScene->world.GetComponent<TransformComponent>(e);
