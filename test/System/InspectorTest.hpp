@@ -3,6 +3,7 @@
 
 #include "Display/GUI/InspectorButton.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
+#include "Display/GUI/Selection.hpp"
 #include "Math/Math.hpp"
 #include "Scene/SceneSystem.hpp"
 #include "Scene/TransformComponent.hpp"
@@ -35,7 +36,10 @@ class InspectorTest : public Test
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system);
-            inspector.SelectEntity(a.GetIndex());
+            Selection selA;
+            selA.entityIndex = a.GetIndex();
+            selA.hasSelection = true;
+            inspector.SetSelection(&selA);
 
             // axis 0 = Pos X → 應顯示 1.00
             const String &posXLabel = inspector.GetFieldRows()[0]->GetLabel();
@@ -51,7 +55,10 @@ class InspectorTest : public Test
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system);
-            inspector.SelectEntity(a.GetIndex());
+            Selection selA;
+            selA.entityIndex = a.GetIndex();
+            selA.hasSelection = true;
+            inspector.SetSelection(&selA);
 
             // Pos X + (axis 0, sign +1) → +0.5
             inspector.ApplyEdit(a.GetIndex(), InspectorAxis::PositionX, +1.f);
@@ -89,9 +96,15 @@ class InspectorTest : public Test
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system);
-            inspector.SelectEntity(a.GetIndex());
+            Selection selA;
+            selA.entityIndex = a.GetIndex();
+            selA.hasSelection = true;
+            inspector.SetSelection(&selA);
             inspector.ApplyEdit(a.GetIndex(), InspectorAxis::PositionX, +1.f);
-            inspector.SelectEntity(b.GetIndex());
+            Selection selB;
+            selB.entityIndex = b.GetIndex();
+            selB.hasSelection = true;
+            inspector.SetSelection(&selB);
             inspector.ApplyEdit(b.GetIndex(), InspectorAxis::RotationY, +1.f);
 
             TransformComponent *pA = system.world.GetComponent<TransformComponent>(a);
@@ -108,11 +121,45 @@ class InspectorTest : public Test
             Entity a = system.CreateNode();
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system);
-            inspector.SelectEntity(a.GetIndex());
+            Selection selA;
+            selA.entityIndex = a.GetIndex();
+            selA.hasSelection = true;
+            inspector.SetSelection(&selA);
             system.world.DestroyEntity(a);
             // 選到已毀 entity → Update 應安全跳過(不 crash,不改任何東西)
             inspector.Update();
             EXPECT_TRUE(true, "選取已毀 entity 後 Update 不崩.", true);
+        }
+
+        // ---- AC5 (ADR-0001 D2):Selection 為唯一真相來源,Inspector 只讀 ----
+        {
+            SceneSystem system;
+            Entity a = system.CreateNode();
+            Entity b = system.CreateNode();
+            system.world.GetComponent<TransformComponent>(a)->position = Point3D(1, 2, 3);
+            system.world.GetComponent<TransformComponent>(b)->position = Point3D(9, 9, 9);
+
+            Selection sel; // 擁有者(對應 Panel::selection)
+            sel.entityIndex = a.GetIndex();
+            sel.hasSelection = true;
+
+            InspectorLayer inspector(Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+            inspector.SetSelection(&sel);
+            EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() > 0,
+                        "選 a:Inspector 讀 Selection 顯示 a 的值.", true);
+
+            // 只改 Selection(entityIndex → b),不另 call Inspector —— Inspector 應跟著變
+            sel.entityIndex = b.GetIndex();
+            inspector.Update();
+            EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() > 0,
+                        "改 Selection→b:Inspector 讀同一份 Selection,顯示 b.", true);
+
+            // hasSelection = false → Inspector 不顯示任何欄(RebuildValueLabels 早退)
+            sel.hasSelection = false;
+            inspector.Update();
+            EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() == 0,
+                        "hasSelection=false:Inspector 清空欄位(不崩、不顯示舊值).", true);
         }
 
         SUCCESS_MESSAGE("Inspector");

@@ -7,7 +7,7 @@ Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController
              SceneSystem *pSceneSystem)
     : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
       layout(Point2D(info.GetWidth(), info.GetHeight())), pSimRecorder(pSimRecorder),
-      pCameraController(pCameraController), pSceneSystem(pSceneSystem), selectedEntity()
+      pCameraController(pCameraController), pSceneSystem(pSceneSystem), selection()
 {
 }
 
@@ -72,9 +72,10 @@ bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
 
 void Panel::OnHierarchyRowClicked(Entity entity)
 {
-    selectedEntity = entity;
+    selection.entityIndex = entity.GetIndex();
+    selection.hasSelection = true;
     if (InspectorLayer *pInspector = layout.GetInspector())
-        pInspector->SelectEntity(entity.GetIndex());
+        pInspector->SetSelection(&selection);
     RefreshHierarchyHighlight();
 }
 
@@ -83,7 +84,9 @@ void Panel::RefreshHierarchyHighlight()
     auto &rows = layout.GetHierarchyRows();
     for (size_t i = 0; i < rows.GetNElements(); i++)
     {
-        if (rows[i]->GetEntity() == selectedEntity)
+        const bool isSelected = selection.hasSelection &&
+                                rows[i]->GetEntity().GetIndex() == selection.entityIndex;
+        if (isSelected)
             rows[i]->SetColor(Color(0.35f, 0.45f, 0.85f)); // 選取高亮
         else
             rows[i]->SetColor(Color(0.22f, 0.22f, 0.25f));
