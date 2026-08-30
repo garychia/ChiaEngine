@@ -124,6 +124,12 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     // (VUID 錯誤);TextLayout 已依佈局寬度截斷 label,固定容量綽綽有餘。
     static constexpr uint32_t MaxTextVertices = 4096;
 
+    // #67:renderableGpuMap 的 key 是 IRenderable::identifier,但 MarkLoaded
+    // 從無呼叫者 → 全部 renderable id=0 → Insert 無條件覆寫,後載入的幾何
+    // 蓋掉先載入的(cube 被 toolbar 蓋掉 / 所有 GUI rect 共用第一顆資料)。
+    // LoadRenderable 首次見到 id==0 時發給唯一 id 並寫回 renderable。
+    size_t nextRenderableId = 0;
+
     // ── Instance helpers ──────────────────────────────────────────────────
     bool CheckSupportedExtensions(DynamicArray<const char *> *pGLFWExtensionNames);
     bool CheckSupportedValidationLayers(const DynamicArray<const char *> *pValidationLayers);
@@ -139,6 +145,7 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool CreateSwapchain();
     bool CreateSwapchainImageViews();
     void CleanupSwapchain();
+    void RecreateSwapchain(); // #56: resize(#41) 與 acquire 失敗路徑共用
 
     VkSurfaceFormatKHR ChooseSwapSurfaceFormat(const DynamicArray<VkSurfaceFormatKHR> &availableFormats) const;
     VkPresentModeKHR ChooseSwapPresentMode(const DynamicArray<VkPresentModeKHR> &availablePresentModes) const;
@@ -176,7 +183,7 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool LoadRenderable(const IRenderable &renderable);       // RenderInfo → GPU buffer
     bool LoadTextureImage(const Texture &texture);            // 載入真實貼圖(單一 slot)
     void UpdateTextureDescriptor();                           // 重新寫 UBO + sampler 描述子
-    void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable);
+    void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace = false);
     void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world);
     void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
                              const glm::mat4 &projection, bool useTexture);
