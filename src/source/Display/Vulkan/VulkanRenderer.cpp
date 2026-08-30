@@ -1025,13 +1025,12 @@ void VulkanRenderer::OnCameraChanged()
 {
 }
 
-void VulkanRenderer::OnWindowResized(long newWidth, long newHeight)
+// #56:swapchain 完整重建序列。resize(#41) 與 acquire 失敗路徑共用同一組
+// 依賴順序:framebuffer 參照 swapchain image view → 先銷毀;depth buffer 依附
+// extent → 一併重建;swapchain image 數量改變 → command buffers / sync objects
+// 重建並重設 frame counter,免得舊 slot 的 fence/semaphore 與新 swapchain 錯位。
+void VulkanRenderer::RecreateSwapchain()
 {
-    (void)newWidth;
-    (void)newHeight;
-    // swapchain / framebuffer 依賴 surface 尺寸,resize 後重建
-    // framebuffer 參照 swapchain image view,必須先於 swapchain 銷毀;
-    // depth buffer 依附 extent,一併重建
     vkDeviceWaitIdle(device);
     CleanupFramebuffers();
     CleanupDepthResources();
@@ -1040,16 +1039,18 @@ void VulkanRenderer::OnWindowResized(long newWidth, long newHeight)
     CreateSwapchainImageViews();
     CreateDepthResources();
     CreateFramebuffers();
-    // ── resize 後徹底重排 GPU 佇列狀態 ──────────────────────────────
-    // swapchain image 數量改變 → command buffers(依 image 數)要重建;
-    // sync objects(frame-in-flight slot)一併重建並重設 frame counter,免得
-    // 舊 slot 的 fence/semaphore 與新 swapchain 錯位(#41)。
     CleanupSyncObjects();
     CreateCommandPool();
     CreateCommandBuffers();
     CreateSyncObjects();
     currentFrameIndex = 0;
     currentImageIndex = 0;
+}
+
+void VulkanRenderer::OnWindowResized(long /*newWidth*/, long /*newHeight*/)
+{
+    // 解析度由 CreateSwapchain() 直接查 surface extent,無須使用傳入參數。
+    RecreateSwapchain();
 }
 
 void VulkanRenderer::Update()
@@ -1109,12 +1110,13 @@ bool VulkanRenderer::Execute(const Frame &frame)
                     for (size_t li = 0; li < layers.GetNElements(); li++)
                     {
                         LoadRenderable(*layers[li]);
-                        RecordDrawCommands(commandBuffers[currentImageIndex], *layers[li]);
+                        // #67:GUI 幾何是 NDC 空間,用正交投影直出(否則被 perspective clip)
+                        RecordDrawCommands(commandBuffers[currentImageIndex], *layers[li], true);
                         const DynamicArray<SharedPtr<IGUI>> &components = layers[li]->GetComponents();
                         for (size_t ci = 0; ci < components.GetNElements(); ci++)
                         {
                             LoadRenderable(*components[ci]);
-                            RecordDrawCommands(commandBuffers[currentImageIndex], *components[ci]);
+                            RecordDrawCommands(commandBuffers[currentImageIndex], *components[ci], true);
                         }
                     }
                 }
@@ -1196,9 +1198,17 @@ bool VulkanRenderer::BeginFrame()
     uint32_t imageIndex = 0;
     const VkResult acquireResult = vkAcquireNextImageKHR(
         device, swapchain, UINT64_MAX, imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE, &imageIndex);
-    if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR)
-        return false; // TODO: 觸發 swapchain 重建
-    if (acquireResult != VK_SUCCESS && acquireResult != VK_SUBOPTIMAL_KHR)
+    // #56:swapchain 失效(視窗最小化/還原/resize 後 surface 過期)→ 重建後重試本幀,
+    // 而非直接放棄整個 Execute。復原失敗才回傳 false。
+    if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_KHR)
+    {
+        RecreateSwapchain();
+        if (vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+                                  imageAvailableSemaphores[currentFrameIndex], VK_NULL_HANDLE,
+                                  &imageIndex) != VK_SUCCESS)
+            return false;
+    }
+    else if (acquireResult != VK_SUCCESS)
         return false;
     currentImageIndex = imageIndex;
 
@@ -1834,7 +1844,15 @@ void VulkanRenderer::CleanupMeshCache()
 
 bool VulkanRenderer::LoadRenderable(const IRenderable &renderable)
 {
-    const size_t id = renderable.GetIdentifier();
+    size_t id = renderable.GetIdentifier();
+    if (id == 0)
+    {
+        // #67:identifier 從未被賦值(全為 0)。發給唯一 id 並寫回 renderable,
+        // 否則 renderableGpuMap id=0 被 Insert 無條件覆寫 → 所有部件共用
+        // 第一個載入者的幾何/顏色。
+        id = ++nextRenderableId;
+        const_cast<IRenderable &>(renderable).MarkLoaded(id);
+    }
     if (renderableGpuMap.Contains(id))
     {
         // 載入這顆 renderable 的貼圖(單一 slot,v1)
@@ -1958,7 +1976,7 @@ bool VulkanRenderer::LoadTextureImage(const Texture &texture)
     return true;
 }
 
-void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable)
+void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace)
 {
     const size_t id = renderable.GetIdentifier();
     HashTable<size_t, RenderableGpuData>::Iterator itr = renderableGpuMap.Find(id);
@@ -1968,7 +1986,7 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                             0, 1, &descriptorSet, 0, nullptr);
+                            0, 1, &descriptorSet, 0, nullptr);
 
     // UBO:逐 drawable 更新(world / view / proj)
     const Point3D &pos = renderable.GetPosition();
@@ -1977,11 +1995,25 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     const glm::mat4 world = BuildWorldMatrix(pos, rot, scale);
 
     glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
-                                             static_cast<float>(swapchainExtent.width) /
-                                                 static_cast<float>(swapchainExtent.height),
-                                             0.001f, 100.0f);
-    if (pActiveCamera)
+    glm::mat4 projection = glm::mat4(1.0f);
+    // #67:GUI 幾何在 NDC 空間(IGUI::SetTopLeftPosition px→NDC,正交假設)。
+    // 舊 fallback 用 70° perspective 把 NDC 乘 1.14~1.43 倍 → 靠邊的元件被
+    // clip 光,整個 GUI 從沒畫出來(P6b 宣稱的 ortho 從未實作;P6b「驗收」是
+    // aux vision 幻覺)。GUI 用 ortho:z_rect ∈ [-1,1] 對映到 Vulkan depth
+    // depth=(1-z)/2(隨 z_rect 遞減 → LESS depth test 讓後加入的 layer 蓋住
+    // 先加入的,維持 CalculateComponentDepths 的 z 語意)。
+    if (guiSpace)
+    {
+        // #67:GUI 幾何在 NDC 空間,GL y-up(GL y=+top)。Vulkan 的正高度 viewport
+        // 把 clip y=+1 對到 framebuffer 底部 → 直接把 top/bottom 對調(y→-y)
+        // 讓 GL「頂端」元素落到 Vulkan 頂端且字形不再上下顛倒。
+        // depth:zNear=-1,zFar=1 → clip z=(1-z)/2(與註解語意一致)。LESS test +
+        // clear 1.0 下,後加入的 layer/component(z 較大)得較小 depth→ 較近 →
+        // 蓋住先畫的。若 zNear=1,zFar=-1,第一個畫的 layer 反而最「近」(0.025),
+        // 之後的按鈕/rows/text 全被 depth cull → GUI 只剩兩個 layer 底色。
+        projection = glm::orthoRH_ZO(-1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f);
+    }
+    else if (pActiveCamera)
     {
         view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
         const float aspect = static_cast<float>(swapchainExtent.width) /
@@ -1989,6 +2021,13 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
         projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
                                      pActiveCamera->GetDistanceToNearPlane(),
                                      pActiveCamera->GetDistanceToFarPlane());
+    }
+    else
+    {
+        projection = glm::perspective(glm::radians(70.0f),
+                                      static_cast<float>(swapchainExtent.width) /
+                                          static_cast<float>(swapchainExtent.height),
+                                      0.001f, 100.0f);
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
     UpdateUniformBuffer(world, view, projection, useTexture);
@@ -2244,21 +2283,14 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
                             0, 1, &textDescriptorSet, 0, nullptr);
 
-    // 與按鈕矩形同一投影(RFC R1:label 須以矩形同投影繪製,否則視覺對不齊)。
+    // #67:文字與按鈕矩形同為 NDC 空間 → 同一正交投影(RFC R1:label 須以
+    // 矩形同投影繪製,否則視覺對不齊)。舊 fallback 的 perspective 同樣把
+    // 文字 clip 光(為何 P7e 的 toolbar pixel-scan 一直是 0 白像素)。
+    // depth=(1-z)/2:文字 z = 矩形 z + 0.01 → 略近於矩形,LESS depth 序正確。
+    // (zNear=-1,zFar=1 才對;zNear=1,zFar=-1 時第一個 layer 佔最淺 depth,
+    //  所有後畫的文字/rect 全被 cull。)
     glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
-                                             static_cast<float>(swapchainExtent.width) /
-                                                 static_cast<float>(swapchainExtent.height),
-                                             0.001f, 100.0f);
-    if (pActiveCamera)
-    {
-        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                     pActiveCamera->GetDistanceToNearPlane(),
-                                     pActiveCamera->GetDistanceToFarPlane());
-    }
+    glm::mat4 projection = glm::orthoRH_ZO(-1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f);
     // 字形圖集:白字透明底,shader 以 useTexture>0 + cmode=1 乘上 textColor。
     UpdateUniformBuffer(world, view, projection, true);
 
