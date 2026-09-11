@@ -2,11 +2,15 @@
 
 #include "Data/Str.hpp"
 
-const unsigned long PanelLayout::TopBarHeight = 30;
+const unsigned long PanelLayout::TopBarHeight = PanelLayoutConstants::TopBarHeight;
 
-const unsigned long PanelLayout::SidebarWidth = 180;
+const unsigned long PanelLayout::SidebarWidth = PanelLayoutConstants::SidebarWidth;
 
-const unsigned long PanelLayout::RowHeight = 22;
+const unsigned long PanelLayout::RowHeight = PanelLayoutConstants::RowHeight;
+
+const unsigned long PanelLayout::InspectorWidth = PanelLayoutConstants::InspectorWidth;
+
+// ADR-0001 D5-resize:headless-testable region math 已移到 PanelRegions.hpp。
 
 PanelLayout::PanelLayout(const Point2D &windowSize) : GUILayout(), pHierarchyLayer(), pHierarchyRows()
 {
@@ -18,6 +22,9 @@ PanelLayout::PanelLayout(const Point2D &windowSize) : GUILayout(), pHierarchyLay
         SharedPtr<GUILayer>::Construct(windowSize, Border(0.f, TopBarHeight, SidebarWidth, 400.f));
     pHierarchyLayer->SetColor(Color(0.13f, 0.13f, 0.15f));
     AddLayer(pHierarchyLayer);
+
+    // 右側 inspector 由 CreateInspector 建立(InspectorLayer 自帶背景色),
+    // SetRegions 會 reposition 它到 rightDock 位置。
 }
 
 void PanelLayout::BuildHierarchy(SceneSystem &scene)
@@ -48,13 +55,46 @@ void PanelLayout::BuildHierarchy(SceneSystem &scene)
     RefreshDepths();
 }
 
+void PanelLayout::SetRegions(const Point2D &windowSize, const PanelRegions &regions)
+{
+    SetWindowSize(windowSize);
+
+    // 各 dock layer 用 regions 重新定位(border 直接改 x/y/w/h)。
+    if (GetLayers().GetNElements() > 0)
+    {
+        Border &topBar = GetLayers()[0]->GetBorder();
+        topBar.xPos = regions.topBar.xPos;
+        topBar.yPos = regions.topBar.yPos;
+        topBar.width = regions.topBar.width;
+        topBar.height = regions.topBar.height;
+        GetLayers()[0]->SetWindowSize(windowSize);
+    }
+    pHierarchyLayer->GetBorder().xPos = regions.leftDock.xPos;
+    pHierarchyLayer->GetBorder().yPos = regions.leftDock.yPos;
+    pHierarchyLayer->GetBorder().width = regions.leftDock.width;
+    pHierarchyLayer->GetBorder().height = regions.leftDock.height;
+    pHierarchyLayer->SetWindowSize(windowSize);
+
+    if (pInspector)
+    {
+        Border &insp = pInspector->GetBorder();
+        insp.xPos = regions.rightDock.xPos;
+        insp.yPos = regions.rightDock.yPos;
+        insp.width = regions.rightDock.width;
+        insp.height = regions.rightDock.height;
+        pInspector->SetWindowSize(windowSize);
+    }
+
+    // #67:動態改 panel 後 z 順序會亂,重排深度。
+    RefreshDepths();
+}
+
 void PanelLayout::CreateInspector(SceneSystem &scene, UndoStack *pUndoStack)
 {
     const Point2D windowSize = GetLayers().GetNElements() > 0 ? GetLayers()[0]->GetWindowSize() : Point2D(1000, 800);
-    const float inspectorWidth = 200.f;
-    const float x = windowSize.x - inspectorWidth;
+    const float x = windowSize.x - InspectorWidth;
     pInspector = SharedPtr<InspectorLayer>::Construct<InspectorLayer>(
-        windowSize, Border(x, PanelLayout::TopBarHeight, inspectorWidth, 400.f), &scene, pUndoStack);
+        windowSize, Border(x, PanelLayout::TopBarHeight, InspectorWidth, 400.f), &scene, pUndoStack);
     SharedPtr<GUILayer> pLayer = pInspector;
     AddLayer(pLayer);
 }

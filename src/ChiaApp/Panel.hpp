@@ -42,6 +42,9 @@ class Panel : public Window
 
     void RefreshHierarchyHighlight();
 
+    // ADR-0001 D5-resize:從 window 尺寸 + scene ratio 計算全部 editor regions。
+    PanelRegions ComputeRegions(long windowWidth, long windowHeight) const;
+
   public:
     virtual bool Initialize(Window *pParent = nullptr) override;
 

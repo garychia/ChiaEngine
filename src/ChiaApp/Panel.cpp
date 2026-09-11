@@ -16,10 +16,13 @@ bool Panel::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    const auto sceneAreaHeight = GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight;
-    const auto sceneWindowWidth = sceneAreaHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
-    WindowInfo childWndInfo(info.pAppInfo, String(), false, sceneWindowWidth, sceneAreaHeight,
-                            GetWindowInfo().GetHeight() - sceneAreaHeight, sceneWindowWidth / 2);
+    const long w = GetWindowInfo().GetWidth();
+    const long h = GetWindowInfo().GetHeight();
+    const PanelRegions regions = ComputeRegions(w, h);
+    WindowInfo childWndInfo(info.pAppInfo, String(), false, static_cast<unsigned long>(regions.sceneSize.x),
+                            static_cast<unsigned long>(regions.sceneSize.y),
+                            GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight,
+                            static_cast<unsigned long>(regions.centerViewport.xPos));
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
                                                                         pSimRecorder, pCameraController,
@@ -29,6 +32,9 @@ bool Panel::Initialize(Window *pParent)
     //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)
     if (!pSceneWindow)
         return false;
+    pSceneWindow->SetPosition(static_cast<long>(regions.centerViewport.xPos),
+                              static_cast<long>(regions.centerViewport.yPos));
+    pSceneWindow->SetSize(static_cast<long>(regions.sceneSize.x), static_cast<long>(regions.sceneSize.y));
     // #60 step 1:SceneWindow::Initialize 已建立 demo 節點,這裡重建側欄並接選取事件。
     layout.BuildHierarchy(*pSceneSystem);
     auto &rows = layout.GetHierarchyRows();
@@ -36,6 +42,7 @@ bool Panel::Initialize(Window *pParent)
         rows[i]->rowClicked.Subscribe(this, &Panel::OnHierarchyRowClicked);
     // #60 step 2:建立右側 Inspector(消費選取的 entity),按鈕 push 到 session undo stack。
     layout.CreateInspector(*pSceneSystem, &editorSession.GetUndoStack());
+    layout.SetRegions(Point2D(static_cast<float>(w), static_cast<float>(h)), regions);
     SetGUILayout(&layout);
     return true;
 }
@@ -52,11 +59,16 @@ void Panel::Render()
 void Panel::OnWindowResized(long newWidth, long newHeight)
 {
     Window::OnWindowResized(newWidth, newHeight);
-    layout.SetWindowSize(Point2D(newWidth, newHeight));
-    const auto sceneWindowHeight = newHeight - PanelLayout::TopBarHeight;
-    const auto sceneWindowWidth = sceneWindowHeight * sceneWidthHeightRatio.x / sceneWidthHeightRatio.y;
-    pSceneWindow->SetPosition((newWidth - sceneWindowWidth) / 2, PanelLayout::TopBarHeight);
-    pSceneWindow->SetSize(sceneWindowWidth, sceneWindowHeight);
+    const PanelRegions regions = ComputeRegions(newWidth, newHeight);
+    layout.SetRegions(Point2D(static_cast<float>(newWidth), static_cast<float>(newHeight)), regions);
+    pSceneWindow->SetPosition(static_cast<long>(regions.centerViewport.xPos),
+                              static_cast<long>(regions.centerViewport.yPos));
+    pSceneWindow->SetSize(static_cast<long>(regions.sceneSize.x), static_cast<long>(regions.sceneSize.y));
+}
+
+PanelRegions Panel::ComputeRegions(long windowWidth, long windowHeight) const
+{
+    return ComputePanelRegions(windowWidth, windowHeight, sceneWidthHeightRatio);
 }
 
 bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)
