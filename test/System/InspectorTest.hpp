@@ -4,6 +4,7 @@
 #include "Display/GUI/InspectorButton.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
 #include "Display/GUI/Selection.hpp"
+#include "Display/GUI/TransformEditCommand.hpp"
 #include "Math/Math.hpp"
 #include "Scene/SceneSystem.hpp"
 #include "Scene/TransformComponent.hpp"
@@ -29,13 +30,14 @@ class InspectorTest : public Test
         // ---- AC1:SelectEntity 後 label 反映該 entity 的 transform 值 ----
         {
             SceneSystem system;
+            UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
             system.world.GetComponent<TransformComponent>(a)->position = Point3D(1, 2, 3);
             system.world.GetComponent<TransformComponent>(b)->position = Point3D(9, 9, 9);
 
             InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -50,11 +52,12 @@ class InspectorTest : public Test
         // ---- AC2:ApplyEdit 直接改變 SceneSystem transform 並重畫 label ----
         {
             SceneSystem system;
+            UndoStack stack;
             Entity a = system.CreateNode();
             system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
 
             InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -89,13 +92,14 @@ class InspectorTest : public Test
         // ---- AC3:切換 entity 後,ApplyEdit 只影響該 entity ----
         {
             SceneSystem system;
+            UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
             system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
             system.world.GetComponent<TransformComponent>(b)->position = Point3D(0, 0, 0);
 
             InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -118,9 +122,10 @@ class InspectorTest : public Test
         // ---- AC4:inspector 對無效 entity 不崩(Alive 檢查) ----
         {
             SceneSystem system;
+            UndoStack stack;
             Entity a = system.CreateNode();
             InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -134,6 +139,7 @@ class InspectorTest : public Test
         // ---- AC5 (ADR-0001 D2):Selection 為唯一真相來源,Inspector 只讀 ----
         {
             SceneSystem system;
+            UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
             system.world.GetComponent<TransformComponent>(a)->position = Point3D(1, 2, 3);
@@ -144,7 +150,7 @@ class InspectorTest : public Test
             sel.hasSelection = true;
 
             InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system);
+                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
             inspector.SetSelection(&sel);
             EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() > 0,
                         "選 a:Inspector 讀 Selection 顯示 a 的值.", true);
@@ -160,6 +166,37 @@ class InspectorTest : public Test
             inspector.Update();
             EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() == 0,
                         "hasSelection=false:Inspector 清空欄位(不崩、不顯示舊值).", true);
+        }
+
+        // ---- AC5:ADR-0001 D5 — + 鈕 push undoable command,undo 回復原值 ----
+        {
+            SceneSystem system;
+            UndoStack stack;
+            Entity a = system.CreateNode();
+            system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
+
+            // 模擬 + 鈕(axis=PositionX, sign=+1):push 即 apply → position.x += 0.5
+            stack.Push(new TransformEditCommand(&system, a.GetIndex(), InspectorAxis::PositionX, +1.f));
+            TransformComponent *pT = system.world.GetComponent<TransformComponent>(a);
+            EXPECT_TRUE(Math::Abs(pT->position.x - 0.5f) < 1e-4f, "undoable +PosX 後 position.x == 0.5.", true);
+
+            // 再 + 一次 → 1.0
+            stack.Push(new TransformEditCommand(&system, a.GetIndex(), InspectorAxis::PositionX, +1.f));
+            EXPECT_TRUE(Math::Abs(pT->position.x - 1.0f) < 1e-4f, "第二次 +PosX 後 position.x == 1.0.", true);
+
+            // undo → 0.5(第二個 command revert)
+            EXPECT_TRUE(stack.Undo(), "undo 可執行.", true);
+            EXPECT_TRUE(Math::Abs(pT->position.x - 0.5f) < 1e-4f, "undo 後 position.x 回 0.5.", true);
+
+            // 再 undo → 0(第一個 command revert)
+            EXPECT_TRUE(stack.Undo(), "第二次 undo 可執行.", true);
+            EXPECT_TRUE(Math::Abs(pT->position.x) < 1e-4f, "第二次 undo 後 position.x 回 0.", true);
+
+            // redo → 0.5,再 redo → 1.0
+            EXPECT_TRUE(stack.Redo(), "redo 可執行.", true);
+            EXPECT_TRUE(Math::Abs(pT->position.x - 0.5f) < 1e-4f, "redo 後 position.x 回 0.5.", true);
+            EXPECT_TRUE(stack.Redo(), "第二次 redo 可執行.", true);
+            EXPECT_TRUE(Math::Abs(pT->position.x - 1.0f) < 1e-4f, "第二次 redo 後 position.x 回 1.0.", true);
         }
 
         SUCCESS_MESSAGE("Inspector");

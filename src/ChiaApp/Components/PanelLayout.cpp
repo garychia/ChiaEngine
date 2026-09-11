@@ -48,13 +48,13 @@ void PanelLayout::BuildHierarchy(SceneSystem &scene)
     RefreshDepths();
 }
 
-void PanelLayout::CreateInspector(SceneSystem &scene)
+void PanelLayout::CreateInspector(SceneSystem &scene, UndoStack *pUndoStack)
 {
     const Point2D windowSize = GetLayers().GetNElements() > 0 ? GetLayers()[0]->GetWindowSize() : Point2D(1000, 800);
     const float inspectorWidth = 200.f;
     const float x = windowSize.x - inspectorWidth;
     pInspector = SharedPtr<InspectorLayer>::Construct<InspectorLayer>(
-        windowSize, Border(x, PanelLayout::TopBarHeight, inspectorWidth, 400.f), &scene);
+        windowSize, Border(x, PanelLayout::TopBarHeight, inspectorWidth, 400.f), &scene, pUndoStack);
     SharedPtr<GUILayer> pLayer = pInspector;
     AddLayer(pLayer);
 }

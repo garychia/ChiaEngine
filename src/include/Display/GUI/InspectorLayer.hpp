@@ -3,6 +3,7 @@
 
 #include "Display/GUI/GUILayer.hpp"
 #include "Display/GUI/Button.hpp"
+#include "Display/GUI/EditorSession.hpp" // UndoStack
 #include "Display/GUI/InspectorButton.hpp"
 #include "Display/GUI/Selection.hpp"
 #include "Scene/SceneSystem.hpp"
@@ -22,6 +23,7 @@ class InspectorLayer : public GUILayer
     static const float BtnWidth;
 
     SceneSystem *pScene;
+    UndoStack *pUndoStack; // ADR-0001 D5:按鈕 push 到 session 的 undo stack
     const Selection *pSelection; // ADR-0001 D2:由 Panel 擁有,Inspector 只讀
 
     // 9 個 field row(只顯示文字):index 0..8 對應 InspectorAxis 順序。
@@ -33,7 +35,8 @@ class InspectorLayer : public GUILayer
     static const char16_t *AxisLabel(InspectorAxis axis);
 
   public:
-    InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene);
+    InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
+                   UndoStack *pUndoStack);
 
     // 設定目前選取的 entity(由 Panel 在點擊 hierarchy 列時呼叫)。
     // ADR-0001 D2:直接引用 Panel 擁有的 Selection,避免雙份狀態。

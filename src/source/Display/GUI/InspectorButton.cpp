@@ -1,4 +1,5 @@
 #include "Display/GUI/InspectorButton.hpp"
+#include "Display/GUI/TransformEditCommand.hpp"
 #include "Scene/TransformComponent.hpp"
 
 void EditTransformComponent(SceneSystem *pScene, uint32_t entityIndex, InspectorAxis axis, float sign)
@@ -28,8 +29,9 @@ void EditTransformComponent(SceneSystem *pScene, uint32_t entityIndex, Inspector
 }
 
 InspectorButton::InspectorButton(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
-                                 uint32_t targetEntityIndex, InspectorAxis axis, float sign)
-    : Button(windowSize, border), pScene(pScene), targetEntityIndex(targetEntityIndex), axis(axis), sign(sign)
+                                 UndoStack *pUndoStack, uint32_t targetEntityIndex, InspectorAxis axis, float sign)
+    : Button(windowSize, border), pScene(pScene), pUndoStack(pUndoStack),
+      targetEntityIndex(targetEntityIndex), axis(axis), sign(sign)
 {
 }
 
@@ -41,6 +43,11 @@ void InspectorButton::SetTarget(uint32_t entityIndex)
 void InspectorButton::OnClicked(const Point2D &coordinates)
 {
     Button::OnClicked(coordinates);
-    if (WithIn(coordinates))
+    if (!WithIn(coordinates))
+        return;
+    // ADR-0001 D5:push undoable command (push applies), instead of direct edit.
+    if (pUndoStack)
+        pUndoStack->Push(new TransformEditCommand(pScene, targetEntityIndex, axis, sign));
+    else
         EditTransformComponent(pScene, targetEntityIndex, axis, sign);
 }

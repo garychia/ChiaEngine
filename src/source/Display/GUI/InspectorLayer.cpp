@@ -25,8 +25,9 @@ const char16_t *InspectorLayer::AxisLabel(InspectorAxis axis)
     return u"?";
 }
 
-InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene)
-    : GUILayer(windowSize, border), pScene(pScene), pSelection(nullptr)
+InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
+                               UndoStack *pUndoStack)
+    : GUILayer(windowSize, border), pScene(pScene), pUndoStack(pUndoStack), pSelection(nullptr)
 {
     SetColor(Color(0.10f, 0.10f, 0.12f));
     for (size_t i = 0; i < 9; i++)
@@ -44,12 +45,12 @@ InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, 
         // - / + 鈕(初始 target = 0;SetSelection 會以 Selection.entityIndex 刷新)。
         auto pMinus = AddComponent<InspectorButton>(windowSize,
                                                      Border(ColLabelWidth + 6.f, y, BtnWidth, RowHeight - 2.f), pScene,
-                                                     0, axis, -1.f);
+                                                     pUndoStack, 0, axis, -1.f);
         pMinus->SetLabel(String(u"-"));
         pMinus->SetFontSize(12.f);
         auto pPlus = AddComponent<InspectorButton>(windowSize,
                                                    Border(ColLabelWidth + 6.f + BtnWidth, y, BtnWidth, RowHeight - 2.f),
-                                                   pScene, 0, axis, +1.f);
+                                                   pScene, pUndoStack, 0, axis, +1.f);
         pPlus->SetLabel(String(u"+"));
         pPlus->SetFontSize(12.f);
         pButtons[i * 2] = pMinus;

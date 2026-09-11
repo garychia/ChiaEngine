@@ -34,8 +34,8 @@ bool Panel::Initialize(Window *pParent)
     auto &rows = layout.GetHierarchyRows();
     for (size_t i = 0; i < rows.GetNElements(); i++)
         rows[i]->rowClicked.Subscribe(this, &Panel::OnHierarchyRowClicked);
-    // #60 step 2:建立右側 Inspector(消費選取的 entity)。
-    layout.CreateInspector(*pSceneSystem);
+    // #60 step 2:建立右側 Inspector(消費選取的 entity),按鈕 push 到 session undo stack。
+    layout.CreateInspector(*pSceneSystem, &editorSession.GetUndoStack());
     SetGUILayout(&layout);
     return true;
 }
@@ -61,6 +61,36 @@ void Panel::OnWindowResized(long newWidth, long newHeight)
 
 bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)
 {
+    // ADR-0001 D5:editor 快捷鍵 — Ctrl+Z undo、Ctrl+Y redo(與 SimRecorder 的
+    // F5/F6 replay 完全分離:這是 editor-time edit,不是 gameplay replay)。
+    // 消費掉,不再轉發給場景(避免 WASD 同時觸發)。
+    bool hasCtrl = false;
+    bool hasZ = false;
+    bool hasY = false;
+    for (size_t i = 0; i < keys.keys.Length(); i++)
+    {
+        switch (keys.keys[i])
+        {
+            case KeyCodeControl: hasCtrl = true; break;
+            case KeyCodeZ: hasZ = true; break;
+            case KeyCodeY: hasY = true; break;
+            default: break;
+        }
+    }
+    if (hasCtrl && hasZ)
+    {
+        editorSession.GetUndoStack().Undo();
+        if (InspectorLayer *pInspector = layout.GetInspector())
+            pInspector->Update();
+        return true;
+    }
+    if (hasCtrl && hasY)
+    {
+        editorSession.GetUndoStack().Redo();
+        if (InspectorLayer *pInspector = layout.GetInspector())
+            pInspector->Update();
+        return true;
+    }
     return Window::OnKeyboardInputReceived(keys);
 }
 

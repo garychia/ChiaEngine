@@ -7,6 +7,8 @@
 #include "Scene/SceneSystem.hpp"
 #include "TopPanelBar.hpp"
 
+class UndoStack; // forward decl (CreateInspector 參數)
+
 // 主視窗佈局:GUI 走 Frame 的唯一出口(P6)。
 // 目前兩層:頂部 toolbar(TopPanelBar)+ 左側 hierarchy 側欄(#60 step 1)。
 class PanelLayout : public GUILayout
@@ -26,7 +28,8 @@ class PanelLayout : public GUILayout
 
     // #60 step 2:建立右側 Inspector 層,顯示/編輯選取 entity 的 TransformComponent。
     // 必須在 BuildHierarchy 之後(選取來自 hierarchy 列)呼叫一次。
-    void CreateInspector(SceneSystem &scene);
+    // pUndoStack:ADR-0001 D5 — inspector 按鈕把編輯 push 到 session 的 undo stack。
+    void CreateInspector(SceneSystem &scene, UndoStack *pUndoStack);
 
     InspectorLayer *GetInspector();
 

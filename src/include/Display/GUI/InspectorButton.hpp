@@ -25,17 +25,20 @@ enum class InspectorAxis
 // step 依軸類型(position 0.5 / rotation 5.0 / scale 0.1)。
 void EditTransformComponent(SceneSystem *pScene, uint32_t entityIndex, InspectorAxis axis, float sign);
 
+class UndoStack; // forward decl (InspectorButton.hpp 只持指標)
+
 class InspectorButton : public Button
 {
   private:
     SceneSystem *pScene;
+    UndoStack *pUndoStack; // ADR-0001 D5:入 undo stack,取代直接編輯
     uint32_t targetEntityIndex;
     InspectorAxis axis;
     float sign; // +1 / -1
 
   public:
     InspectorButton(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
-                    uint32_t targetEntityIndex, InspectorAxis axis, float sign);
+                    UndoStack *pUndoStack, uint32_t targetEntityIndex, InspectorAxis axis, float sign);
 
     // 選取 entity 改變時更新 target(避免每次 SelectEntity 重建整批鈕)。
     void SetTarget(uint32_t entityIndex);
