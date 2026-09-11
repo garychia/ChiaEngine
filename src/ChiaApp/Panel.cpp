@@ -7,7 +7,8 @@ Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController
              SceneSystem *pSceneSystem)
     : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
       layout(Point2D(info.GetWidth(), info.GetHeight())), pSimRecorder(pSimRecorder),
-      pCameraController(pCameraController), pSceneSystem(pSceneSystem), selection()
+      pCameraController(pCameraController), pSceneSystem(pSceneSystem),
+      editorSession(), selection(editorSession.GetSelection())
 {
 }
 
@@ -72,8 +73,7 @@ bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
 
 void Panel::OnHierarchyRowClicked(Entity entity)
 {
-    selection.entityIndex = entity.GetIndex();
-    selection.hasSelection = true;
+    editorSession.SetSelection(entity.GetIndex(), true);
     if (InspectorLayer *pInspector = layout.GetInspector())
         pInspector->SetSelection(&selection);
     RefreshHierarchyHighlight();

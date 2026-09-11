@@ -58,6 +58,9 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/InspectorButton.cpp
     include/Display/GUI/InspectorLayer.hpp
     source/Display/GUI/InspectorLayer.cpp
+    include/Display/GUI/Selection.hpp
+    include/Display/GUI/EditorSession.hpp
+    source/Display/GUI/EditorSession.cpp
     include/Display/Text/GlyphAtlas.hpp
     source/Display/Text/GlyphAtlas.cpp
     include/Display/Text/TextLayout.hpp

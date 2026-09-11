@@ -5,6 +5,7 @@
 #include "FrameCounterTest.hpp"
 #include "GUITest.hpp"
 #include "InspectorTest.hpp"
+#include "EditorSessionTest.hpp"
 #include "IO/IOTest.hpp"
 #include "InputSystemTest.hpp"
 #include "ModuleTest.hpp"
@@ -32,6 +33,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<guitest::GUITest>();
     AddTest<guitest::HierarchyRowTest>();
     AddTest<inspectortest::InspectorTest>();
+    AddTest<editorsessiontest::EditorSessionTest>();
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();

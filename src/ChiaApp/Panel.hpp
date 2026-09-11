@@ -5,6 +5,7 @@
 #include "Data/Pointers.hpp"
 #include "SceneWindow.hpp"
 #include "Components/PanelLayout.hpp"
+#include "Display/GUI/EditorSession.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
 #include "Display/GUI/Selection.hpp"
 #include "System/Module/CameraController.hpp"
@@ -27,8 +28,12 @@ class Panel : public Window
     // #60 step 1:hierarchy 側欄的資料源(Sim 側場景圖)
     SceneSystem *pSceneSystem;
 
-    // editor 選取狀態(ADR-0001 D2:單一真相來源,InspectorLayer 只讀此)。
-    Selection selection;
+    // ADR-0001 D4:window-agnostic editor state (selection + undo/redo).
+    EditorSession editorSession;
+
+    // #60 step 1:選取狀態(ADR-0001 D2:單一真相來源,InspectorLayer 只讀),
+    // 由 editorSession 擁有。
+    Selection &selection;
 
     Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,
           SceneSystem *pSceneSystem);
