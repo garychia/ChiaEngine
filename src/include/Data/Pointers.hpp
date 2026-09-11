@@ -107,8 +107,10 @@ template <class T> class Ptr
     friend class SharedPtr<T>;
 };
 
-namespace
-{
+// PtrInfo is intentionally at global scope (NOT an anonymous namespace):
+// SharedPtr<T> is a template instantiated in every TU, and a subobject whose
+// type lives in an anonymous namespace triggers -Wsubobject-linkage (each TU
+// gets a distinct type → potential ODR violation).
 class PtrInfo
 {
   private:
@@ -169,7 +171,6 @@ class PtrInfo
         return !counter && !weakCount;
     }
 };
-} // namespace
 
 template <class T> class WeakPtr;
 
