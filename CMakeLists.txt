@@ -16,7 +16,7 @@ set(CHIA_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include)
 
 cmake_dependent_option(
     DIRECTX_ENABLED
-    "Use DirectX as the rendering engine."
+    "Use DirectX as the rendering engine. (DEPRECATED — not wired into the Frame/IFrameExecutor architecture, build-broken; see docs/agents/directx-backend-assessment.md)"
     ON "WIN32" OFF)
 cmake_dependent_option(
     VULKAN_ENABLED

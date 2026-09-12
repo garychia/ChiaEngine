@@ -1,3 +1,9 @@
+// DEPRECATED — DirectX backend. See DirectXRenderer.hpp: not wired into the
+// Frame/IFrameExecutor architecture, build-broken (legacy IRenderer only,
+// Renderer.cpp Execute has no DIRECTX_ENABLED branch), ~52 stubs in 712 lines
+// (#53/#63), Windows-only with no CI coverage. Kept only as legacy reference;
+// see docs/agents/directx-backend-assessment.md.
+
 #include "Display/DirectX/DirectXRenderer.hpp"
 
 #include "Display/Window.hpp"

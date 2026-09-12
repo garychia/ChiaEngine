@@ -1,6 +1,12 @@
 #ifndef DIRECTX_RENDERER_HPP
 #define DIRECTX_RENDERER_HPP
 
+// DEPRECATED — DirectX backend. Not wired into the Frame/IFrameExecutor
+// architecture (Renderer.cpp has no DIRECTX_ENABLED Execute branch; this class
+// implements only the legacy IRenderer interface), build-broken (~52 stubs in
+// 712 lines, see #53/#63), and Windows-only with no CI coverage.
+// Kept only as legacy reference; see docs/agents/directx-backend-assessment.md.
+
 #include "Data/DynamicArray.hpp"
 #include "DirectXHelper.hpp"
 #include "Display/IRenderer.hpp"

@@ -1,6 +1,9 @@
 #ifndef DIRECTX_HELPER_HPP
 #define DIRECTX_HELPER_HPP
 
+// DEPRECATED — DirectX backend helper. See DirectXRenderer.hpp: used only by the
+// deprecated DirectXRenderer; kept as legacy reference.
+
 #include "pch.hpp"
 
 class DirectXHelper

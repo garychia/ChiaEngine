@@ -4,15 +4,15 @@ A cross-platform 3D game engine built from scratch in modern C++ (C++17).
 
 ## Overview
 
-ChiaEngine is a modular game engine. **Vulkan** is the only fully working rendering backend (runs ChiaApp, real draw + GUI + text). **DirectX** is a Windows-only legacy backend with ~52 stubs (Frame-broken build, see #53/#63). **OpenGL** is **deprecated** (not wired into the Frame/IFrameExecutor architecture). It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
+ChiaEngine is a modular game engine. **Vulkan** is the only fully working rendering backend (runs ChiaApp, real draw + GUI + text). **DirectX** is a Windows-only legacy backend with ~52 stubs and a Frame-broken build — **deprecated** (see [#53](https://github.com/garychia/ChiaEngine/issues/53)/[#63](https://github.com/garychia/ChiaEngine/issues/63)). **OpenGL** is also **deprecated** (not wired into the Frame/IFrameExecutor architecture). It features custom containers, a math library, geometry primitives, input handling, and a GUI system — all designed with minimal external dependencies.
 
 | Backend | Windows | Linux | macOS |
 |---------|---------|-------|-------|
-| DirectX | ✅ | — | — |
 | Vulkan | ✅ | ✅ | ✅ |
+| DirectX | ⚠️ deprecated | — | — |
 | OpenGL | ⚠️ deprecated | ⚠️ deprecated | ⚠️ deprecated |
 
-> **Note:** Vulkan is the working reference backend. DirectX is the Windows-only legacy backend. The OpenGL backend is **deprecated** — not wired into the Frame/IFrameExecutor architecture, not compiled by default, and requires a manually generated GLAD loader (see [assessment](docs/agents/opengl-backend-assessment.md)).
+> **Note:** Vulkan is the working reference backend. DirectX and OpenGL are both **deprecated** — not wired into the Frame/IFrameExecutor architecture (DirectX has no `Execute(const Frame&)`; both have legacy-only renderers). DirectX is Windows-only with a build-broken Frame path (see [assessment](docs/agents/directx-backend-assessment.md)).
 
 ## Requirements
 

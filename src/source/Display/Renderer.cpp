@@ -77,5 +77,12 @@ void Renderer::Clear()
 
 bool Renderer::Execute(const Frame &frame)
 {
+#ifdef VULKAN_ENABLED
     return specializedRenderer.Execute(frame);
+#else
+    // DirectX/OpenGL 是 legacy backend,未實作 Frame/IFrameExecutor 契約 →
+    // Execute 不可用(見 docs/agents/directx-backend-assessment.md)。
+    (void)frame;
+    return false;
+#endif
 }
