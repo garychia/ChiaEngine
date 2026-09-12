@@ -19,16 +19,6 @@ template <class T> class DynamicArray : public Array<T>
             delete[] oldData;
     }
 
-    inline void DynamicallyResize() noexcept
-    {
-        if (nElements > this->length)
-            ResizeArray(nElements);
-        else if (nElements == this->length)
-            ResizeArray(this->length > 2 ? this->length << 1 : 4);
-        else if (this->length > 0 && nElements < (this->length >> 2))
-            ResizeArray(this->length >> 1);
-    }
-
   public:
     DynamicArray() noexcept : Array<T>(), nElements(0)
     {
@@ -99,7 +89,10 @@ template <class T> class DynamicArray : public Array<T>
 
     template <class Element> inline void Append(Element &&e) noexcept
     {
-        DynamicallyResize();
+        // Grow-only on append (issue #85): never shrink here — the buffer is a
+        // reusable resource across frames (Frame::Clear keeps capacity now).
+        if (nElements >= this->length)
+            ResizeArray(this->length > 2 ? this->length << 1 : 4);
         this->data[nElements++] = Types::Forward<decltype(e)>(e);
     }
 
@@ -108,15 +101,19 @@ template <class T> class DynamicArray : public Array<T>
         if (this->IsEmpty())
             return;
         this->data[--nElements] = T();
-        DynamicallyResize();
+        // Exponential shrink headroom (issue #85): shrink only when below 1/4
+        // capacity, and never below 4 elements — matches std::vector amortized
+        // behavior, so per-removal churn (ComponentPool/EntityRegistry destroy
+        // paths) stops being O(n^2)-ish.
+        if ((this->length > 8) && nElements < (this->length >> 2))
+            ResizeArray(this->length >> 1);
     }
 
     inline void RemoveAll() noexcept
     {
+        // Issue #85: KEEP capacity — callers do not free, they reset. Frame::Clear()
+        // runs every frame; dropping the buffer here means a cold realloc every frame.
         nElements = 0;
-        delete[] this->data;
-        this->data = nullptr;
-        this->length = 0; // 容量一起歸零,否則 Append 看 length>nElements 以為還有空間 → 寫 null
     }
 
     inline void Resize(size_t newSize) noexcept
@@ -137,21 +134,25 @@ template <class T> class DynamicArray : public Array<T>
 
     inline virtual T &GetFirst() noexcept override
     {
+        assert(!IsEmpty() && "DynamicArray::GetFirst on empty container");
         return this->data[0];
     }
 
     inline virtual const T &GetFirst() const noexcept override
     {
+        assert(!IsEmpty() && "DynamicArray::GetFirst on empty container");
         return this->data[0];
     }
 
     inline virtual T &GetLast() noexcept override
     {
+        assert(!IsEmpty() && "DynamicArray::GetLast on empty container");
         return this->data[nElements - 1];
     }
 
     inline virtual const T &GetLast() const noexcept override
     {
+        assert(!IsEmpty() && "DynamicArray::GetLast on empty container");
         return this->data[nElements - 1];
     }
 

@@ -3,6 +3,7 @@
 
 #include <initializer_list>
 #include <cstddef>
+#include <cassert>
 
 template <class T> class Array
 {
@@ -145,21 +146,25 @@ template <class T> class Array
 
     inline virtual T &GetFirst() noexcept
     {
+        assert(length > 0 && "Array::GetFirst on empty container");
         return data[0];
     }
 
     inline virtual const T &GetFirst() const noexcept
     {
+        assert(length > 0 && "Array::GetFirst on empty container");
         return data[0];
     }
 
     inline virtual T &GetLast() noexcept
     {
+        assert(length > 0 && "Array::GetLast on empty container");
         return data[length - 1];
     }
 
     inline virtual const T &GetLast() const noexcept
     {
+        assert(length > 0 && "Array::GetLast on empty container");
         return data[length - 1];
     }
 
