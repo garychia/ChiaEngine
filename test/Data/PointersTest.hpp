@@ -1,6 +1,5 @@
 #include "Test.hpp"
 #include "Data/Pointers.hpp"
-#include "Data/Maybe.hpp"
 #include "Data/Pair.hpp"
 #include <iostream>
 
@@ -60,48 +59,6 @@ class PointersTest : public Test
         int *raw = wp2.operator->();
         EXPECT_TRUE(raw != nullptr, "operator-> should return non-null when valid.", true);
         SUCCESS_MESSAGE("WeakPtr operator->");
-
-        // ===== Maybe Tests =====
-        TEST_MESSAGE("Maybe Default");
-        Maybe<int> m1;
-        EXPECT_TRUE(!m1.IsValid(), "Default Maybe should be invalid.", true);
-        EXPECT_TRUE(!m1, "Bool operator should be false.", true);
-        SUCCESS_MESSAGE("Maybe Default");
-
-        TEST_MESSAGE("Maybe Value");
-        Maybe<int> m2(42);
-        EXPECT_TRUE(m2.IsValid(), "Value Maybe should be valid.", true);
-        EXPECT_TRUE(m2.Get() == 42, "Get() should return 42.", true);
-        EXPECT_TRUE((bool)m2, "Bool operator should be true.", true);
-        SUCCESS_MESSAGE("Maybe Value");
-
-        TEST_MESSAGE("Maybe Assign");
-        Maybe<int> m3;
-        m3 = 99;
-        EXPECT_TRUE(m3.IsValid(), "After assign should be valid.", true);
-        EXPECT_TRUE(m3.Get() == 99, "After assign value should be 99.", true);
-        SUCCESS_MESSAGE("Maybe Assign");
-
-        TEST_MESSAGE("Maybe Remove");
-        Maybe<int> m4(77);
-        m4.Remove();
-        EXPECT_TRUE(!m4.IsValid(), "After Remove should be invalid.", true);
-        SUCCESS_MESSAGE("Maybe Remove");
-
-        TEST_MESSAGE("Maybe Copy");
-        Maybe<int> m5(55);
-        Maybe<int> m6(m5);
-        EXPECT_TRUE(m6.IsValid(), "Copied Maybe should be valid.", true);
-        EXPECT_TRUE(m6.Get() == 55, "Copied value should be 55.", true);
-        SUCCESS_MESSAGE("Maybe Copy");
-
-        TEST_MESSAGE("Maybe Equality");
-        Maybe<int> m7(10);
-        Maybe<int> m8(10);
-        Maybe<int> m9(20);
-        EXPECT_TRUE(m7 == m8, "Equal Maybes should compare equal.", true);
-        EXPECT_TRUE(!(m7 == m9), "Different Maybes should not compare equal.", true);
-        SUCCESS_MESSAGE("Maybe Equality");
 
         // ===== Pair Tests =====
         TEST_MESSAGE("Pair Key and Value");

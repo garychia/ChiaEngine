@@ -6,7 +6,6 @@
 #include "ArrayTest.hpp"
 #include "DynamicArrayTest.hpp"
 #include "ListTest.hpp"
-#include "SetTest.hpp"
 #include "HashTableTest.hpp"
 #include "PointersTest.hpp"
 

@@ -4,10 +4,8 @@ set(DATA_SOURCE_FILES
     Hash.hpp
     HashTable.hpp
     List.hpp
-    Maybe.hpp
     Pair.hpp
     Pointers.hpp
-    Set.hpp
     Str.hpp
     String.hpp
 )

@@ -1,7 +1,8 @@
 #ifndef MATH_HPP
 #define MATH_HPP
 
-#include "Data/DynamicArray.hpp"
+#include <cmath>
+#include <cstddef>
 
 namespace Math
 {
@@ -27,127 +28,47 @@ template <class T> T Max(const T x, const T y)
     return x > y ? x : y;
 }
 
-template <class T> T Exponent(const T &x)
-{
-    if (x == 0)
-        return 1;
-    const auto input = Abs<T>(x);
-    T result = 0;
-    T numerator = 1;
-    std::size_t denominator = 1;
-    std::size_t i = 1;
-    T term = numerator / denominator;
-    while (Abs<T>(term) > 1E-10)
-    {
-        result += term;
-        if (Abs<T>(numerator) >= 1E10 / input)
-        {
-            numerator /= denominator;
-            denominator = 1;
-        }
-        numerator *= input;
-        denominator *= i;
-        i++;
-        term = numerator / denominator;
-    }
-    return x > 0 ? result : 1 / result;
-}
-
-template <class T> T NaturalLog(const T &x)
-{
-    T input = x;
-    T exp = 0;
-    while (input > 1)
-    {
-        input /= 2;
-        exp++;
-    }
-    input = input - 1;
-    bool positiveTerm = true;
-    T result = 0;
-    T numerator = input;
-    T denominator = 1;
-    T ratio = numerator / denominator;
-    for (std::size_t i = 0; i < 1000; i++)
-    {
-        result += ratio * (positiveTerm ? 1 : -1);
-        numerator *= input;
-        denominator++;
-        ratio = numerator / denominator;
-        positiveTerm = !positiveTerm;
-    }
-    return result + Constants::Ln2 * exp;
-}
-
+// Delegate to std (issue #88): the hand-rolled Taylor series were slower and
+// less accurate than <cmath>. Overloads for the arithmetic types the engine
+// passes (float/double) resolve to std::sin/cos/exp/pow etc.
 template <class T> T Sine(const T &x)
 {
-    T input = x < 0 ? -x : x;
-    const auto doublePi = Constants::Pi * 2;
-    while (input >= doublePi)
-        input -= doublePi;
-    T squaredInput = input * input;
-    T factor = 1;
-    T numerator = input;
-    T denominator = 1;
-    T result = numerator / denominator;
-    std::size_t i = 3;
-    while (numerator / denominator > 1E-10)
-    {
-        factor = -factor;
-        numerator *= squaredInput;
-        denominator *= i * (i - 1);
-        i += 2;
-        result += factor * numerator / denominator;
-    }
-    return x < 0 ? -result : result;
+    return static_cast<T>(std::sin(x));
 }
 
 template <class T> T Cosine(const T &x)
 {
-    T input = x < 0 ? -x : x;
-    const auto doublePi = Constants::Pi * 2;
-    while (input >= doublePi)
-        input -= doublePi;
-    T squaredInput = input * input;
-    T factor = 1;
-    T numerator = 1;
-    T denominator = 1;
-    T result = numerator / denominator;
-    std::size_t i = 2;
-    while (numerator / denominator > 1E-10)
-    {
-        factor = -factor;
-        numerator *= squaredInput;
-        denominator *= i * (i - 1);
-        i += 2;
-        result += factor * numerator / denominator;
-    }
-    return result;
+    return static_cast<T>(std::cos(x));
 }
 
 template <class T> T Tangent(const T &x)
 {
-    return Sine(x) / Cosine(x);
+    return static_cast<T>(std::tan(x));
+}
+
+template <class T> T Exponent(const T &x)
+{
+    return static_cast<T>(std::exp(x));
+}
+
+template <class T> T NaturalLog(const T &x)
+{
+    return static_cast<T>(std::log(x));
 }
 
 template <class T> T Sinh(const T &x)
 {
-    const T exponential = Exponent(x);
-    return (exponential - 1 / exponential) * 0.5;
+    return static_cast<T>(std::sinh(x));
 }
 
 template <class T> T Cosh(const T &x)
 {
-    const T exponential = Exponent(x);
-    return (exponential + 1 / exponential) * 0.5;
+    return static_cast<T>(std::cosh(x));
 }
 
 template <class T> T Tanh(const T &x)
 {
-    if (2 * x > 14 || 2 * x < -14)
-        return x > 0 ? 1 : -1;
-    const T exponential = Exponent(2 * x);
-    return (exponential - 1) / (exponential + 1);
+    return static_cast<T>(std::tanh(x));
 }
 
 template <class T> T _PowerLong(const T &scaler, long n)
@@ -156,24 +77,16 @@ template <class T> T _PowerLong(const T &scaler, long n)
         return scaler;
     else if (n == 0)
         return 1;
+    // Fast integer-exponent path via squaring (kept from the original).
     auto p = n > 0 ? n : -n;
-    DynamicArray<bool> even;
-    while (p > 1)
+    T result = 1;
+    T base = scaler;
+    while (p > 0)
     {
-        even.Append((p & 1) == 0);
+        if (p & 1)
+            result *= base;
+        base *= base;
         p >>= 1;
-    }
-    auto result = scaler;
-    if (!even.IsEmpty())
-    {
-        size_t i = even.Length();
-        while (i != 0)
-        {
-            result *= result;
-            if (!even[i - 1])
-                result *= scaler;
-            i--;
-        }
     }
     return n > 0 ? result : T(1) / result;
 }
@@ -188,9 +101,7 @@ template <class T, class PowerType> T Power(const T &scaler, PowerType n)
         return scaler;
     else if ((long)n == n)
         return _PowerLong<T>(scaler, (long)n);
-    else if (n < 0)
-        return T(1) / Power(scaler, -n);
-    return Exponent(n * NaturalLog(scaler));
+    return static_cast<T>(std::pow(scaler, n));
 }
 
 template <class T> T ReLU(const T &x)
