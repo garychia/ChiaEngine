@@ -274,19 +274,21 @@ VkPresentModeKHR VulkanRenderer::ChooseSwapPresentMode(
 
 VkExtent2D VulkanRenderer::ChooseSwapExtent(const VkSurfaceCapabilitiesKHR &caps) const
 {
-    if (caps.currentExtent.width != UINT32_MAX)
+    if (caps.currentExtent.width != UINT32_MAX && caps.currentExtent.width > 0 && caps.currentExtent.height > 0)
         return caps.currentExtent;
 
-    int width, height;
-    glfwGetFramebufferSize(pWindow->GetHandle(), &width, &height);
-
-    VkExtent2D actualExtent = {
-        static_cast<uint32_t>(width),
-        static_cast<uint32_t>(height)
-    };
-    actualExtent.width  = std::clamp(actualExtent.width,  caps.minImageExtent.width,  caps.maxImageExtent.width);
-    actualExtent.height = std::clamp(actualExtent.height, caps.minImageExtent.height, caps.maxImageExtent.height);
-    return actualExtent;
+    // Wayland:currentExtent == UINT32_MAX 代表「由 swapchain 定義尺寸」,
+    // 且剛建窗(unconfigured surface)時 glfwGetFramebufferSize 回 0x0、
+    // min/maxImageExtent 也可能是 0x0 — clamp 出 0x0 會讓
+    // vkCreateSwapchainKHR 回 VK_ERROR_INITIALIZATION_FAILED(-3, NVIDIA Wayland WSI)。
+    // 修法:用 window 的「要求的」尺寸,並 clamp 到 min 1x1。
+    uint32_t w = std::max<uint32_t>(static_cast<uint32_t>(pWindow->GetWindowInfo().GetWidth()), 1u);
+    uint32_t h = std::max<uint32_t>(static_cast<uint32_t>(pWindow->GetWindowInfo().GetHeight()), 1u);
+    if (caps.minImageExtent.width > 0 && caps.maxImageExtent.width > 0)
+        w = std::clamp(w, caps.minImageExtent.width, caps.maxImageExtent.width);
+    if (caps.minImageExtent.height > 0 && caps.maxImageExtent.height > 0)
+        h = std::clamp(h, caps.minImageExtent.height, caps.maxImageExtent.height);
+    return { w, h };
 }
 
 bool VulkanRenderer::CreateSwapchain()
@@ -324,6 +326,11 @@ bool VulkanRenderer::CreateSwapchain()
     swapchainInfo.imageFormat = format.format;
     swapchainInfo.imageColorSpace = format.colorSpace;
     swapchainInfo.imageExtent = ChooseSwapExtent(caps);
+    if (swapchainInfo.imageExtent.width == 0 || swapchainInfo.imageExtent.height == 0)
+    {
+        PRINTLN_ERR(L"VulkanRenderer: swapchain extent is 0x0 (window not configured yet).");
+        return false;
+    }
     swapchainInfo.imageArrayLayers = 1;
     swapchainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
@@ -346,7 +353,14 @@ bool VulkanRenderer::CreateSwapchain()
     }
 
     swapchainInfo.preTransform = caps.currentTransform;
-    swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    // #55 compat:不要硬編 OPAQUE — Wayland 合成器常只支援 PREMULTIPLIED,
+    // OPAQUE 不支援時 vkCreateSwapchainKHR 回 VK_ERROR_INITIALIZATION_FAILED(-3)。
+    if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR)
+        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    else if (caps.supportedCompositeAlpha & VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR)
+        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_PRE_MULTIPLIED_BIT_KHR;
+    else
+        swapchainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR;
     swapchainInfo.presentMode = presentMode;
     swapchainInfo.clipped = VK_TRUE;
     swapchainInfo.oldSwapchain = VK_NULL_HANDLE;
@@ -1143,8 +1157,10 @@ bool VulkanRenderer::Execute(const Frame &frame)
                 break;
             case Frame::Command::BindMaterial:
                 currentMaterialId = command.materialId;
-                // TODO(P7d):材質管線/descriptor 綁定。目前單一 graphicsPipeline,
-                // materialId 先記錄,真正的材質 cache 留待獨立 material 資產票。
+                // #55:材質管線。materialCache 有該 id → RecordMeshDrawCommands
+                // 綁 per-material descriptor set(UBO + 各自 texture);未註冊 fallback
+                // 到預設 descriptorSet。
+                boundMaterialId = currentMaterialId;
                 break;
             case Frame::Command::DrawMesh:
             {
@@ -1469,16 +1485,18 @@ bool VulkanRenderer::CreateDescriptorSetLayout()
 
 bool VulkanRenderer::CreateDescriptorPool()
 {
-    // 2 組描述子集:場景主 set + 文字 set;兩者都綁同一個 uniformBuffer 與各自的 sampler。
+    // 場景色 set + 文字 set + #55 per-material sets(MaxMaterials)。
+    // 每組都綁同一個 uniformBuffer 與各自的 sampler(UBO binding 0, 材質 binding 1)。
+    const uint32_t extra = MaxMaterials;
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2}
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 + extra},
+        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 + extra}
     };
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = 2;
     poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 2;
+    poolInfo.maxSets = 2 + extra;
     if (vkCreateDescriptorPool(device, &poolInfo, nullptr, &descriptorPool) != VK_SUCCESS)
         return false;
     return true;
@@ -1802,6 +1820,7 @@ void VulkanRenderer::CleanupPipelineResources()
     if (textureImageMemory)
         vkFreeMemory(device, textureImageMemory, nullptr);
     CleanupFontAtlasCache();
+    CleanupMaterialCache();
     if (textVertexBuffer)
         vkDestroyBuffer(device, textVertexBuffer, nullptr);
     if (textVertexMemory)
@@ -2130,6 +2149,125 @@ bool VulkanRenderer::RegisterMeshGeometry(uint64_t meshId, const RenderInfo &inf
     return true;
 }
 
+// ── #55:per-material descriptor 綁定────────────────────────────────────────
+
+bool VulkanRenderer::RegisterMaterial(uint64_t materialId, const MaterialSource &source)
+{
+    if (materialCache.Contains(materialId))
+        return true; // 已註冊 → 去重(與 meshCache / fontAtlasCache 同精神)
+
+    MaterialGpuData data = {};
+    data.textureImage = VK_NULL_HANDLE;
+    data.textureMemory = VK_NULL_HANDLE;
+    data.textureImageView = VK_NULL_HANDLE;
+    data.descriptorSet = VK_NULL_HANDLE;
+
+    // 資料來源:inline raw RGBA(仿 FontAtlas,不依賴磁碟)或 Texture path(stbi)。
+    const unsigned char *pPixels = nullptr;
+    uint32_t texW = 1, texH = 1;
+    if (source.pRawRGBA && source.width && source.height)
+    {
+        pPixels = source.pRawRGBA;
+        texW = source.width;
+        texH = source.height;
+    }
+    else if (source.pTexture)
+    {
+        int w = 0, h = 0, ch = 0;
+        char pathBuf[1024];
+        source.pTexture->imagePath.ToUTF8(pathBuf, 1024);
+        const unsigned char *pImg = stbi_load(pathBuf, &w, &h, &ch, 4);
+        if (!pImg)
+        {
+            PRINTLN_ERR(String(L"RegisterMaterial: failed to load texture '") +
+                        source.pTexture->imagePath + String(L"'."));
+            return false;
+        }
+        texW = static_cast<uint32_t>(w);
+        texH = static_cast<uint32_t>(h);
+        if (!CreateImageWithData(device, physicalDevice, graphicsQueue, commandPool,
+                                 texW, texH, pImg, data.textureImage, data.textureMemory))
+        {
+            stbi_image_free(const_cast<unsigned char *>(pImg));
+            return false;
+        }
+        stbi_image_free(const_cast<unsigned char *>(pImg));
+    }
+    else
+    {
+        // 無來源:1x1 白色 fallback(保證 binding 1 有效)。
+        const uint32_t whitePixel = 0xFFFFFFFF;
+        const unsigned char *pWhite = reinterpret_cast<const unsigned char *>(&whitePixel);
+        if (!CreateImageWithData(device, physicalDevice, graphicsQueue, commandPool,
+                                 1, 1, pWhite, data.textureImage, data.textureMemory))
+            return false;
+    }
+    if (!data.textureImage)
+    {
+        // pRawRGBA 路徑:CreateImageWithData 尚未執行,補上。
+        if (!CreateImageWithData(device, physicalDevice, graphicsQueue, commandPool,
+                                 texW, texH, pPixels, data.textureImage, data.textureMemory))
+            return false;
+    }
+    data.textureImageView = CreateImageView(data.textureImage, VK_FORMAT_R8G8B8A8_SRGB);
+
+    // per-material descriptor set:UBO(binding 0, 共用 uniformBuffer)+ 各自 texture(binding 1)。
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &descriptorSetLayout;
+    if (vkAllocateDescriptorSets(device, &allocInfo, &data.descriptorSet) != VK_SUCCESS)
+    {
+        vkDestroyImageView(device, data.textureImageView, nullptr);
+        vkDestroyImage(device, data.textureImage, nullptr);
+        vkFreeMemory(device, data.textureMemory, nullptr);
+        return false;
+    }
+
+    VkDescriptorBufferInfo bufferInfo = {};
+    bufferInfo.buffer = uniformBuffer;
+    bufferInfo.offset = 0;
+    bufferInfo.range = sizeof(MatrixBuffer);
+
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = data.textureImageView;
+    imageInfo.sampler = textureSampler;
+
+    VkWriteDescriptorSet writes[2] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = data.descriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &bufferInfo;
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = data.descriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].pImageInfo = &imageInfo;
+    vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+
+    materialCache.Insert(materialId, data);
+    return true;
+}
+
+void VulkanRenderer::CleanupMaterialCache()
+{
+    if (!device)
+        return;
+    for (auto itr = materialCache.First(); itr != materialCache.Last(); itr++)
+    {
+        vkDestroyImageView(device, itr->Value().textureImageView, nullptr);
+        vkDestroyImage(device, itr->Value().textureImage, nullptr);
+        vkFreeMemory(device, itr->Value().textureMemory, nullptr);
+        // descriptor sets 由 descriptorPool 統一釋放,不需個別 vkFreeDescriptorSets
+    }
+    materialCache.Clear();
+}
+
 void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world)
 {
     HashTable<uint64_t, GpuMesh>::Iterator itr = meshCache.Find(meshId);
@@ -2137,9 +2275,18 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
         return; // meshId 未註冊(幾何來源尚未由 View 提供)→ 略過
 
     const GpuMesh &mesh = itr->Value();
+
+    // #55:per-material descriptor 綁定。BindMaterial 指定的 material 在
+    // materialCache 中 → 綁它的 descriptor set(UBO + 各自 texture);
+    // 未註冊材質(或從未 BindMaterial)= fallback 到預設 descriptorSet。
+    VkDescriptorSet bindSet = descriptorSet;
+    HashTable<uint64_t, MaterialGpuData>::Iterator matItr = materialCache.Find(boundMaterialId);
+    if (matItr != materialCache.Last())
+        bindSet = matItr->Value().descriptorSet;
+
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                            0, 1, &descriptorSet, 0, nullptr);
+                            0, 1, &bindSet, 0, nullptr);
 
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection = glm::perspective(glm::radians(70.0f),

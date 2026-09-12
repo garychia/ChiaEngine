@@ -12,6 +12,8 @@
 
 #include <string>
 
+struct Texture; // forward decl:MaterialSource 以指標持有(RenderInfo 鏈才給完整定義)
+
 class Window;
 
 class VulkanRenderer : public IRenderer, public IFrameExecutor
@@ -103,6 +105,20 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     };
     HashTable<uint64_t, GpuMesh> meshCache; // 以 meshId(content-hash)為 key 的幾何快取
 
+    // ── #55:per-material descriptor 綁定───────────────────────────────
+    // MaterialSource 供 View 層命名(定義在 public 區)。
+    // MaterialGpuData 是純內部型別,需在 materialCache 成員前完整定義(private)。
+    struct MaterialGpuData
+    {
+        VkImage textureImage;
+        VkDeviceMemory textureMemory;
+        VkImageView textureImageView;
+        VkDescriptorSet descriptorSet; // UBO(binding 0) + 各自 texture(binding 1)
+    };
+    static constexpr uint32_t MaxMaterials = 16;                // descriptor pool 預留額度
+    HashTable<uint64_t, MaterialGpuData> materialCache;        // key = materialId(content-hash)
+    uint64_t boundMaterialId = 0;                              // BindMaterial 目前綁定的材質
+
     // ── P7e:文字渲染───────────────────────────────────────────────
     struct FontAtlasGpuData
     {
@@ -178,6 +194,7 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     void CleanupPipelineResources();
     void CleanupRenderableGpuMap();
     void CleanupMeshCache();
+    void CleanupMaterialCache();
 
     // ── Renderable 繪製 ─────────────────────────────────────────────────────
     bool LoadRenderable(const IRenderable &renderable);       // RenderInfo → GPU buffer
@@ -244,6 +261,15 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
 
     // ── P7d:mesh 幾何註冊(由 View 側把 renderable 幾何登記成 content-hash meshId)──
     bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info);
+
+    // ── #55:material 註冊(材質 id → texture + descriptor set)──────────────
+    struct MaterialSource
+    {
+        const Texture *pTexture = nullptr;        // 非 null → stbi 載入 imagePath
+        const unsigned char *pRawRGBA = nullptr;  // 非 null → inline raw RGBA(仿 FontAtlas)
+        uint32_t width = 0, height = 0;            // pRawRGBA 用
+    };
+    bool RegisterMaterial(uint64_t materialId, const MaterialSource &source);
 };
 
 #endif

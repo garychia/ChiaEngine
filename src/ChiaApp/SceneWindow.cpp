@@ -1,5 +1,7 @@
 #include "SceneWindow.hpp"
 #include "Paths.hpp"
+#include "Display/Frame.hpp"
+#include "Display/Vulkan/VulkanRenderer.hpp"
 #include "Geometry/Primitives.hpp"
 
 SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
@@ -18,6 +20,9 @@ bool SceneWindow::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
+    // #55:多材質示範 — 幾何/Material 註冊延到 Render() 首次執行時
+    // (Window::Show → renderer.Initialize 之後才能建 GPU 資源);
+    // 此處保留 legacy Scene 供既有 path 相容。
     auto cube = SharedPtr<IRenderable>::Construct<Cube>();
     auto pTexture = SharedPtr<Texture>::Construct(String(IMAGE_FILE_PATH) + "michael-sum-unsplash.jpg");
     pTextures.Append(pTexture);
@@ -36,6 +41,81 @@ bool SceneWindow::Initialize(Window *pParent)
         pSceneSystem->CreateNode(childA);
     }
     return LoadScene(*pMainScene);
+}
+
+void SceneWindow::EnsureMaterialDemoRegistered()
+{
+    if (materialsRegistered)
+        return; // 只註冊一次(renderer 資源全域共用)
+    materialsRegistered = true;
+
+    VulkanRenderer *pRenderer = dynamic_cast<VulkanRenderer *>(&renderer);
+    if (!pRenderer)
+        return;
+
+    // 幾何:content-hash meshId(固定常數;真實系統由 AssetManager 內容定址給)。
+    if (meshId_ == 0)
+    {
+        const uint64_t kCubeMeshId = 0x43554245ull; // "CUBE"
+        auto cube = SharedPtr<IRenderable>::Construct<Cube>();
+        if (pRenderer->RegisterMeshGeometry(kCubeMeshId, cube->GetRenderInfo()))
+            meshId_ = kCubeMeshId;
+    }
+
+    // 材質 1:原本的貓 JPG(磁碟資產,stbi 載入)。
+    VulkanRenderer::MaterialSource mat1;
+    mat1.pTexture = pTextures.GetFirst().GetRaw();
+    pRenderer->RegisterMaterial(0x4D415431ull /* "MAT1" */, mat1);
+
+    // 材質 2:inline RGBA 棋盤格(2x2,紅/暗紅)— 展示 per-material texture 不需磁碟資產。
+    static const unsigned char kChecker[2 * 2 * 4] = {
+        255, 60, 40, 255, 120, 20, 15, 255,
+        120, 20, 15, 255, 255, 60, 40, 255,
+    };
+    VulkanRenderer::MaterialSource mat2;
+    mat2.pRawRGBA = kChecker;
+    mat2.width = 2;
+    mat2.height = 2;
+    pRenderer->RegisterMaterial(0x4D415432ull /* "MAT2" */, mat2);
+}
+
+void SceneWindow::Render()
+{
+    // children(此視窗無子視窗)→ 略過
+    // 首次執行時註冊 multi-material 示範(renderer 已初始化)。
+    EnsureMaterialDemoRegistered();
+
+    Frame frame;
+    frame.BeginFrame();
+    if (pController)
+        frame.SetCamera(pController->GetCamera());
+    // #55:走 DrawMesh + BindMaterial 路徑 — 2 顆 cube、2 種材質。
+    VulkanRenderer *pRenderer = dynamic_cast<VulkanRenderer *>(&renderer);
+    if (pRenderer && meshId_ != 0)
+    {
+        // 材質 1 cube(左):貓 JPG。
+        frame.BindMaterial(0x4D415431ull);
+        frame.PushTransform(Point3D(-1.2f, 0.0f, 0.0f), Point3D(), Point3D(0.9f));
+        frame.DrawMesh(meshId_);
+        frame.PopTransform();
+        // 材質 2 cube(右):紅色棋盤格。
+        frame.BindMaterial(0x4D415432ull);
+        frame.PushTransform(Point3D(1.2f, 0.0f, 0.0f), Point3D(), Point3D(0.9f));
+        frame.DrawMesh(meshId_);
+        frame.PopTransform();
+    }
+    else
+    {
+        // fallback:legacy renderable 路徑(renderer 非 Vulkan 或註冊失敗)。
+        if (pMainScene)
+        {
+            const DynamicArray<SharedPtr<IRenderable>> &renderables = pMainScene->GetRenderables();
+            for (size_t i = 0; i < renderables.GetNElements(); i++)
+                frame.DrawRenderable(*renderables[i]);
+        }
+    }
+    frame.EndFrame();
+    renderer.Execute(frame);
 }
 
 bool SceneWindow::OnKeyboardInputReceived(const KeyCombination &combination)

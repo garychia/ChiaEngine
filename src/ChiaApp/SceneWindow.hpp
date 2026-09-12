@@ -25,6 +25,11 @@ class SceneWindow : public Window
 
     bool replayKeyDown; // F5 邊緣偵測(按下觸發一次)
 
+    // #55:multi-material 示範 — 註冊延到 Render 首次執行(renderer 已 init)。
+    bool materialsRegistered = false;
+    uint64_t meshId_ = 0; // 已註冊的 cube meshId(0 = 未註冊)
+    void EnsureMaterialDemoRegistered();
+
     SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
                 SceneSystem *pSceneSystem);
 
@@ -32,6 +37,8 @@ class SceneWindow : public Window
     ~SceneWindow();
 
     virtual bool Initialize(Window *pParent = nullptr) override;
+
+    virtual void Render() override;
 
     virtual bool OnKeyboardInputReceived(const KeyCombination &combination) override;
 

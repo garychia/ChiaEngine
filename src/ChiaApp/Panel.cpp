@@ -32,9 +32,9 @@ bool Panel::Initialize(Window *pParent)
     //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)
     if (!pSceneWindow)
         return false;
-    pSceneWindow->SetPosition(static_cast<long>(regions.centerViewport.xPos),
-                              static_cast<long>(regions.centerViewport.yPos));
-    pSceneWindow->SetSize(static_cast<long>(regions.sceneSize.x), static_cast<long>(regions.sceneSize.y));
+    // 初始位置/尺寸已由 childWndInfo(border)決定;不要在 Initialize 階段
+    // SetPosition/SetSize — GLFW handle 還沒建立(Show() 才建),呼叫會 assert。
+    // (OnWindowResized 才是 resize 後重新定位的時機。)
     // #60 step 1:SceneWindow::Initialize 已建立 demo 節點,這裡重建側欄並接選取事件。
     layout.BuildHierarchy(*pSceneSystem);
     auto &rows = layout.GetHierarchyRows();
