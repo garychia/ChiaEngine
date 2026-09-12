@@ -1,7 +1,7 @@
 #ifndef EVENT_HPP
 #define EVENT_HPP
 
-#include "Data/HashTable.hpp"
+#include "Data/DynamicArray.hpp"
 #include "Function.hpp"
 #include "Types/Types.hpp"
 
@@ -14,6 +14,7 @@ template <class T, class... Args> class Callback<T(Args...)>
     {
       public:
         virtual T Invoke(Args... args) = 0;
+        virtual ~IWrapper() = default;
     };
 
     template <class Subscriber> class MemberFunctionWrapper : public IWrapper
@@ -100,32 +101,25 @@ template <class T> class Event;
 template <class T, class... Args> class Event<T(Args...)>
 {
   private:
-    HashTable<void *, Callback<T(Args...)> *> callbacks;
+    // Subscription-ordered dispatch (issue #79): subscribers and callbacks are
+    // held as PARALLEL DynamicArrays in subscribe order. Invoke iterates in
+    // subscription order (deterministic, replay-stable), and Event OWNS every
+    // Callback* — Unsubscribe/Clear/dtors delete them (no leaks).
+    DynamicArray<void *> subscribers;
+    DynamicArray<Callback<T(Args...)> *> callbacks;
 
   public:
-    Event() : callbacks()
+    Event() : subscribers(), callbacks()
     {
     }
 
-    Event(const Event &other) : callbacks(other.callbacks)
-    {
-    }
+    Event(const Event &other) = delete;
 
-    Event(Event &&other) : callbacks(Move(other.callbacks))
-    {
-    }
+    Event &operator=(const Event &other) = delete;
 
-    Event &operator=(const Event &other)
-    {
-        callbacks = other.callbacks;
-        return *this;
-    }
+    Event(Event &&other) = delete;
 
-    Event &operator=(Event &&other)
-    {
-        callbacks = Types::Move(other.callbacks);
-        return *this;
-    }
+    Event &operator=(Event &&other) = delete;
 
     ~Event()
     {
@@ -134,25 +128,61 @@ template <class T, class... Args> class Event<T(Args...)>
 
     template <class Subscriber> void Subscribe(Subscriber *pSubscriber, T (Subscriber::*pFunc)(Args...))
     {
-        callbacks.Insert((void *)pSubscriber, new Callback<T(Args...)>(pSubscriber, pFunc));
+        Callback<T(Args...)> *pCallback = new Callback<T(Args...)>(pSubscriber, pFunc);
+        // Duplicate subscribe on the same subscriber: replace in place (no leak).
+        for (size_t i = 0; i < subscribers.Length(); i++)
+        {
+            if (subscribers[i] == (void *)pSubscriber)
+            {
+                delete callbacks[i];
+                callbacks[i] = pCallback;
+                return;
+            }
+        }
+        subscribers.Append((void *)pSubscriber);
+        callbacks.Append(pCallback);
     }
 
     template <class Subscriber> void Unsubscribe(Subscriber *pSubscriber)
     {
-        callbacks.Remove((void *)pSubscriber);
+        for (size_t i = 0; i < subscribers.Length(); i++)
+        {
+            if (subscribers[i] == (void *)pSubscriber)
+            {
+                delete callbacks[i];
+                // Swap-with-last removal keeps the array dense; remaining
+                // dispatch order stays the ORIGINAL subscribe order.
+                callbacks[i] = callbacks[callbacks.Length() - 1];
+                subscribers[i] = subscribers[subscribers.Length() - 1];
+                callbacks.RemoveLast();
+                subscribers.RemoveLast();
+                return;
+            }
+        }
     }
 
     void Invoke(Args... args)
     {
-        for (auto itr = callbacks.First(); itr != callbacks.Last(); itr++)
+        for (size_t i = 0; i < callbacks.Length(); i++)
         {
-            (*itr->Value())(args...);
+            (*callbacks[i])(args...);
         }
     }
 
     void Clear()
     {
-        callbacks.Clear();
+        for (size_t i = 0; i < callbacks.Length(); i++)
+        {
+            delete callbacks[i];
+            callbacks[i] = nullptr;
+        }
+        callbacks.RemoveAll();
+        subscribers.RemoveAll();
+    }
+
+    size_t Length() const
+    {
+        return callbacks.Length();
     }
 };
 

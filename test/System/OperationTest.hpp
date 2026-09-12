@@ -5,9 +5,40 @@
 #include "System/Operation/Function.hpp"
 #include "System/Operation/Event.hpp"
 
+namespace operationtest
+{
+
 static int g_functionResult = 0;
 static void FreeFunctionVoid() { g_functionResult = 42; }
 static int FreeFunctionInt(int x) { return x * 2; }
+
+static int g_orderLog[8] = {0};
+static int g_orderCount = 0;
+static int g_invokeCount = 0;
+
+// Distinct subscriber objects — different addresses, so the OLD hash-table
+// implementation dispatched them in address order; the NEW one must dispatch
+// in subscribe order.
+class OrderSubscriberA
+{
+  public:
+    void OnFire() { g_orderLog[g_orderCount++] = 1; }
+    void OnFireInt(int) { g_orderLog[g_orderCount++] = 1; }
+};
+
+class OrderSubscriberB
+{
+  public:
+    void OnFire() { g_orderLog[g_orderCount++] = 2; }
+    void OnFireInt(int) { g_orderLog[g_orderCount++] = 2; }
+};
+
+class OrderSubscriberC
+{
+  public:
+    void OnFire() { g_orderLog[g_orderCount++] = 3; }
+    void OnFireInt(int) { g_orderLog[g_orderCount++] = 3; }
+};
 
 class SystemOperationTest : public Test
 {
@@ -22,8 +53,14 @@ class SystemOperationTest : public Test
     void SetMemberValue(int v) { memberValue = v; }
     int GetMemberValue() const { return memberValue; }
 
+    void OnTestEvent() { g_functionResult = 100; }
+    void OnTestEventInt(int v) { memberValue = v; }
+    void OnIncrement() { g_invokeCount++; }
+
     bool Run() noexcept override
     {
+        g_invokeCount = 0;
+
         TEST_MESSAGE("Function default ctor");
         Function<void()> emptyFunc;
         EXPECT_TRUE(!emptyFunc.Valid(), "Default function is invalid.", true);
@@ -79,7 +116,7 @@ class SystemOperationTest : public Test
         evt.Invoke();
         EXPECT_TRUE(g_functionResult == 0, "After unsubscribe, no effect.", true);
 
-        TEST_MESSAGE("Event multiple subscribers");
+        TEST_MESSAGE("Event with args");
         Event<void(int)> evt2;
         evt2.Subscribe(this, &SystemOperationTest::OnTestEventInt);
         memberValue = 0;
@@ -89,19 +126,106 @@ class SystemOperationTest : public Test
         TEST_MESSAGE("Event clear");
         Event<void()> evt3;
         evt3.Subscribe(this, &SystemOperationTest::OnTestEvent);
-        evt3.Subscribe(this, &SystemOperationTest::OnTestEvent);
         evt3.Clear();
         g_functionResult = 0;
         evt3.Invoke();
         EXPECT_TRUE(g_functionResult == 0, "Clear removes all subscribers.", true);
+
+        // ────────────────────────────────────────────────────────────
+        // #79 regression tests: subscription-ordered dispatch, duplicate
+        // subscribe replaces, unsubscribe removes only target, no leaks.
+        // ────────────────────────────────────────────────────────────
+
+        TEST_MESSAGE("Event dispatch in SUBSCRIPTION order (#79)");
+        {
+            OrderSubscriberA a;
+            OrderSubscriberB b;
+            OrderSubscriberC c;
+            Event<void()> orderEvt;
+
+            g_orderCount = 0;
+            orderEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            orderEvt.Subscribe(&b, &OrderSubscriberB::OnFire);
+            orderEvt.Subscribe(&c, &OrderSubscriberC::OnFire);
+            orderEvt.Invoke();
+
+            EXPECT_TRUE(g_orderCount == 3, "All three subscribers fired.", true);
+            EXPECT_TRUE(g_orderLog[0] == 1, "Subscriber A fired FIRST (subscribe order).", true);
+            EXPECT_TRUE(g_orderLog[1] == 2, "Subscriber B fired SECOND.", true);
+            EXPECT_TRUE(g_orderLog[2] == 3, "Subscriber C fired THIRD.", true);
+        }
+
+        TEST_MESSAGE("Event duplicate subscribe replaces, not adds (#79)");
+        {
+            OrderSubscriberA a;
+            OrderSubscriberB b;
+            Event<void()> dupEvt;
+
+            dupEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            dupEvt.Subscribe(&b, &OrderSubscriberB::OnFire);
+            // Re-subscribe A: must REPLACE the existing A slot (same object).
+            dupEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            EXPECT_TRUE(dupEvt.Length() == 2, "Duplicate subscribe replaced, not added.", true);
+
+            // A fires once, B fires once — order preserved.
+            g_orderCount = 0;
+            dupEvt.Invoke();
+            EXPECT_TRUE(g_orderCount == 2, "Exactly two fires, not three.", true);
+            EXPECT_TRUE(g_orderLog[0] == 1 && g_orderLog[1] == 2, "Order A then B preserved.", true);
+        }
+
+        TEST_MESSAGE("Event unsubscribe removes ONLY the target (#79)");
+        {
+            OrderSubscriberA a;
+            OrderSubscriberB b;
+            OrderSubscriberC c;
+            Event<void()> unSubEvt;
+
+            unSubEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            unSubEvt.Subscribe(&b, &OrderSubscriberB::OnFire);
+            unSubEvt.Subscribe(&c, &OrderSubscriberC::OnFire);
+            unSubEvt.Unsubscribe(&b);
+
+            g_orderCount = 0;
+            unSubEvt.Invoke();
+            EXPECT_TRUE(g_orderCount == 2, "Only two subscribers after unsubscribing B.", true);
+            EXPECT_TRUE(g_orderLog[0] == 1, "A still first.", true);
+            EXPECT_TRUE(g_orderLog[1] == 3, "C still third (B removed, order kept).", true);
+        }
+
+        TEST_MESSAGE("Event Clear then reuse stays empty (#79)");
+        {
+            OrderSubscriberA a;
+            Event<void()> clearEvt;
+            clearEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            clearEvt.Clear();
+            g_orderCount = 0;
+            clearEvt.Invoke();
+            EXPECT_TRUE(g_orderCount == 0, "After Clear, no subscribers fire.", true);
+            // Re-subscribe after clear (container must be reusable).
+            clearEvt.Subscribe(&a, &OrderSubscriberA::OnFire);
+            clearEvt.Invoke();
+            EXPECT_TRUE(g_orderCount == 1, "Re-subscribe after Clear works.", true);
+        }
+
+        TEST_MESSAGE("Event lifetime: dtor cleans up all callbacks (#79)");
+        {
+            // In this scope, evt subscribes and the dtor fires at the closing brace.
+            // Any double-free/leak in the dtor path fails here (or in ASan builds).
+            Event<void(int)> lifetimeEvt;
+            lifetimeEvt.Subscribe(this, &SystemOperationTest::OnTestEventInt);
+            lifetimeEvt.Subscribe(this, &SystemOperationTest::OnTestEventInt); // dup replaced
+            lifetimeEvt.Invoke(5);
+            EXPECT_TRUE(memberValue == 5, "Still invokes after dup subscribe.", true);
+        }
 
         SUCCESS_MESSAGE("SystemOperation");
         return true;
     }
 
   private:
-    void OnTestEvent() { g_functionResult = 100; }
-    void OnTestEventInt(int v) { memberValue = v; }
 };
+
+} // namespace operationtest
 
 #endif

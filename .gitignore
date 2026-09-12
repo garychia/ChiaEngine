@@ -52,3 +52,4 @@ test/AllTests
 # code-graph-rag tool cache
 .cgr-*
 .qdrant_code_embeddings/
+.codegraph/

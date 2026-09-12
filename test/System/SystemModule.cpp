@@ -27,7 +27,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<assetfmt::TextureViewHookTest>();
     AddTest<textureviewtest::TextureAssetViewTest>();
     AddTest<IOTest>(ioTestPath);
-    AddTest<SystemOperationTest>();
+    AddTest<operationtest::SystemOperationTest>();
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
     AddTest<framecountertest::FrameCounterTest>();
