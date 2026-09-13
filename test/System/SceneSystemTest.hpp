@@ -146,6 +146,46 @@ class SceneSystemTest : public Test
             EXPECT_TRUE(nodes[3] == childB && depths[3] == 1, "childB 在 childA 子樹後.", true);
         }
 
+        // ---- AC5:編輯器 seam(#82)— GetTransform/EditTransform/CreateEditorDemoHierarchy ----
+        {
+            SceneSystem system;
+            Entity a = system.CreateNode();
+            system.GetLocalTransform(a)->position = Point3D(1, 2, 3);
+
+            // GetTransform:讀回已寫入的 local transform。
+            TransformComponent tc;
+            EXPECT_TRUE(system.GetTransform(a.GetIndex(), tc), "GetTransform 讀取成功.", true);
+            EXPECT_TRUE(Math::Abs(tc.position.x - 1) < 1e-4f, "GetTransform 回 position.x == 1.", true);
+            EXPECT_TRUE(!system.GetTransform(999999u, tc), "無效 index 的 GetTransform 回 false.", true);
+
+            // EditTransform:增量疊加,position/rotation/scale 各自獨立。
+            TransformComponent delta;
+            delta.position.x = 0.5f;
+            delta.rotation.y = 5.f;
+            delta.scale.z = 0.1f;
+            system.EditTransform(a.GetIndex(), delta);
+            EXPECT_TRUE(system.GetTransform(a.GetIndex(), tc), "EditTransform 後仍可讀.", true);
+            EXPECT_TRUE(Math::Abs(tc.position.x - 1.5f) < 1e-4f, "EditTransform 後 position.x == 1.5.", true);
+            EXPECT_TRUE(Math::Abs(tc.rotation.y - 5.f) < 1e-4f, "EditTransform 後 rotation.y == 5.0.", true);
+            EXPECT_TRUE(Math::Abs(tc.scale.z - 1.1f) < 1e-4f, "EditTransform 後 scale.z == 1.1 (default 1 + 0.1).", true);
+
+            // 對已毀 entity 編輯 = no-op(不崩、不復活)。
+            system.DestroyNode(a);
+            system.EditTransform(a.GetIndex(), delta);
+            EXPECT_TRUE(!system.Alive(a), "DestroyNode 後 a 消失.", true);
+            EXPECT_TRUE(!system.GetTransform(a.GetIndex(), tc), "已毀 entity 的 GetTransform 回 false.", true);
+
+            // CreateEditorDemoHierarchy:#60 demo 階層 = root(childA、childB)childA(grand)。
+            SceneSystem demo;
+            demo.CreateEditorDemoHierarchy();
+            DynamicArray<Entity> nodes;
+            DynamicArray<uint32_t> depths;
+            demo.GetHierarchy(nodes, depths);
+            EXPECT_TRUE(nodes.GetNElements() == 4, "demo 階層共 4 節點.", true);
+            EXPECT_TRUE(depths[0] == 0 && depths[1] == 1, "root 深度 0,childA 深度 1.", true);
+            EXPECT_TRUE(depths[2] == 2 && depths[3] == 1, "grand 深度 2,childB 深度 1.", true);
+        }
+
         // ---- 驗證:SceneSystem 透過 EngineContext RegisterService 可被 Resolve ----
         {
             Engine engine(1);

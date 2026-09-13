@@ -83,6 +83,12 @@ class InspectorTest : public Test
             inspector.ApplyEdit(a.GetIndex(), InspectorAxis::ScaleY, +1.f);
             inspector.Update();
             EXPECT_TRUE(Math::Abs(pT->scale.y - 1.1f) < 1e-4f, "ApplyEdit +SclY 後 scale.y == 1.1 (default 1 + 0.1).", true);
+            // #82 fix:軸外 scale 不得被污染(Pre-fix:每次 edit 加 (1,1,1) → 漂移)。
+            EXPECT_TRUE(Math::Abs(pT->scale.x - 1.0f) < 1e-4f && Math::Abs(pT->scale.z - 1.0f) < 1e-4f,
+                        "SclY edit 後 scale.x/z 保持 1.0(不漂移).", true);
+            // position/rotation 也不得被 scale edit 污染。
+            EXPECT_TRUE(Math::Abs(pT->position.x) < 1e-4f && Math::Abs(pT->rotation.z - 5.0f) < 1e-4f,
+                        "SclY edit 不污染 position/rotation.", true);
 
             // label 重畫後 Pos X 仍為 0.00
             EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() > 0,

@@ -79,6 +79,51 @@ class SceneSystem : public IModule
         SetParent(e, Entity());
     }
 
+    // ---- 編輯器 seam(#82)----
+    // View(InspectorButton/InspectorLayer/SceneWindow)只能經由這些操作存取場景圖,
+    // 不直接碰 world field(層規則只擋 Sim→Display,補上 View→Sim 的窄縫)。
+    // editor 的 Selection 存 entity index(不用 handle),故 seam 以 index 為參數,
+    // 存活/存在性檢查一律在 Sim 內做,View 不需也無法摸元件池。
+
+    // 讀取 local transform(index + 存活檢查);無效回 false。
+    // (World::GetComponent 無 const 重載,故本方法非 const — 與 GetChildren 一致。)
+    bool GetTransform(uint32_t entityIndex, TransformComponent &out)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        TransformComponent *pT = world.GetComponent<TransformComponent>(e);
+        if (!pT)
+            return false;
+        out = *pT;
+        return true;
+    }
+
+    // 編輯器增量編輯:local TRS += delta(axis 對應的 delta 由 View 端組好,
+    // Sim 不認識 InspectorAxis)。entity 不存在或無元件則 no-op。
+    void EditTransform(uint32_t entityIndex, const TransformComponent &delta)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        TransformComponent *pT = world.GetComponent<TransformComponent>(e);
+        if (!pT)
+            return;
+        pT->position += delta.position;
+        pT->rotation += delta.rotation;
+        pT->scale += delta.scale;
+    }
+
+    // #60 step 1 demo 階層整批建立(#82:SceneWindow 不再自行拼裝 scene 內容)。
+    // root → childA + childB;childA → grandchild(4 節點,供 hierarchy 側欄展示)。
+    void CreateEditorDemoHierarchy()
+    {
+        Entity root = CreateNode();
+        Entity childA = CreateNode(root);
+        CreateNode(root);
+        CreateNode(childA);
+    }
+
     // children 依 entity index 升序(掃描 pool,parent == e)。
     DynamicArray<Entity> GetChildren(Entity e) const
     {
