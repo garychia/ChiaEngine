@@ -36,8 +36,8 @@ class InspectorTest : public Test
             system.GetLocalTransform(a)->position = Point3D(1, 2, 3);
             system.GetLocalTransform(b)->position = Point3D(9, 9, 9);
 
-            InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
+            InspectorLayer inspector(String(u"Inspector"), Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), PanelDock::RightDock, &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -56,8 +56,8 @@ class InspectorTest : public Test
             Entity a = system.CreateNode();
             system.GetLocalTransform(a)->position = Point3D(0, 0, 0);
 
-            InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
+            InspectorLayer inspector(String(u"Inspector"), Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), PanelDock::RightDock, &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -104,8 +104,8 @@ class InspectorTest : public Test
             system.GetLocalTransform(a)->position = Point3D(0, 0, 0);
             system.GetLocalTransform(b)->position = Point3D(0, 0, 0);
 
-            InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
+            InspectorLayer inspector(String(u"Inspector"), Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), PanelDock::RightDock, &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -130,8 +130,8 @@ class InspectorTest : public Test
             SceneSystem system;
             UndoStack stack;
             Entity a = system.CreateNode();
-            InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
+            InspectorLayer inspector(String(u"Inspector"), Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), PanelDock::RightDock, &system, &stack);
             Selection selA;
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
@@ -155,8 +155,8 @@ class InspectorTest : public Test
             sel.entityIndex = a.GetIndex();
             sel.hasSelection = true;
 
-            InspectorLayer inspector(Point2D(1000, 800),
-                                     Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
+            InspectorLayer inspector(String(u"Inspector"), Point2D(1000, 800),
+                                     Border(800.f, 30.f, 200.f, 400.f), PanelDock::RightDock, &system, &stack);
             inspector.SetSelection(&sel);
             EXPECT_TRUE(inspector.GetFieldRows()[0]->GetLabel().Length() > 0,
                         "選 a:Inspector 讀 Selection 顯示 a 的值.", true);
