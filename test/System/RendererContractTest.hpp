@@ -54,13 +54,13 @@ struct ExecutedCommand
     String text;
     float textSize;
     Color textColor;
-    const Camera *pCamera;
+    Frame::CameraPayload camera; // #80:SetCamera 值快照
     const IRenderable *pRenderable;
     const GUILayout *pLayout;
 
     ExecutedCommand() : command(Frame::Command::BeginFrame), transform(), meshId(0), materialId(0),
                         viewport(), fontId(0), text(), textSize(0), textColor(),
-                        pCamera(nullptr), pRenderable(nullptr), pLayout(nullptr)
+                        camera(), pRenderable(nullptr), pLayout(nullptr)
     {
     }
 };
@@ -121,7 +121,7 @@ class MockExecutor : public IFrameExecutor
             rec.text = cmd.text;
             rec.textSize = cmd.textSize;
             rec.textColor = cmd.textColor;
-            rec.pCamera = cmd.pCamera;
+            rec.camera = cmd.camera; // #80:SetCamera 值快照(取代 pCamera 指標)
             rec.pRenderable = cmd.pRenderable;
             rec.pLayout = cmd.pLayout;
             records.Append(Types::Move(rec));
@@ -383,8 +383,10 @@ class RendererContractTest : public Test
             EXPECT_TRUE(executor.records[1].command == Frame::Command::SetCamera, "命令 1 為 SetCamera.", true);
             EXPECT_TRUE(executor.records[2].command == Frame::Command::DrawRenderable, "命令 2 為 DrawRenderable.", true);
             EXPECT_TRUE(executor.records[3].command == Frame::Command::DrawGUILayout, "命令 3 為 DrawGUILayout.", true);
-            // executor 執行當下指標有效(round-trip 前)
-            EXPECT_TRUE(executor.records[1].pCamera != nullptr, "SetCamera 執行當下帶有效 Camera 指標.", true);
+            // executor 執行當下:SetCamera 帶「值快照」(#80,非指標)— pos 已快照。
+            EXPECT_TRUE(executor.records[1].camera.position.x == 10.0f && executor.records[1].camera.position.y == 20.0f &&
+                            executor.records[1].camera.position.z == 30.0f,
+                        "SetCamera 執行當下攜帶值快照(position 已快照,不再是指標).", true);
             EXPECT_TRUE(executor.records[2].pRenderable != nullptr, "DrawRenderable 執行當下帶有效 IRenderable 指標.", true);
             EXPECT_TRUE(executor.records[3].pLayout != nullptr, "DrawGUILayout 執行當下帶有效 GUILayout 指標.", true);
 
@@ -433,33 +435,40 @@ class RendererContractTest : public Test
                 EXPECT_TRUE(rt.GetCommand(i).command == frame.GetCommand(i).command,
                             "round-trip 後命令順序保留.", true);
             }
-            EXPECT_TRUE(rt.GetCommand(1).pCamera == nullptr, "SetCamera 指標 round-trip 後歸 null(無法 round-trip).", true);
+            EXPECT_TRUE(rt.GetCommand(1).camera.position.x == 10.0f && rt.GetCommand(1).camera.position.y == 20.0f &&
+                            rt.GetCommand(1).camera.position.z == 30.0f && rt.GetCommand(1).camera.angleOfView == 45.0f &&
+                            rt.GetCommand(1).camera.nearPlane == 0.5f && rt.GetCommand(1).camera.farPlane == 200.0f,
+                        "SetCamera 值快照完整 round-trip(#80:position/AoV/near/far 保留).", true);
             EXPECT_TRUE(rt.GetCommand(2).pRenderable == nullptr, "DrawRenderable 指標 round-trip 後歸 null.", true);
             EXPECT_TRUE(rt.GetCommand(3).pLayout == nullptr, "DrawGUILayout 指標 round-trip 後歸 null.", true);
 
-            // 誠實記錄實際行為:重序列化時 legacy 酬載變成全零(命令名保留)。
-            // 這是文件預期的取捨 — 「round-trip 驗收只針對新命令」。
-            String expectedNulled = String(u"BeginFrame") + String(u"\n");
-            String nullCam = String(u"SetCamera");
-            for (int k = 0; k < 9; k++)
-                AppendFloatToken(nullCam, 0.0f);
-            expectedNulled = expectedNulled + nullCam + String(u"\n");
+            // 誠實記錄實際行為:重序列化時 SetCamera(#80)完整保留值快照;仍為 legacy 的
+            // DrawRenderable/DrawGUILayout 酬載歸零(命令名保留)。
+            String expectedRoundtrip = String(u"BeginFrame") + String(u"\n");
+            String rtCam = String(u"SetCamera");
+            AppendFloatToken(rtCam, 10.0f); AppendFloatToken(rtCam, 20.0f); AppendFloatToken(rtCam, 30.0f);
+            AppendFloatToken(rtCam, 0.0f); AppendFloatToken(rtCam, 90.0f); AppendFloatToken(rtCam, 0.0f);
+            AppendFloatToken(rtCam, 45.0f); AppendFloatToken(rtCam, 0.5f); AppendFloatToken(rtCam, 200.0f);
+            expectedRoundtrip = expectedRoundtrip + rtCam + String(u"\n");
             String nullDraw = String(u"DrawRenderable");
             AppendIntToken(nullDraw, 0);
             for (int k = 0; k < 9; k++)
                 AppendFloatToken(nullDraw, 0.0f);
-            expectedNulled = expectedNulled + nullDraw + String(u"\n");
-            expectedNulled = expectedNulled + String(u"DrawGUILayout") + String(u"\n");
-            expectedNulled = expectedNulled + String(u"EndFrame");
-            EXPECT_TRUE(rt.Serialize() == expectedNulled, "round-trip 後重序列化:legacy 酬載歸零、命令名保留(實際行為).", true);
+            expectedRoundtrip = expectedRoundtrip + nullDraw + String(u"\n");
+            expectedRoundtrip = expectedRoundtrip + String(u"DrawGUILayout") + String(u"\n");
+            expectedRoundtrip = expectedRoundtrip + String(u"EndFrame");
+            EXPECT_TRUE(rt.Serialize() == expectedRoundtrip,
+                        "round-trip 後重序列化:SetCamera 值保留、legacy 酬載歸零(命令名保留).", true);
 
-            // 3d. executor 執行 deserialize 後的幀:legacy 命令以 null 指標 dispatch,
-            //     不崩潰(mock 記錄 null 指標;Vulkan executor 對 null 有 if 防護)
+            // 3d. executor 執行 deserialize 後的幀:SetCamera 以「值」dispatch(#80),
+            //     DrawRenderable/DrawGUILayout 以 null 指標 dispatch,不崩潰。
             MockExecutor rtExecutor;
             rtExecutor.Initialize(nullptr);
             EXPECT_TRUE(rtExecutor.Execute(rt), "執行 round-trip 幀安全(legacy null 指標).", true);
-            EXPECT_TRUE(rtExecutor.records[1].command == Frame::Command::SetCamera && rtExecutor.records[1].pCamera == nullptr,
-                        "deserialize 幀的 SetCamera 以 null 指標到達 executor.", true);
+            EXPECT_TRUE(rtExecutor.records[1].command == Frame::Command::SetCamera &&
+                            rtExecutor.records[1].camera.angleOfView == 45.0f &&
+                            rtExecutor.records[1].camera.farPlane == 200.0f,
+                        "deserialize 幀的 SetCamera 以值快照到達 executor(#80:完整 round-trip).", true);
             EXPECT_TRUE(rtExecutor.records[2].command == Frame::Command::DrawRenderable && rtExecutor.records[2].pRenderable == nullptr,
                         "deserialize 幀的 DrawRenderable 以 null 指標到達 executor.", true);
             EXPECT_TRUE(rtExecutor.records[3].command == Frame::Command::DrawGUILayout && rtExecutor.records[3].pLayout == nullptr,

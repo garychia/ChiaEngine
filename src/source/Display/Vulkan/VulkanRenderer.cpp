@@ -777,7 +777,7 @@ VulkanRenderer::VulkanRenderer()
       presentQueue(),
       graphicsQueueFamilyIndex(UINT32_MAX),
       presentQueueFamilyIndex(UINT32_MAX),
-      pActiveCamera(nullptr),
+      activeCamera(), // #80:值快照(預設 = 無相機 fallback 語義)
       renderPass(),
       swapchainFramebuffers(),
       pipelineLayout(),
@@ -1083,8 +1083,9 @@ bool VulkanRenderer::Execute(const Frame &frame)
                     return false;
                 break;
             case RenderOp::Op::SetCamera:
-                if (op.pCamera)
-                    pActiveCamera = op.pCamera;
+                // #80:值快照(op.camera 由 interpreter 攜帶)— executor 不再 deref
+                // caller memory。直接取代 activeCamera。
+                activeCamera = op.camera;
                 break;
             case RenderOp::Op::DrawRenderable:
                 if (op.pRenderable)
@@ -1979,20 +1980,15 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
         // #84:慣例集中到 RendererMath::BuildGuiOrtho。
         projection = RendererMath::BuildGuiOrtho();
     }
-    else if (pActiveCamera)
-    {
-        view = RendererMath::BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = RendererMath::BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                                   pActiveCamera->GetDistanceToNearPlane(),
-                                                   pActiveCamera->GetDistanceToFarPlane());
-    }
     else
     {
-        // #84:無相機 fallback 集中到 RendererMath 統一慣例(70°,0.001,100)。
-        projection = RendererMath::BuildFallbackPerspective(
-            static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height));
+        // #80:相機 = activeCamera 值快照(interpreter 每幀 SetCamera 更新;
+        // 預設 = 70° / near 0.001 / far 100,方為舊「無相機 fallback」語義)。
+        view = RendererMath::BuildViewMatrix(activeCamera.position, activeCamera.rotation);
+        const float aspect = static_cast<float>(swapchainExtent.width) /
+                             static_cast<float>(swapchainExtent.height);
+        projection = RendererMath::BuildProjMatrix(activeCamera.angleOfView, aspect,
+                                                   activeCamera.nearPlane, activeCamera.farPlane);
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
     UpdateUniformBuffer(world, view, projection, useTexture);
@@ -2237,17 +2233,12 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
 
     // #84:矩陣慣例集中到 RendererMath;無相機 fallback 用統一慣例(70°,0.001,100)。
     glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = RendererMath::BuildFallbackPerspective(
-        static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height));
-    if (pActiveCamera)
-    {
-        view = RendererMath::BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = RendererMath::BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                                   pActiveCamera->GetDistanceToNearPlane(),
-                                                   pActiveCamera->GetDistanceToFarPlane());
-    }
+    // #80:相機 = activeCamera 值快照(預設 = 舊 fallback 語義)。
+    view = RendererMath::BuildViewMatrix(activeCamera.position, activeCamera.rotation);
+    const float aspect = static_cast<float>(swapchainExtent.width) /
+                         static_cast<float>(swapchainExtent.height);
+    glm::mat4 projection = RendererMath::BuildProjMatrix(activeCamera.angleOfView, aspect,
+                                                         activeCamera.nearPlane, activeCamera.farPlane);
     UpdateUniformBuffer(world, view, projection, false);
 
     VkBuffer vertexBuffers[] = {mesh.vertexBuffer};

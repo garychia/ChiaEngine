@@ -67,6 +67,20 @@ class Frame
         }
     };
 
+    // SetCamera 的值快照(#80):相機在 record 當下的 TRS + 投影參數。
+    // 取代 raw Camera* 指標 — executor 不再 dereference caller memory,
+    // 序列化可完整 round-trip(相機不再反序列化歸零)。
+    struct CameraPayload
+    {
+        Point3D position;
+        Point3D rotation; // degree Euler,同 BuildViewMatrix 慣例
+        float angleOfView = 70.0f;
+        float nearPlane = 0.001f;
+        float farPlane = 100.0f;
+
+        void CaptureFrom(const Camera &camera); // 快照所有欄位
+    };
+
     // 命令酬載:未使用欄位為空(nullptr / 0 / 空 String)。
     // 注意:含 String 酬載 → 不再 trivially copyable(讓步換所有權與可序列化)。
     struct CommandData
@@ -76,6 +90,8 @@ class Frame
         Camera *pCamera;
         const IRenderable *pRenderable;
         GUILayout *pLayout;
+        // ── #80:SetCamera 已改值快照(取代 pCamera 指標用途)→ camera 保存值 ──
+        CameraPayload camera;
         // ── 新增:值酬載 ──
         TransformPayload transform;
         uint64_t meshId;     // mesh 的 content-hash id
@@ -102,7 +118,11 @@ class Frame
 
     void SetCamera(WeakPtr<Camera> pCamera)
     {
-        Append(Command::SetCamera).pCamera = pCamera.operator->(); // 無效相機 → nullptr(安全)
+        // #80:值快照 — executor 不再 dereference 這個指標(record 當下就固定)。
+        // 無效相機 → 紀錄一組全零快照(安全,與 null 語義一致)。
+        CommandData &cmd = Append(Command::SetCamera);
+        if (pCamera)
+            cmd.camera.CaptureFrom(*pCamera.operator->());
     }
 
     void DrawRenderable(const IRenderable &renderable)
@@ -245,26 +265,18 @@ class Frame
                 }
                 case Command::SetCamera:
                 {
+                    // #80:值快照序列化 — pos/rot + projection,完整 round-trip
+                    // (不再 dereference pCamera;反序列化後 rate 值重建)。
                     line = String(u"SetCamera");
-                    if (cmd.pCamera)
-                    {
-                        const Point3D pos = cmd.pCamera->GetPosition();
-                        const Point3D rot = cmd.pCamera->GetRotation();
-                        AppendFloat(line, pos.x);
-                        AppendFloat(line, pos.y);
-                        AppendFloat(line, pos.z);
-                        AppendFloat(line, rot.x);
-                        AppendFloat(line, rot.y);
-                        AppendFloat(line, rot.z);
-                        AppendFloat(line, cmd.pCamera->GetAngleOfView());
-                        AppendFloat(line, cmd.pCamera->GetDistanceToNearPlane());
-                        AppendFloat(line, cmd.pCamera->GetDistanceToFarPlane());
-                    }
-                    else
-                    {
-                        for (int k = 0; k < 9; k++) // 無效相機 → 全零(確定)
-                            AppendFloat(line, 0.0f);
-                    }
+                    AppendFloat(line, cmd.camera.position.x);
+                    AppendFloat(line, cmd.camera.position.y);
+                    AppendFloat(line, cmd.camera.position.z);
+                    AppendFloat(line, cmd.camera.rotation.x);
+                    AppendFloat(line, cmd.camera.rotation.y);
+                    AppendFloat(line, cmd.camera.rotation.z);
+                    AppendFloat(line, cmd.camera.angleOfView);
+                    AppendFloat(line, cmd.camera.nearPlane);
+                    AppendFloat(line, cmd.camera.farPlane);
                     break;
                 }
                 case Command::DrawRenderable:
@@ -518,11 +530,36 @@ class Frame
             frame.DrawText(uintTok(1), text, floatTok(2), Color(r, g, b, a));
             return;
         }
+        // #80:SetCamera 值快照可完整 round-trip — 解析回值(不再歸 null)。
+        if (name == String(u"SetCamera"))
+        {
+            CommandData &cmd = frame.Append(Command::SetCamera);
+            cmd.camera.position.x = floatTok(1);
+            cmd.camera.position.y = floatTok(2);
+            cmd.camera.position.z = floatTok(3);
+            cmd.camera.rotation.x = floatTok(4);
+            cmd.camera.rotation.y = floatTok(5);
+            cmd.camera.rotation.z = floatTok(6);
+            cmd.camera.angleOfView = floatTok(7);
+            cmd.camera.nearPlane = floatTok(8);
+            cmd.camera.farPlane = floatTok(9);
+            return;
+        }
         // legacy 指標命令:無法無頭重建,僅記錄命令 + null 指標
-        if (name == String(u"SetCamera")) { frame.Append(Command::SetCamera); return; }
         if (name == String(u"DrawRenderable")) { frame.Append(Command::DrawRenderable); return; }
         if (name == String(u"DrawGUILayout")) { frame.Append(Command::DrawGUILayout); return; }
     }
 };
+
+// #80:SetCamera 的值快照定義(header-only;Camera getters declared in Camera.hpp,
+// defined in Camera.cpp — 連結時解析,與 Frame 其他用法一致)。
+inline void Frame::CameraPayload::CaptureFrom(const Camera &camera)
+{
+    position = camera.GetPosition();
+    rotation = camera.GetRotation();
+    angleOfView = camera.GetAngleOfView();
+    nearPlane = camera.GetDistanceToNearPlane();
+    farPlane = camera.GetDistanceToFarPlane();
+}
 
 #endif // FRAME_HPP

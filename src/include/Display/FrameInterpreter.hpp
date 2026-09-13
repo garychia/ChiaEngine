@@ -51,7 +51,7 @@ struct RenderOp
     {
         BeginFrame,      // 幀起點:清畫面、acquire
         EndFrame,        // 幀終點:submit + present
-        SetCamera,       // 設定本幀相機(pCamera)
+        SetCamera,       // 設定本幀相機(值快照 #80)
         DrawRenderable,  // 畫 IRenderable(pRenderable)
         DrawGUILayout,   // 畫 GUI 佈局(pLayout,GPU 端展開 layers/components)
         DrawMesh,        // 用 world + meshId + materialId 畫幾何
@@ -61,18 +61,18 @@ struct RenderOp
 
     Op op = Op::BeginFrame;
 
-    // ── legacy 指標(pass-through)──
-    Camera *pCamera = nullptr;
+    // ── legacy 指標(pass-through;DrawRenderable/DrawGUILayout 仍走 live 物件)──
     const IRenderable *pRenderable = nullptr;
     const GUILayout *pLayout = nullptr;
 
     // ── 值酬載(已解析)──
-    glm::mat4 world = glm::mat4(1.0f); // DrawMesh/DrawText 的 resolved world
+    Frame::CameraPayload camera;         // SetCamera(#80:值快照,executor 不再 deref)
+    glm::mat4 world = glm::mat4(1.0f);   // DrawMesh/DrawText 的 resolved world
     uint64_t meshId = 0;
-    uint64_t materialId = 0;           // DrawMesh 當下 BindMaterial 的狀態
-    Frame::ViewportPayload viewport;   // SetViewport
+    uint64_t materialId = 0;             // DrawMesh 當下 BindMaterial 的狀態
+    Frame::ViewportPayload viewport;     // SetViewport
     uint64_t fontId = 0;
-    String text;                       // DrawText
+    String text;                         // DrawText
     float textSize = 0;
     Color textColor;
 };
@@ -91,7 +91,7 @@ class FrameInterpreter
     void Reset()
     {
         stack.RemoveAll();
-        pActiveCamera = nullptr;
+        activeCamera = Frame::CameraPayload(); // #80:空相機快照(取代 nullptr)
         boundMaterialId = 0;
     }
 
@@ -123,10 +123,11 @@ class FrameInterpreter
                 }
                 case Frame::Command::SetCamera:
                 {
-                    pActiveCamera = command.pCamera;
+                    // #80:值快照 — executor 不再 dereference caller memory。
+                    activeCamera = command.camera;
                     RenderOp op;
                     op.op = RenderOp::Op::SetCamera;
-                    op.pCamera = pActiveCamera;
+                    op.camera = activeCamera;
                     ops.Append(Types::Move(op));
                     break;
                 }
@@ -199,13 +200,13 @@ class FrameInterpreter
     }
 
     // ── 契約可測的狀態端點 ──
-    const Camera *GetActiveCamera() const { return pActiveCamera; }
+    const Frame::CameraPayload &GetActiveCamera() const { return activeCamera; }
     uint64_t GetBoundMaterialId() const { return boundMaterialId; }
     size_t GetStackDepth() const { return stack.GetNElements(); }
 
   private:
-    DynamicArray<glm::mat4> stack; // PushTransform 推入的 world 矩陣(Executor 端狀態)
-    Camera *pActiveCamera;
+    DynamicArray<glm::mat4> stack;       // PushTransform 推入的 world 矩陣(Executor 端狀態)
+    Frame::CameraPayload activeCamera;   // #80:SetCamera 值快照(取代 Camera* 指標)
     uint64_t boundMaterialId;
 };
 

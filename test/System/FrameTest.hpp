@@ -59,18 +59,24 @@ class FrameTest : public Test
             frame.DrawRenderable(renderable);
             frame.DrawGUILayout(layout);
 
-            EXPECT_TRUE(frame.GetCommand(0).pCamera == pCamera.operator->(), "相機指標正確.", true);
+            EXPECT_TRUE(frame.GetCommand(0).camera.angleOfView == 70.0f && frame.GetCommand(0).camera.position.x == 0.0f,
+                            "#80:SetCamera 貯存值快照(預設相機 values captured).", true);
             EXPECT_TRUE(frame.GetCommand(0).pRenderable == nullptr, "未使用欄位為 nullptr.", true);
             EXPECT_TRUE(frame.GetCommand(1).pRenderable == &renderable, "renderable 指標正確.", true);
-            EXPECT_TRUE(frame.GetCommand(1).pCamera == nullptr, "未使用欄位為 nullptr.", true);
+            EXPECT_TRUE(frame.GetCommand(1).camera.angleOfView == 70.0f && frame.GetCommand(1).camera.rotation.x == 0.0f,
+                        "非 SetCamera 命令的 camera 酬載為預設值(未使用欄位).", false);
             EXPECT_TRUE(frame.GetCommand(2).pLayout == &layout, "layout 指標正確.", true);
         }
 
-        TEST_MESSAGE("Frame invalid camera is nullptr");
+        TEST_MESSAGE("Frame invalid camera leaves default value snapshot");
         {
             Frame frame;
-            frame.SetCamera(WeakPtr<Camera>()); // 無效相機
-            EXPECT_TRUE(frame.GetCommand(0).pCamera == nullptr, "無效相機 → nullptr(安全).", true);
+            frame.SetCamera(WeakPtr<Camera>()); // 無效相機 → 值快照維持預設(安全)
+            // #80:無效相機不再存 null 指標,而是「未快照」= 預設 AoV 70°。
+            EXPECT_TRUE(frame.GetCommand(0).camera.angleOfView == 70.0f &&
+                            frame.GetCommand(0).camera.nearPlane == 0.001f &&
+                            frame.GetCommand(0).camera.farPlane == 100.0f,
+                        "無效相機 → 值快照維持預設(不崩潰、語義一致).", true);
         }
 
         TEST_MESSAGE("Frame clear and reuse");

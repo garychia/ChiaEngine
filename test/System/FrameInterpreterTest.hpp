@@ -85,8 +85,13 @@ class FrameInterpreterTest : public Test
 
             EXPECT_TRUE(ops[0].op == RenderOp::Op::BeginFrame, "op[0] = BeginFrame.", true);
             EXPECT_TRUE(ops[1].op == RenderOp::Op::SetCamera, "op[1] = SetCamera.", true);
-            EXPECT_TRUE(ops[1].pCamera == pCamera.operator->(), "SetCamera op 帶有效 Camera 指標.", true);
-            EXPECT_TRUE(interpreter.GetActiveCamera() == pCamera.operator->(), "active camera 更新.", false);
+            // #80:SetCamera op 攜帶值快照(取代 Camera* 指標)— pos/rot/AoV/planes 已快照。
+            EXPECT_TRUE(ops[1].camera.position.x == 10.0f && ops[1].camera.position.y == 20.0f &&
+                            ops[1].camera.position.z == 30.0f && ops[1].camera.rotation.y == 90.0f,
+                        "SetCamera op 攜帶值快照(position/rotation 已快照,不再是指標).", true);
+            const Frame::CameraPayload &activeCam = interpreter.GetActiveCamera();
+            EXPECT_TRUE(activeCam.position.x == 10.0f && activeCam.rotation.y == 90.0f,
+                        "interpreter 的 active camera 值快照更新.", false);
             EXPECT_TRUE(ops[2].op == RenderOp::Op::DrawRenderable && ops[2].pRenderable == &renderable,
                         "DrawRenderable op 帶 IRenderable 指標.", true);
             EXPECT_TRUE(ops[3].op == RenderOp::Op::DrawMesh && ops[3].meshId == 0x1234ULL,

@@ -57,7 +57,10 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor, public IRenderer
     uint32_t presentQueueFamilyIndex;
 
     // Frame 狀態
-    Camera *pActiveCamera;
+    // #80:SetCamera 值快照(取代 Camera* 指標)— recorders 不再 dereference
+    // caller memory;無相機 = 預設快照(70° / near 0.001 / far 100,pos/rot 零),
+    // 與舊 fallback 語義一致。
+    Frame::CameraPayload activeCamera;
 
     // ── Render pass / pipeline / framebuffers ───────────────────────────────
     VkRenderPass renderPass;
