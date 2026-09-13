@@ -7,8 +7,8 @@ Scene::Scene(SceneType type) : type(type), pRenderables(), onCameraChanged()
 Scene::~Scene()
 {
     pRenderables.RemoveAll();
-    if (pCamera.IsValid())
-        pCamera->onChanged.Unsubscribe(this);
+    if (SharedPtr<Camera> strong = pCamera.Lock())
+        strong->onChanged.Unsubscribe(this);
 }
 
 void Scene::AddRenderable(const SharedPtr<IRenderable> &pRenderable)
@@ -39,11 +39,12 @@ const DynamicArray<SharedPtr<IRenderable>> &Scene::GetRenderables() const
 
 void Scene::ApplyCamera(WeakPtr<Camera> pCamera)
 {
-    if (this->pCamera.IsValid())
-        this->pCamera->onChanged.Unsubscribe(this);
+    // #86:WeakPtr 不再可直接解引用 — 一律先 Lock()(目標已亡 → 空 SharedPtr,安全略過)。
+    if (SharedPtr<Camera> strongOld = this->pCamera.Lock())
+        strongOld->onChanged.Unsubscribe(this);
     this->pCamera = pCamera;
-    if (pCamera.IsValid())
-        pCamera->onChanged.Subscribe(this, &Scene::OnCameraChanged);
+    if (SharedPtr<Camera> strongNew = pCamera.Lock())
+        strongNew->onChanged.Subscribe(this, &Scene::OnCameraChanged);
     onCameraChanged.Invoke(pCamera);
 }
 

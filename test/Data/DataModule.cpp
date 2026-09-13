@@ -8,4 +8,5 @@ DataModule::DataModule() : Module()
     AddTest<ListTest>();
     AddTest<HashTableTest>();
     AddTest<PointersTest>();
+    AddTest<OwnershipTest>();
 }

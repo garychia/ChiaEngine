@@ -8,6 +8,7 @@
 #include "ListTest.hpp"
 #include "HashTableTest.hpp"
 #include "PointersTest.hpp"
+#include "OwnershipTest.hpp"
 
 class DataModule : public Module
 {

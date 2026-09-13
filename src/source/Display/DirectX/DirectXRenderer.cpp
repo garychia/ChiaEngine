@@ -85,7 +85,8 @@ DirectXRenderer::~DirectXRenderer()
 
 void DirectXRenderer::UpdateConstantBuffer()
 {
-    if (!pCamera)
+    // #86:IsValid 僅供斷言(可能馬上過期);真正取值一律在 OnCameraChanged 內 Lock。
+    if (!pCamera.IsValid())
     {
         DirectX::XMStoreFloat4x4(&matrixBuffer.world, DirectX::XMMatrixIdentity());
         DirectX::XMStoreFloat4x4(&matrixBuffer.view, DirectX::XMMatrixIdentity());
@@ -585,7 +586,7 @@ bool DirectXRenderer::LoadScene(Scene &scene)
         if (!LoadRenderable(*renderables[i], scene.GetType()))
             return false;
     }
-    if (const auto pCamera = scene.GetCamera())
+    if (const auto pCamera = scene.GetCamera(); pCamera.IsValid())
         ApplyCamera(pCamera);
     return true;
 }
@@ -647,9 +648,13 @@ void DirectXRenderer::ApplyCamera(WeakPtr<Camera> pCamera)
 
 void DirectXRenderer::OnCameraChanged()
 {
-    const auto pos = pCamera->GetPosition();
-    const auto focalPointPos = pCamera->GetFocalPointPosition();
-    const auto upVec = pCamera->GetUpVector();
+    // #86:WeakPtr 不直接解引用 — Lock() 升級為強引用,相機已釋放 → 空值直接略過。
+    const SharedPtr<Camera> strong = pCamera.Lock();
+    if (!strong)
+        return;
+    const auto pos = strong->GetPosition();
+    const auto focalPointPos = strong->GetFocalPointPosition();
+    const auto upVec = strong->GetUpVector();
     DirectX::XMStoreFloat4x4(&matrixBuffer.view,
                              DirectX::XMMatrixTranspose(DirectX::XMMatrixLookAtLH(
                                  DirectX::XMVectorSet(pos.x, pos.y, -pos.z, 0.f),
@@ -660,8 +665,8 @@ void DirectXRenderer::OnCameraChanged()
     DirectX::XMStoreFloat4x4(
         &matrixBuffer.projection,
         DirectX::XMMatrixTranspose(DirectX::XMMatrixPerspectiveFovLH(
-            2.f * std::atan(std::tan(DirectX::XMConvertToRadians(pCamera->GetAngleOfView()) * 0.5f) / aspectRatioY),
-            aspectRatioX, pCamera->GetDistanceToNearPlane(), pCamera->GetDistanceToFarPlane())));
+            2.f * std::atan(std::tan(DirectX::XMConvertToRadians(strong->GetAngleOfView()) * 0.5f) / aspectRatioY),
+            aspectRatioX, strong->GetDistanceToNearPlane(), strong->GetDistanceToFarPlane())));
 }
 
 void DirectXRenderer::OnWindowResized(long newWidth, long newHeight)

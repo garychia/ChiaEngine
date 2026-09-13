@@ -268,9 +268,11 @@ void OpenGLRenderer::Update()
 {
     glfwPollEvents();
 
-    if (cameraChanged && pCamera)
+    // #86:WeakPtr 不直接解引用 — Lock() 一次升級為強引用,下方兩段共用。
+    const SharedPtr<Camera> strong = pCamera.Lock();
+    if (cameraChanged && strong)
     {
-        Camera &cam = *pCamera;
+        Camera &cam = *strong;
         viewMatrix = OpenGLHelper::BuildViewMatrix(cam.GetPosition(), cam.GetRotation());
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
         projMatrix = OpenGLHelper::BuildProjMatrix(cam.GetAngleOfView(), aspect,
@@ -280,7 +282,7 @@ void OpenGLRenderer::Update()
     }
 
     // Update matrix UBO with identity when no camera
-    if (!pCamera)
+    if (!strong)
     {
         viewMatrix = glm::mat4(1.0f);
         float aspect = static_cast<float>(windowWidth) / static_cast<float>(windowHeight);
