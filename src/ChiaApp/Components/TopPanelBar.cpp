@@ -4,7 +4,7 @@
 #include "Display/GUI/Button.hpp"
 
 TopPanelBar::TopPanelBar(const Point2D &windowSize, float height)
-    : HorizontalList(windowSize, Border(0.f, 0.f, {1.f, true}, height))
+    : HorizontalList(windowSize, Border(0.f, 0.f, {1.f, true}, height), String(u"Toolbar"), PanelDock::TopBar)
 {
     auto pButton1 = HorizontalList::AddComponent<Button>(windowSize, Border(0.f, 0.f, 90.f, height));
     pButton1->SetColor(Color(1, 1, 0));

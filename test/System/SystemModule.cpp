@@ -7,6 +7,7 @@
 #include "InspectorTest.hpp"
 #include "EditorSessionTest.hpp"
 #include "PanelRegionsTest.hpp"
+#include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
 #include "IO/IOTest.hpp"
 #include "InputSystemTest.hpp"
 #include "ModuleTest.hpp"
@@ -37,6 +38,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<inspectortest::InspectorTest>();
     AddTest<editorsessiontest::EditorSessionTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
+    AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();

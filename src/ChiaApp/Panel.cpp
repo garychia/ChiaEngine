@@ -6,9 +6,9 @@
 Panel::Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,
              SceneSystem *pSceneSystem)
     : Window(info), pSceneWindow(nullptr), sceneWidthHeightRatio(4, 3),
-      layout(Point2D(info.GetWidth(), info.GetHeight())), pSimRecorder(pSimRecorder),
-      pCameraController(pCameraController), pSceneSystem(pSceneSystem),
-      editorSession(), selection(editorSession.GetSelection())
+      editorSession(pSceneSystem, pCameraController, pSimRecorder),
+      layout(Point2D(info.GetWidth(), info.GetHeight()), editorSession),
+      selection(editorSession.GetSelection())
 {
 }
 
@@ -23,10 +23,12 @@ bool Panel::Initialize(Window *pParent)
                             static_cast<unsigned long>(regions.sceneSize.y),
                             GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight,
                             static_cast<unsigned long>(regions.centerViewport.xPos));
+    // ADR-0001 D4:pointer set 由 editorSession 擁有,View 從 session 取。
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
-                                                                        pSimRecorder, pCameraController,
-                                                                        pSceneSystem));
+                                                                        editorSession.GetSimRecorder(),
+                                                                        editorSession.GetCameraController(),
+                                                                        editorSession.GetSceneSystem()));
     // P6:GUI 走 Frame — 佈局掛上視窗,由 Window::Render 錄成 DrawGUILayout 命令。
     // (取代 legacy renderer.LoadGUILayout/Render(layout),該路徑在 Vulkan 下是空實作,
     //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)
@@ -36,12 +38,12 @@ bool Panel::Initialize(Window *pParent)
     // SetPosition/SetSize — GLFW handle 還沒建立(Show() 才建),呼叫會 assert。
     // (OnWindowResized 才是 resize 後重新定位的時機。)
     // #60 step 1:SceneWindow::Initialize 已建立 demo 節點,這裡重建側欄並接選取事件。
-    layout.BuildHierarchy(*pSceneSystem);
+    layout.BuildHierarchy(*editorSession.GetSceneSystem());
     auto &rows = layout.GetHierarchyRows();
     for (size_t i = 0; i < rows.GetNElements(); i++)
         rows[i]->rowClicked.Subscribe(this, &Panel::OnHierarchyRowClicked);
     // #60 step 2:建立右側 Inspector(消費選取的 entity),按鈕 push 到 session undo stack。
-    layout.CreateInspector(*pSceneSystem, &editorSession.GetUndoStack());
+    layout.CreateInspector(*editorSession.GetSceneSystem());
     layout.SetRegions(Point2D(static_cast<float>(w), static_cast<float>(h)), regions);
     SetGUILayout(&layout);
     return true;
@@ -75,6 +77,7 @@ bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)
 {
     // ADR-0001 D5:editor 快捷鍵 — Ctrl+Z undo、Ctrl+Y redo(與 SimRecorder 的
     // F5/F6 replay 完全分離:這是 editor-time edit,不是 gameplay replay)。
+    // 判斷鍵集合,交給 session 處理(無 Window 依賴,可無頭測試)。
     // 消費掉,不再轉發給場景(避免 WASD 同時觸發)。
     bool hasCtrl = false;
     bool hasZ = false;
@@ -89,16 +92,8 @@ bool Panel::OnKeyboardInputReceived(const KeyCombination &keys)
             default: break;
         }
     }
-    if (hasCtrl && hasZ)
+    if (editorSession.HandleEditorShortcut(hasCtrl, hasZ, hasY))
     {
-        editorSession.GetUndoStack().Undo();
-        if (InspectorLayer *pInspector = layout.GetInspector())
-            pInspector->Update();
-        return true;
-    }
-    if (hasCtrl && hasY)
-    {
-        editorSession.GetUndoStack().Redo();
         if (InspectorLayer *pInspector = layout.GetInspector())
             pInspector->Update();
         return true;
@@ -115,7 +110,8 @@ bool Panel::OnMouseInputReceived(const MouseInfo &mouseInfo)
 
 void Panel::OnHierarchyRowClicked(Entity entity)
 {
-    editorSession.SetSelection(entity.GetIndex(), true);
+    // ADR-0001 D4:選取同步走 session(model);View 只刷新 inspector/highlight。
+    editorSession.Select(entity.GetIndex());
     if (InspectorLayer *pInspector = layout.GetInspector())
         pInspector->SetSelection(&selection);
     RefreshHierarchyHighlight();

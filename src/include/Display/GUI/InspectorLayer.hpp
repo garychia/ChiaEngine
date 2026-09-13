@@ -1,10 +1,10 @@
 #ifndef INSPECTOR_LAYER_HPP
 #define INSPECTOR_LAYER_HPP
 
-#include "Display/GUI/GUILayer.hpp"
 #include "Display/GUI/Button.hpp"
 #include "Display/GUI/EditorSession.hpp" // UndoStack
 #include "Display/GUI/InspectorButton.hpp"
+#include "Display/GUI/PanelPane.hpp"
 #include "Display/GUI/Selection.hpp"
 #include "Scene/SceneSystem.hpp"
 
@@ -12,7 +12,7 @@
 // TransformComponent(position / rotation / scale,各 3 軸)。每軸一行:
 // 左側文字欄(目前值)+ 右側 + / - 兩顆調整鈕。
 // 邏輯全在 Sim/View 純資料層,可無頭測試(SceneSystem + InspectorLayer)。
-class InspectorLayer : public GUILayer
+class InspectorLayer : public PanelPane
 {
   private:
     static const float StepPosition;
@@ -35,8 +35,9 @@ class InspectorLayer : public GUILayer
     static const char16_t *AxisLabel(InspectorAxis axis);
 
   public:
-    InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
-                   UndoStack *pUndoStack);
+    // ADR-0001 D3:Inspector 是 RightDock 的 named pane(title + dock)。
+    InspectorLayer(const String &title, const Point2D &windowSize, const Border &border, PanelDock dock,
+                   SceneSystem *pScene, UndoStack *pUndoStack);
 
     // 設定目前選取的 entity(由 Panel 在點擊 hierarchy 列時呼叫)。
     // ADR-0001 D2:直接引用 Panel 擁有的 Selection,避免雙份狀態。

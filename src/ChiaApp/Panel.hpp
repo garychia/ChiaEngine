@@ -12,6 +12,10 @@
 #include "System/Module/SimRecorder.hpp"
 #include "System/World/Entity.hpp"
 
+// ADR-0001 D4:Panel 是 View — 組合根是 EditorSession。
+// ctor 把 SceneSystem*/CameraController*/SimRecorder* 注入 session,
+// session 擁有 pane registry + selection + undo stack;這裡只做
+// 視窗/GLFW 相關接線(子視窗定位、輸入轉發、inspector 刷新)。
 class Panel : public Window
 {
   private:
@@ -19,20 +23,13 @@ class Panel : public Window
 
     Point2D sceneWidthHeightRatio;
 
-    PanelLayout layout;
-
-    SimRecorder *pSimRecorder;
-
-    CameraController *pCameraController;
-
-    // #60 step 1:hierarchy 側欄的資料源(Sim 側場景圖)
-    SceneSystem *pSceneSystem;
-
-    // ADR-0001 D4:window-agnostic editor state (selection + undo/redo).
+    // ADR-0001 D4:window-agnostic editor model(pointer set + pane registry
+    // + selection + undo)。宣告在 layout 之前:layout ctor 需要它。
     EditorSession editorSession;
 
-    // #60 step 1:選取狀態(ADR-0001 D2:單一真相來源,InspectorLayer 只讀),
-    // 由 editorSession 擁有。
+    PanelLayout layout;
+
+    // ADR-0001 D2:單一真相來源,由 editorSession 擁有(InspectorLayer 只讀)。
     Selection &selection;
 
     Panel(const WindowInfo &info, SimRecorder *pSimRecorder, CameraController *pCameraController,

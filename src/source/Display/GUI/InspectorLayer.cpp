@@ -25,9 +25,9 @@ const char16_t *InspectorLayer::AxisLabel(InspectorAxis axis)
     return u"?";
 }
 
-InspectorLayer::InspectorLayer(const Point2D &windowSize, const Border &border, SceneSystem *pScene,
-                               UndoStack *pUndoStack)
-    : GUILayer(windowSize, border), pScene(pScene), pUndoStack(pUndoStack), pSelection(nullptr)
+InspectorLayer::InspectorLayer(const String &title, const Point2D &windowSize, const Border &border, PanelDock dock,
+                               SceneSystem *pScene, UndoStack *pUndoStack)
+    : PanelPane(title, windowSize, border, dock), pScene(pScene), pUndoStack(pUndoStack), pSelection(nullptr)
 {
     SetColor(Color(0.10f, 0.10f, 0.12f));
     for (size_t i = 0; i < 9; i++)

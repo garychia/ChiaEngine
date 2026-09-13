@@ -59,6 +59,7 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/InspectorButton.cpp
     include/Display/GUI/InspectorLayer.hpp
     source/Display/GUI/InspectorLayer.cpp
+    include/Display/GUI/PanelPane.hpp
     include/Display/GUI/Selection.hpp
     include/Display/GUI/EditorSession.hpp
     source/Display/GUI/EditorSession.cpp

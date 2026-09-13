@@ -38,7 +38,8 @@ void HorizontalList::ArrangeChildren()
     OnWindowResized();
 }
 
-HorizontalList::HorizontalList(const Point2D &windowSize, const Border &border, bool resizable)
-    : GUILayer(windowSize, border), resizable(resizable)
+HorizontalList::HorizontalList(const Point2D &windowSize, const Border &border, const String &title,
+                               PanelDock dock, bool resizable)
+    : PanelPane(title, windowSize, border, dock), resizable(resizable)
 {
 }
