@@ -17,8 +17,7 @@ int ChiaApp::Execute()
 {
     WindowInfo winInfo(&info, String("Chia Engine"), false, DEFAULT_MAIN_WINDOW_WIDTH,
                        DEFAULT_MAIN_WINDOW_HEIGHT);
-    pMainWindow = WindowManager::GetSingleton().ConstructWindow<Panel>(winInfo, &simRecorder,
-                                                                       &cameraController, &sceneSystem);
+    pMainWindow = WindowManager::GetSingleton().ConstructWindow<Window>(winInfo);
     if (!pMainWindow)
         return EXIT_FAILURE;
     if (!pMainWindow->Show())

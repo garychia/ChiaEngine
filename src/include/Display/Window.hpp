@@ -28,8 +28,6 @@ class Window
 
     DynamicArray<Window *> pChildren;
 
-    Window(const WindowInfo &info);
-
     DynamicArray<Window *> &GetChildren();
 
     const DynamicArray<Window *> &GetChildren() const;
@@ -37,6 +35,8 @@ class Window
     bool AddChild(Window *pChild);
 
   public:
+    Window(const WindowInfo &info);
+
     ~Window();
 
     virtual bool Initialize(Window *pParent = nullptr);
