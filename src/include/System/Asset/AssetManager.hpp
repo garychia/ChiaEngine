@@ -17,17 +17,15 @@
 #include "Types/Types.hpp"
 
 // 共享內容區塊:同一顆 contentHash(FNV-1a over bytes)的所有 Asset 共用同一份記憶體。
-// `refCount` = 目前「指向這顆 block」的已載入 Asset 數(§5.3 引用計數)。
-// 由 AssetManager 在把 block 綁給 asset 時 ++、在 asset 被釋放時 --;
-// 當它歸零(也就是「最後一個指向它的 asset 離開」)→ 從 blocks 表移除 → 真正 unload。
+// #86:不再維護 block 自己的 refCount —— 記憶體存亡完全由 SharedPtr<AssetBlock>(atomic
+// 引用計數)決定,最後一份釋放才真正 unload;「目前被幾個已載入 asset 指向」語意保留,
+// 但改由 GetBlockRefCount() 掃描 assets 表推得,避免兩套引用計數並存失諧。
 struct AssetBlock
 {
     DynamicArray<unsigned char> bytes;
     uint64_t contentHash;
-    uint32_t refCount;
 
-    AssetBlock(const DynamicArray<unsigned char> &inBytes, uint64_t hash)
-        : bytes(inBytes), contentHash(hash), refCount(0)
+    AssetBlock(const DynamicArray<unsigned char> &inBytes, uint64_t hash) : bytes(inBytes), contentHash(hash)
     {
     }
 };
@@ -41,7 +39,7 @@ struct Asset
     uint64_t keyHash;     // key 的 FNV-1a(HashTable 只支援整數 key → 內容定址)
     SharedPtr<AssetBlock> pBlock; // 內容區塊(可為 null = 尚未載入/載入失敗)
     bool loaded;
-    uint32_t refCount;    // 消費方引用計數:LoadAsync 建立時 = 1,每次 Release 遞減。歸零才卸載。
+    uint32_t refCount;    // 消費方租約:LoadAsync 建立時 = 1,每次 Release 遞減。歸零才卸載。
     bool released;        // 已在載入完成前被 Release(等 Dispatch 時真正 unload)
 
     Asset(const String &key, uint64_t keyHash)
@@ -67,9 +65,13 @@ struct Asset
 //
 // 使用慣例:
 //  - 所有公開方法在「主執行緒」呼叫(LoadAsync / DispatchCompletedEvents / GetLoadedBytes)。
-//  - 載入在 JobSystem 的 worker 執行:
-//      * 只碰「本次待寫入的 sharedBlock」(讀檔 → 算 contentHash → 衰 mutex 找/建 block)。
-//      * `blocks`(contentHash → shared block)是跨 worker 共享表,寫入期間要加鎖。
+//  - 記憶體存亡 = SharedPtr(atomic 引用計數,#86)→ 跨執行緒複製一律安全、不會雙 delete;
+//    Asset 與 AssetBlock 的記憶體生命週期完全由 SharedPtr 決定。
+//  - `Asset::refCount` 是「消費方租約」(主執行緒專用,不是記憶體引用數):保證 LoadAsync
+//    每一次回傳都有對應的 Release、卸載不早於最後一次 Release(含載入完成前就釋放)。
+//  - worker 會寫 id->loaded / id->pBlock —— 主執行緒對這兩個欄位的讀取一律拿 blocksMutex,
+//    避免與 worker 交錯時看到半套狀態。
+//  - 載入在 JobSystem 的 worker 執行:讀檔 → 算 contentHash → 拿 blocksMutex 找/建 block。
 //  - 完成事件不從 worker 直接發 — 塞進 completed 佇列,
 //    DispatchCompletedEvents() 在主執行緒成批廣播 LoadedEvent。
 class AssetManager
@@ -102,7 +104,7 @@ class AssetManager
         assets.Insert(keyHash, id);
         numAssets++;
 
-        // worker 只碰「建立/共享 block」,Asset 本身由 SharedPtr 持有跨執行緒安全。
+        // worker 只碰「建立/共享 block」、寫 id->loaded / id->pBlock(均在 blocksMutex 保護下)。
         jobs.Enqueue([this, id] { LoadWorker(id); });
         return id;
     }
@@ -119,7 +121,13 @@ class AssetManager
             return;
 
         id->released = true;
-        if (id->loaded && id->pBlock)
+        bool unloadNow = false;
+        {
+            // #86:loaded/pBlock 由 worker 寫入 → 加鎖讀,避免撕裂/過期判斷。
+            std::lock_guard<std::mutex> lock(blocksMutex);
+            unloadNow = id->loaded && id->pBlock;
+        }
+        if (unloadNow)
             UnloadAsset(id);
     }
 
@@ -175,13 +183,23 @@ class AssetManager
         return id ? id->refCount : 0;
     }
 
-    // 某顆共享內容區塊目前被多少個已載入 asset 引用(§5.3 引用計數)。
-    uint32_t GetBlockRefCount(const BlockId &block) const
+    // 某顆共享內容區塊目前被多少個「已登記的」asset 指向(#86:掃表推得,
+    // 不再依賴 block 自己的 refCount)。
+    uint32_t GetBlockRefCount(const BlockId &block)
     {
-        return block ? block->refCount : 0;
+        if (!block)
+            return 0;
+        std::lock_guard<std::mutex> lock(blocksMutex);
+        uint32_t count = 0;
+        for (typename HashTable<uint64_t, AssetId>::Iterator it = assets.First(); it != assets.Last(); ++it)
+            if (it->Value()->pBlock == block)
+                count++;
+        return count;
     }
 
     // 跨 key 共享的內容區塊數(不同 contentHash 的個數)。供測試驗證「相同內容只存一份」。
+    // 註:直接由 numSharedBlocks 計數推得,而非讀 blocks.Length() —— HashTable 在
+    // 擴張/收縮 rehash 時不會重置 nElements(既有 # 待修),Length() 會雙算。
     size_t GetNumSharedBlocks()
     {
         std::lock_guard<std::mutex> lock(blocksMutex);
@@ -202,6 +220,8 @@ class AssetManager
         if (it == assets.Last())
             return false;
         AssetId id = it->Value();
+        // #86:loaded/pBlock 由 worker 寫入 → 加鎖讀。
+        std::lock_guard<std::mutex> lock(blocksMutex);
         if (!id->loaded || !id->pBlock)
             return false;
         *pOut = id->pBlock->bytes;
@@ -217,8 +237,8 @@ class AssetManager
 
     void LoadWorker(AssetId id)
     {
-        id->loaded = false;
-        id->pBlock = SharedPtr<AssetBlock>(); // 重置,重新決定共享目標
+        // id 是 LoadAsync 才建的全新 Asset(loaded=false、pBlock 空 → 不需重設;
+        // 移除舊版 unlocked 重設:它會與稍後的加鎖寫入打架)。
 
         const Str<char> utf8Path = id->key.ToUTF8();
         DynamicArray<unsigned char> rawBytes; // 臨時複本,決定要共享哪個 block 後即不再持有
@@ -251,16 +271,14 @@ class AssetManager
                     BlockId existing = itr->Value();
                     if (BytesEqual(existing->bytes, rawBytes))
                     {
-                        id->pBlock = existing;
-                        existing->refCount++; // 這顆 content 多一個已載入 asset 指向
+                        id->pBlock = existing; // content 去重:與既有 block 共用(跨 key 共享)
                         id->loaded = true;
                     }
                 }
                 if (!id->pBlock)
                 {
                     id->pBlock = SharedPtr<AssetBlock>::Construct(rawBytes, contentHash);
-                    id->pBlock->refCount = 1; // 新內容:第一個指向它的 asset
-                    blocks.Insert(contentHash, id->pBlock);
+                    blocks.Insert(contentHash, id->pBlock); // 新內容:登記進去重表
                     numSharedBlocks++;
                     id->loaded = true;
                 }
@@ -273,8 +291,10 @@ class AssetManager
         }
     }
 
-    // 真正卸載:從 assets 表移除(釋放 key)、把 block 引用還回去。
-    // block 引用歸零 → 從 blocks 表移除(釋放 bytes)——§5.3「最後一個 release 才真正 unload」。
+    // 真正卸載:從 assets 表移除(釋放 key)、歸還指向的共享 block。
+    // block 的記憶體存亡全由 SharedPtr 計數決定(§5.3「最後一個 release 才真正 unload」);
+    // 這裡只負責:表內不再有其他 asset 指向它時,把 block 從去重表移除。
+    // #86:不再有 AssetBlock::refCount —— 「有沒有其他人指向」用掃表得出。
     // 呼叫端必須持有 id 的某份 strong ref(caller 的 SharedPtr 或 completedJobs)。
     void UnloadAsset(AssetId id)
     {
@@ -289,23 +309,32 @@ class AssetManager
             numAssets--;
         }
 
-        // 2) 釋放指向的共享 block 的引用;最後一個引用離開才把 block 從表移除
+        // 2) 歸還持有的共享 block;最後一個「已登記」的 asset 離開 → 從去重表移除。
+        //    (快照與清空都在 blocksMutex 內 —— worker 可能正在寫 id->pBlock。)
         {
             std::lock_guard<std::mutex> lock(blocksMutex);
             if (id->pBlock)
             {
-                if (id->pBlock->refCount > 0)
-                    id->pBlock->refCount--;
-                if (id->pBlock->refCount == 0)
+                BlockId block = id->pBlock; // 先快照一份,再清掉本 asset 的引用
+                id->pBlock = BlockId();      // 真正 unload bytes 由 SharedPtr 計數決定
+                if (!HasSharedRefs(block))
                 {
-                    blocks.Remove(id->pBlock->contentHash);
+                    blocks.Remove(block->contentHash);
                     numSharedBlocks--;
-                    id->pBlock = BlockId(); // 釋放 SharedPtr,真正 unload bytes
                 }
             }
         }
 
         id->released = true;
+    }
+
+    // blocksMutex 保護下呼叫:掃描已登記 asset,看是否仍有 asset 指向 block。
+    bool HasSharedRefs(const BlockId &block)
+    {
+        for (typename HashTable<uint64_t, AssetId>::Iterator it = assets.First(); it != assets.Last(); ++it)
+            if (it->Value()->pBlock == block)
+                return true;
+        return false;
     }
 
     static bool BytesEqual(const DynamicArray<unsigned char> &lhs, const DynamicArray<unsigned char> &rhs)
@@ -321,7 +350,7 @@ class AssetManager
     HashTable<uint64_t, AssetId> assets;              // key hash -> 資產(依 key 去重)
     size_t numAssets;
     HashTable<uint64_t, BlockId> blocks;              // contentHash -> 共享內容區塊
-    size_t numSharedBlocks = 0;
+    size_t numSharedBlocks = 0;                       // blocks 表的有效登錄數(見 GetNumSharedBlocks 註)
     std::mutex blocksMutex;
     DynamicArray<AssetId> completedJobs;
     size_t completedCursor = 0;

@@ -119,10 +119,10 @@ class Frame
     void SetCamera(WeakPtr<Camera> pCamera)
     {
         // #80:值快照 — executor 不再 dereference 這個指標(record 當下就固定)。
-        // 無效相機 → 紀錄一組全零快照(安全,與 null 語義一致)。
+        // 目標已亡 / 無效相機 → 紀錄一組全零快照(安全,與 null 語義一致)。
         CommandData &cmd = Append(Command::SetCamera);
-        if (pCamera)
-            cmd.camera.CaptureFrom(*pCamera.operator->());
+        if (SharedPtr<Camera> strong = pCamera.Lock())
+            cmd.camera.CaptureFrom(*strong);
     }
 
     void DrawRenderable(const IRenderable &renderable)

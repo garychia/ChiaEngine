@@ -52,13 +52,15 @@ class PointersTest : public Test
         EXPECT_TRUE(wp1.IsValid(), "WeakPtr should be valid while SharedPtr exists.", true);
         SUCCESS_MESSAGE("WeakPtr from SharedPtr");
 
-        TEST_MESSAGE("WeakPtr operator->");
+        TEST_MESSAGE("WeakPtr Lock");
         SharedPtr<int> sp6 = SharedPtr<int>::Construct(500);
         WeakPtr<int> wp2(sp6);
-        // Just verify it doesn't crash and returns a valid pointer
-        int *raw = wp2.operator->();
-        EXPECT_TRUE(raw != nullptr, "operator-> should return non-null when valid.", true);
-        SUCCESS_MESSAGE("WeakPtr operator->");
+        // #86:WeakPtr 不再暴露 operator->;唯一解引用通道是 Lock(),必須回有效 SharedPtr。
+        SharedPtr<int> locked = wp2.Lock();
+        EXPECT_TRUE(locked.IsValid(), "Lock should succeed while target alive.", true);
+        EXPECT_TRUE(*locked == 500, "Locked value should match.", true);
+        locked.Release();
+        SUCCESS_MESSAGE("WeakPtr Lock");
 
         // ===== Pair Tests =====
         TEST_MESSAGE("Pair Key and Value");
