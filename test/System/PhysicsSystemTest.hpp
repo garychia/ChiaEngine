@@ -97,13 +97,9 @@ class PhysicsSystemTest : public Test
             // 3 個重疊對 + 1 個孤兒(world space 固定座標):
             // AABB(0) 與 sphere(1) 重疊、AABB(0) 與 sphere(5) 分離、
             // aabb(覆盖) 與 entity-2 sphere 分離 → 恰好 3 對
-            Entity e0 = system.world.CreateEntity();
-            Entity e1 = system.world.CreateEntity();
-            Entity e2 = system.world.CreateEntity();
-
-            system.world.AddComponent<ColliderComponent>(e0, MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
-            system.world.AddComponent<ColliderComponent>(e1, MakeSphere(0.0f, 0.0f, 0.0f, 2.0f));
-            system.world.AddComponent<ColliderComponent>(e2, MakeSphere(5.0f, 5.0f, 5.0f, 1.0f));
+            Entity e0 = system.SpawnCollider(MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
+            Entity e1 = system.SpawnCollider(MakeSphere(0.0f, 0.0f, 0.0f, 2.0f));
+            Entity e2 = system.SpawnCollider(MakeSphere(5.0f, 5.0f, 5.0f, 1.0f));
 
             engine.Tick(1.0 / 60.0);
             engine.Tick(1.0 / 60.0);
@@ -120,13 +116,9 @@ class PhysicsSystemTest : public Test
             engine.Attach(&system);
             engine.Attach(&recorder);
 
-            Entity e0 = system.world.CreateEntity();
-            Entity e1 = system.world.CreateEntity();
-            Entity e2 = system.world.CreateEntity();
-
-            system.world.AddComponent<ColliderComponent>(e0, MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
-            system.world.AddComponent<ColliderComponent>(e1, MakeSphere(0.0f, 0.0f, 0.0f, 2.0f));
-            system.world.AddComponent<ColliderComponent>(e2, MakeSphere(5.0f, 5.0f, 5.0f, 1.0f));
+            Entity e0 = system.SpawnCollider(MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
+            Entity e1 = system.SpawnCollider(MakeSphere(0.0f, 0.0f, 0.0f, 2.0f));
+            Entity e2 = system.SpawnCollider(MakeSphere(5.0f, 5.0f, 5.0f, 1.0f));
 
             engine.Tick(1.0 / 60.0);
             engine.Tick(1.0 / 60.0);
@@ -140,7 +132,7 @@ class PhysicsSystemTest : public Test
                         UnorderedHash(sequenceA[1].a, sequenceA[1].b) ==
                             UnorderedHash(sequenceB[1].a, sequenceB[1].b),
                         "碰撞序列(標準層)相同 → 確定性(AC4).", true);
-            EXPECT_TRUE(system.world.Hash() != 0, "World hash 非零(有內容).", true);
+            EXPECT_TRUE(system.GetHash() != 0, "World hash 非零(有內容).", true);
         }
 
         // --- 標準化順序 / canonical order 檢查 ---
@@ -151,13 +143,9 @@ class PhysicsSystemTest : public Test
             engine.Attach(&system);
             engine.Attach(&recorder);
 
-            Entity a = system.world.CreateEntity();
-            Entity b = system.world.CreateEntity();
-            Entity c = system.world.CreateEntity();
-
-            system.world.AddComponent<ColliderComponent>(a, MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
-            system.world.AddComponent<ColliderComponent>(b, MakeSphere(0.5f, 0.0f, 0.0f, 2.0f)); // 與 a 重疊
-            system.world.AddComponent<ColliderComponent>(c, MakeSphere(0.5f, 0.0f, 0.0f, 2.0f)); // 與 a/b 都重疊
+            Entity a = system.SpawnCollider(MakeAABB(0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f));
+            Entity b = system.SpawnCollider(MakeSphere(0.5f, 0.0f, 0.0f, 2.0f)); // 與 a 重疊
+            Entity c = system.SpawnCollider(MakeSphere(0.5f, 0.0f, 0.0f, 2.0f)); // 與 a/b 都重疊
 
             engine.Tick(1.0 / 60.0);
 
@@ -182,10 +170,8 @@ class PhysicsSystemTest : public Test
             engine.Attach(&system);
             engine.Attach(&recorder);
 
-            Entity a = system.world.CreateEntity();
-            Entity b = system.world.CreateEntity();
-            system.world.AddComponent<ColliderComponent>(a, MakeSphere(0.0f, 0.0f, 0.0f, 1.0f));
-            system.world.AddComponent<ColliderComponent>(b, MakeSphere(1.0f, 0.0f, 0.0f, 1.0f)); // 相切
+            Entity a = system.SpawnCollider(MakeSphere(0.0f, 0.0f, 0.0f, 1.0f));
+            Entity b = system.SpawnCollider(MakeSphere(1.0f, 0.0f, 0.0f, 1.0f)); // 相切
 
             engine.Detach(&recorder); // 先退訂再 tick → 不該收到
             engine.Tick(1.0 / 60.0);

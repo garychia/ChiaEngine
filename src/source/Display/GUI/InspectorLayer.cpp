@@ -95,10 +95,10 @@ void InspectorLayer::RebuildValueLabels()
         return;
     }
     const uint32_t idx = pSelection->entityIndex;
-    Entity e = pScene->world.GetEntityByIndex(idx);
-    if (!pScene->world.Alive(e))
+    Entity e = pScene->GetEntityByIndex(idx);
+    if (!pScene->Alive(e))
         return;
-    TransformComponent *pT = pScene->world.GetComponent<TransformComponent>(e);
+    TransformComponent *pT = pScene->GetLocalTransform(e);
     if (!pT)
         return;
     const float vals[9] = {pT->position.x, pT->position.y, pT->position.z, pT->rotation.x, pT->rotation.y,

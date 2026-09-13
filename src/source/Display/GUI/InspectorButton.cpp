@@ -6,8 +6,8 @@ void EditTransformComponent(SceneSystem *pScene, uint32_t entityIndex, Inspector
 {
     if (!pScene)
         return;
-    Entity e = pScene->world.GetEntityByIndex(entityIndex);
-    TransformComponent *pT = pScene->world.GetComponent<TransformComponent>(e);
+    Entity e = pScene->GetEntityByIndex(entityIndex);
+    TransformComponent *pT = pScene->GetLocalTransform(e);
     if (!pT)
         return;
     float step = 0.f;

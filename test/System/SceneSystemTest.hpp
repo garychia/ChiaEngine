@@ -49,12 +49,12 @@ class SceneSystemTest : public Test
             SceneSystem system;
             Entity root = system.CreateNode();
             Entity child = system.CreateNode(root);
-            system.world.GetComponent<TransformComponent>(root)->position = Point3D(10, 0, 0);
-            system.world.GetComponent<TransformComponent>(child)->position = Point3D(2, 0, 0);
+            system.GetLocalTransform(root)->position = Point3D(10, 0, 0);
+            system.GetLocalTransform(child)->position = Point3D(2, 0, 0);
             system.FixedUpdate(FrameClock());
 
-            WorldTransformComponent *pRoot = system.world.GetComponent<WorldTransformComponent>(root);
-            WorldTransformComponent *pChild = system.world.GetComponent<WorldTransformComponent>(child);
+            WorldTransformComponent *pRoot = system.GetWorldTransform(root);
+            WorldTransformComponent *pChild = system.GetWorldTransform(child);
             EXPECT_TRUE(pRoot && pChild, "root 與 child 的 world transform 都已重算.", true);
             EXPECT_TRUE(Math::Abs(pRoot->position.x - 10) < 1e-4f, "root world.x == local.x (無父).", true);
             EXPECT_TRUE(Math::Abs(pChild->position.x - 12) < 1e-4f, "child.x == parent.x + local.x (跟隨).", true);
@@ -79,8 +79,8 @@ class SceneSystemTest : public Test
             EXPECT_TRUE(roots.GetNElements() == 3, "a,b,c 皆 root.", true);
 
             system.DestroyNode(c);
-            EXPECT_TRUE(!system.world.Alive(c), "destroy c 後 c 消失.", true);
-            EXPECT_TRUE(system.world.Alive(a) && system.world.Alive(b), "a,b 仍活.", true);
+            EXPECT_TRUE(!system.Alive(c), "destroy c 後 c 消失.", true);
+            EXPECT_TRUE(system.Alive(a) && system.Alive(b), "a,b 仍活.", true);
             EXPECT_TRUE(system.GetRoots().GetNElements() == 2, "餘 a,b 兩 root.", true);
         }
 
@@ -91,7 +91,7 @@ class SceneSystemTest : public Test
             Entity child = system.CreateNode(root);
             Entity grand = system.CreateNode(child);
             system.DestroyNode(root);
-            EXPECT_TRUE(!system.world.Alive(root) && !system.world.Alive(child) && !system.world.Alive(grand),
+            EXPECT_TRUE(!system.Alive(root) && !system.Alive(child) && !system.Alive(grand),
                         "DestroyNode(root) 連 child+grandchild 全毀.", true);
         }
 

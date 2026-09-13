@@ -33,8 +33,8 @@ class InspectorTest : public Test
             UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
-            system.world.GetComponent<TransformComponent>(a)->position = Point3D(1, 2, 3);
-            system.world.GetComponent<TransformComponent>(b)->position = Point3D(9, 9, 9);
+            system.GetLocalTransform(a)->position = Point3D(1, 2, 3);
+            system.GetLocalTransform(b)->position = Point3D(9, 9, 9);
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
@@ -54,7 +54,7 @@ class InspectorTest : public Test
             SceneSystem system;
             UndoStack stack;
             Entity a = system.CreateNode();
-            system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
+            system.GetLocalTransform(a)->position = Point3D(0, 0, 0);
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
@@ -66,7 +66,7 @@ class InspectorTest : public Test
             // Pos X + (axis 0, sign +1) → +0.5
             inspector.ApplyEdit(a.GetIndex(), InspectorAxis::PositionX, +1.f);
             inspector.Update();
-            TransformComponent *pT = system.world.GetComponent<TransformComponent>(a);
+            TransformComponent *pT = system.GetLocalTransform(a);
             EXPECT_TRUE(Math::Abs(pT->position.x - 0.5f) < 1e-4f, "ApplyEdit +PosX 後 position.x == 0.5.", true);
 
             // Pos X - (sign -1) → 回到 0
@@ -95,8 +95,8 @@ class InspectorTest : public Test
             UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
-            system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
-            system.world.GetComponent<TransformComponent>(b)->position = Point3D(0, 0, 0);
+            system.GetLocalTransform(a)->position = Point3D(0, 0, 0);
+            system.GetLocalTransform(b)->position = Point3D(0, 0, 0);
 
             InspectorLayer inspector(Point2D(1000, 800),
                                      Border(800.f, 30.f, 200.f, 400.f), &system, &stack);
@@ -111,8 +111,8 @@ class InspectorTest : public Test
             inspector.SetSelection(&selB);
             inspector.ApplyEdit(b.GetIndex(), InspectorAxis::RotationY, +1.f);
 
-            TransformComponent *pA = system.world.GetComponent<TransformComponent>(a);
-            TransformComponent *pB = system.world.GetComponent<TransformComponent>(b);
+            TransformComponent *pA = system.GetLocalTransform(a);
+            TransformComponent *pB = system.GetLocalTransform(b);
             EXPECT_TRUE(Math::Abs(pA->position.x - 0.5f) < 1e-4f, "a.position.x 受 a 編輯影響 == 0.5.", true);
             EXPECT_TRUE(Math::Abs(pA->rotation.y) < 1e-4f, "a.rotation.y 不受 b 編輯影響 == 0.", true);
             EXPECT_TRUE(Math::Abs(pB->rotation.y - 5.0f) < 1e-4f, "b.rotation.y 受 b 編輯影響 == 5.0.", true);
@@ -130,7 +130,7 @@ class InspectorTest : public Test
             selA.entityIndex = a.GetIndex();
             selA.hasSelection = true;
             inspector.SetSelection(&selA);
-            system.world.DestroyEntity(a);
+            system.DestroyNode(a);
             // 選到已毀 entity → Update 應安全跳過(不 crash,不改任何東西)
             inspector.Update();
             EXPECT_TRUE(true, "選取已毀 entity 後 Update 不崩.", true);
@@ -142,8 +142,8 @@ class InspectorTest : public Test
             UndoStack stack;
             Entity a = system.CreateNode();
             Entity b = system.CreateNode();
-            system.world.GetComponent<TransformComponent>(a)->position = Point3D(1, 2, 3);
-            system.world.GetComponent<TransformComponent>(b)->position = Point3D(9, 9, 9);
+            system.GetLocalTransform(a)->position = Point3D(1, 2, 3);
+            system.GetLocalTransform(b)->position = Point3D(9, 9, 9);
 
             Selection sel; // 擁有者(對應 Panel::selection)
             sel.entityIndex = a.GetIndex();
@@ -173,11 +173,11 @@ class InspectorTest : public Test
             SceneSystem system;
             UndoStack stack;
             Entity a = system.CreateNode();
-            system.world.GetComponent<TransformComponent>(a)->position = Point3D(0, 0, 0);
+            system.GetLocalTransform(a)->position = Point3D(0, 0, 0);
 
             // 模擬 + 鈕(axis=PositionX, sign=+1):push 即 apply → position.x += 0.5
             stack.Push(new TransformEditCommand(&system, a.GetIndex(), InspectorAxis::PositionX, +1.f));
-            TransformComponent *pT = system.world.GetComponent<TransformComponent>(a);
+            TransformComponent *pT = system.GetLocalTransform(a);
             EXPECT_TRUE(Math::Abs(pT->position.x - 0.5f) < 1e-4f, "undoable +PosX 後 position.x == 0.5.", true);
 
             // 再 + 一次 → 1.0

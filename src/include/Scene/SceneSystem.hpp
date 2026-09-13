@@ -26,8 +26,33 @@
 // Display::Scene 是 View 側 renderable 列表。Sim 不觸碰 View 型別。
 class SceneSystem : public IModule
 {
-  public:
+  private:
+    // World 是實作細節 — 模組對外只暴露場景圖與節點 transform 的接縫(#81)。
     World world;
+
+  public:
+    // ---- Entity 生命週期接縫(不暴露 World facade)----
+    bool Alive(Entity entity) const
+    {
+        return world.Alive(entity);
+    }
+
+    // editor 以 entity index(Selection.entityIndex)選取 → 換成完整 handle。
+    Entity GetEntityByIndex(uint32_t entityIndex) const
+    {
+        return world.GetEntityByIndex(entityIndex);
+    }
+
+    // ---- 節點 transform typed queries ----
+    TransformComponent *GetLocalTransform(Entity entity)
+    {
+        return world.GetComponent<TransformComponent>(entity);
+    }
+
+    WorldTransformComponent *GetWorldTransform(Entity entity)
+    {
+        return world.GetComponent<WorldTransformComponent>(entity);
+    }
 
     // 建立節點:掛 TransformComponent + ParentComponent(root 的 parent = 空)。
     Entity CreateNode(Entity parent = Entity())

@@ -27,9 +27,26 @@ struct OnCollision
 // - 不做 broad-phase(spatial-hash 會引入 iteration-order 相依,破壞確定性)。
 class PhysicsSystem : public IModule
 {
-  public:
+  private:
+    // World 是實作細節 — 模組對外只暴露碰撞 spawn 與確定性指紋接縫(#81)。
     World world;
+
+  public:
     Event<void(OnCollision)> onCollision;
+
+    // 建立附 ColliderComponent 的 entity(spawn 語意)。
+    Entity SpawnCollider(const ColliderComponent &collider)
+    {
+        Entity e = world.CreateEntity();
+        world.AddComponent<ColliderComponent>(e, collider);
+        return e;
+    }
+
+    // 碰撞世界狀態的確定性指紋(replay 驗證用)。
+    uint64_t GetHash() const
+    {
+        return world.Hash();
+    }
 
     void OnAttach(EngineContext &context) override
     {
