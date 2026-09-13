@@ -23,6 +23,7 @@ set(DISPLAY_SOURCE_FILES
     include/Display/IRenderable.hpp
     source/Display/IRenderable.cpp
     include/Display/IRenderer.hpp
+    include/Display/IRendererAssetRegistrar.hpp
     include/Display/Renderer.hpp
     source/Display/Renderer.cpp
     include/Display/Scene.hpp

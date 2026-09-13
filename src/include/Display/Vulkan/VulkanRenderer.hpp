@@ -3,6 +3,7 @@
 
 #include "Display/IRenderer.hpp"
 #include "Display/IFrameExecutor.hpp"
+#include "Display/IRendererAssetRegistrar.hpp" // #83:資產註冊 seam(mesh/material)
 #include "Display/FrameInterpreter.hpp" // #84:純解譯器 seam(transform stack / material / camera 狀態)
 #include "Display/RendererMath.hpp"     // #84:單一矩陣慣例模組
 #include "Display/Color.hpp"
@@ -14,11 +15,9 @@
 
 #include <string>
 
-struct Texture; // forward decl:MaterialSource 以指標持有(RenderInfo 鏈才給完整定義)
-
 class Window;
 
-class VulkanRenderer : public IRenderer, public IFrameExecutor
+class VulkanRenderer : public IRenderer, public IFrameExecutor, public IRendererAssetRegistrar
 {
   private:
     // #84:Frame → GPU 的純解譯器。Execute 透過它攤平命令銜(transform stack 64
@@ -266,16 +265,13 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     virtual bool Execute(const Frame &frame) override;
 
     // ── P7d:mesh 幾何註冊(由 View 側把 renderable 幾何登記成 content-hash meshId)──
-    bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info);
+    // #83:經由 IRendererAssetRegistrar seam(不再是 concrete 類的裸方法,View 不再
+    // dynamic_cast 到實類)。
+    bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info) override;
 
     // ── #55:material 註冊(材質 id → texture + descriptor set)──────────────
-    struct MaterialSource
-    {
-        const Texture *pTexture = nullptr;        // 非 null → stbi 載入 imagePath
-        const unsigned char *pRawRGBA = nullptr;  // 非 null → inline raw RGBA(仿 FontAtlas)
-        uint32_t width = 0, height = 0;            // pRawRGBA 用
-    };
-    bool RegisterMaterial(uint64_t materialId, const MaterialSource &source);
+    // MaterialSource 定義在 IRendererAssetRegistrar.hpp(#83 移出,與後端無關)。
+    bool RegisterMaterial(uint64_t materialId, const MaterialSource &source) override;
 };
 
 #endif

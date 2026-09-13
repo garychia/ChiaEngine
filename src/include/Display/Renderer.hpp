@@ -3,6 +3,7 @@
 
 #include "IRenderer.hpp"
 #include "IFrameExecutor.hpp"
+#include "IRendererAssetRegistrar.hpp"
 #include "Display/GUI/GUILayout.hpp"
 
 #ifdef DIRECTX_ENABLED
@@ -13,7 +14,7 @@
 
 class Camera;
 
-class Renderer : public IRenderer, public IFrameExecutor
+class Renderer : public IRenderer, public IFrameExecutor, public IRendererAssetRegistrar
 {
   private:
 #ifdef DIRECTX_ENABLED
@@ -55,6 +56,12 @@ class Renderer : public IRenderer, public IFrameExecutor
 
     // IFrameExecutor
     virtual bool Execute(const Frame &frame) override;
+
+    // IRendererAssetRegistrar — forward 到底下 executor(Vulkan 才實作;非 Vulkan
+    // build 為 false stub,見 Renderer.cpp)。View 以此 seam 取「資產註冊能力」,
+    // 不必 dynamic_cast 到 concrete VulkanRenderer。
+    virtual bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info) override;
+    virtual bool RegisterMaterial(uint64_t materialId, const MaterialSource &source) override;
 };
 
 #endif

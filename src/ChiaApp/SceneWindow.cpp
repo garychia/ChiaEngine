@@ -1,7 +1,7 @@
 #include "SceneWindow.hpp"
 #include "Paths.hpp"
 #include "Display/Frame.hpp"
-#include "Display/Vulkan/VulkanRenderer.hpp"
+#include "Display/IRendererAssetRegistrar.hpp" // #83:資產註冊 seam(不再依賴 concrete VulkanRenderer)
 #include "Geometry/Primitives.hpp"
 
 SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
@@ -49,8 +49,13 @@ void SceneWindow::EnsureMaterialDemoRegistered()
         return; // 只註冊一次(renderer 資源全域共用)
     materialsRegistered = true;
 
-    VulkanRenderer *pRenderer = dynamic_cast<VulkanRenderer *>(&renderer);
-    if (!pRenderer)
+    // #83:經由 IRendererAssetRegistrar seam 註冊資產,不再 dynamic_cast 到 concrete
+    // VulkanRenderer。renderer 是 Renderer facade;facade 實作 IRendererAssetRegistrar
+    // 並 forward 到底下 Vulkan executor,故 cast 成立、多材質示範真正註冊。
+    // (修復 #55 的隱性 bug:舊代碼 dynamic_cast<VulkanRenderer*>(&renderer) 對
+    // facade 永遠回 null,多材質示範因此從未真正註冊、悄悄退回 legacy path。)
+    IRendererAssetRegistrar *pRegistrar = dynamic_cast<IRendererAssetRegistrar *>(&renderer);
+    if (!pRegistrar)
         return;
 
     // 幾何:content-hash meshId(固定常數;真實系統由 AssetManager 內容定址給)。
@@ -58,25 +63,25 @@ void SceneWindow::EnsureMaterialDemoRegistered()
     {
         const uint64_t kCubeMeshId = 0x43554245ull; // "CUBE"
         auto cube = SharedPtr<IRenderable>::Construct<Cube>();
-        if (pRenderer->RegisterMeshGeometry(kCubeMeshId, cube->GetRenderInfo()))
+        if (pRegistrar->RegisterMeshGeometry(kCubeMeshId, cube->GetRenderInfo()))
             meshId_ = kCubeMeshId;
     }
 
     // 材質 1:原本的貓 JPG(磁碟資產,stbi 載入)。
-    VulkanRenderer::MaterialSource mat1;
+    MaterialSource mat1;
     mat1.pTexture = pTextures.GetFirst().GetRaw();
-    pRenderer->RegisterMaterial(0x4D415431ull /* "MAT1" */, mat1);
+    pRegistrar->RegisterMaterial(0x4D415431ull /* "MAT1" */, mat1);
 
     // 材質 2:inline RGBA 棋盤格(2x2,紅/暗紅)— 展示 per-material texture 不需磁碟資產。
     static const unsigned char kChecker[2 * 2 * 4] = {
         255, 60, 40, 255, 120, 20, 15, 255,
         120, 20, 15, 255, 255, 60, 40, 255,
     };
-    VulkanRenderer::MaterialSource mat2;
+    MaterialSource mat2;
     mat2.pRawRGBA = kChecker;
     mat2.width = 2;
     mat2.height = 2;
-    pRenderer->RegisterMaterial(0x4D415432ull /* "MAT2" */, mat2);
+    pRegistrar->RegisterMaterial(0x4D415432ull /* "MAT2" */, mat2);
 }
 
 void SceneWindow::Render()
@@ -90,8 +95,9 @@ void SceneWindow::Render()
     if (pController)
         frame.SetCamera(pController->GetCamera());
     // #55:走 DrawMesh + BindMaterial 路徑 — 2 顆 cube、2 種材質。
-    VulkanRenderer *pRenderer = dynamic_cast<VulkanRenderer *>(&renderer);
-    if (pRenderer && meshId_ != 0)
+    // #83:不再 dynamic_cast 到 concrete VulkanRenderer(對 facade 永遠 null)。
+    // meshId_ != 0 即代表資產已透過 IRendererAssetRegistrar seam 註冊成功。
+    if (meshId_ != 0)
     {
         // 材質 1 cube(左):貓 JPG。
         frame.BindMaterial(0x4D415431ull);

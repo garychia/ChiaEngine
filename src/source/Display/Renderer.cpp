@@ -1,5 +1,6 @@
 #include "Display/Renderer.hpp"
 #include "Display/Camera.hpp"
+#include "Display/IRenderable.hpp" // RenderInfo(for IRendererAssetRegistrar 參數)
 
 Renderer::Renderer() : specializedRenderer()
 {
@@ -84,5 +85,25 @@ bool Renderer::Execute(const Frame &frame)
     // Execute 不可用(見 docs/agents/directx-backend-assessment.md)。
     (void)frame;
     return false;
+#endif
+}
+
+bool Renderer::RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info)
+{
+#ifdef VULKAN_ENABLED
+    return specializedRenderer.RegisterMeshGeometry(meshId, info);
+#else
+    (void)meshId; (void)info;
+    return false; // legacy 後端無資產註冊 seam(見 #83)
+#endif
+}
+
+bool Renderer::RegisterMaterial(uint64_t materialId, const MaterialSource &source)
+{
+#ifdef VULKAN_ENABLED
+    return specializedRenderer.RegisterMaterial(materialId, source);
+#else
+    (void)materialId; (void)source;
+    return false; // legacy 後端無資產註冊 seam(見 #83)
 #endif
 }
