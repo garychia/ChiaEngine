@@ -18,6 +18,10 @@
 // Frame(命令流) + IFrameExecutor(渲染器契約)是 headless 可測的 renderer 層表面;
 // 真正的 GPU 後端(VulkanRenderer)不可無頭測試 → 見下方 VulkanRendererTest 的
 // 4 點 blocker 分析(WindowManager precedent,issue #58)。
+// #84:純解譯器 seam 已抽出(FrameInterpreter);真正後端執行前的純邏輯
+// (transform stack / material / camera / world 解析)由 FrameInterpreterTest
+// 直接打在真實 interpreter 上 — 本檔的 MockExecutor 仍保留作 executor 端
+// 契約與命令流 round-trip 的獨立覆蓋,不再是「唯一」的契約測試面。
 //
 // 覆蓋範圍(與 #47 的 FrameSerializationTest 分工:不重複值命令 serialize 確定性,
 // 而是測「executor 端」契約 + #47 沒測的 legacy 指標命令 + transform stack 契約):
@@ -537,9 +541,10 @@ class RendererContractTest : public Test
 //    的注入點。
 // 4. Execute() 內「純邏輯可測」的部分(transform stack 64 上限、空 stack Pop
 //    no-op、materialId 記錄、null 指標防護)與 GPU 呼叫在同一 switch 內,
-//    無法獨立觸發 — 本檔的 MockExecutor 已把其中可驗證的契約(深度 64、
-//    第 65 個忽略、空 Pop no-op)依 VulkanRenderer.cpp L1089/1134/1139 的
-//    實際行為 headless 測掉。
+//    無法獨立觸發 — #84:這批純邏輯已抽到 FrameInterpreter(純解譯器),
+//    由 FrameInterpreterTest 直接打在真實 interpreter 上(headless);本檔的
+//    MockExecutor 仍把其中可驗證的 executor 端契約(深度 64、第 65 個忽略、
+//    空 Pop no-op)依 VulkanRenderer.cpp 實際行為測掉。
 // 因此不寫 fake GPU 程式碼。日後若提供 device/command buffer 注入點,應補測:
 // SetViewport → vkCmdSetViewport/vkCmdSetScissor 對映(含 0,0 視口)、
 // DrawMesh/DrawText 空 stack 時的 identity fallback(L1149/1177)、

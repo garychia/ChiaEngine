@@ -44,35 +44,10 @@ struct MatrixBuffer
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-//  矩陣慣例與 OpenGLHelper 一致(該檔只在 OPENGL build 編譯,故在此複製)
+//  矩陣慣例已集中到 Display/RendererMath.hpp(#84) — 取代原先在此與
+//  OpenGLHelper 各複製一份的 Build* 靜態函式,以及 RecordDrawCommands /
+//  RecordTextDrawCommands 內聯的正交投影。後端之間不再各寫各的矩陣碼。
 // ══════════════════════════════════════════════════════════════════════════════
-
-static glm::mat4 BuildViewMatrix(const Point3D &pos, const Point3D &rot)
-{
-    glm::vec3 position(pos.x, pos.y, pos.z);
-    glm::vec3 rotation(rot.x, rot.y, rot.z);
-    glm::vec3 front;
-    front.x = cos(glm::radians(rotation.y)) * cos(glm::radians(rotation.x));
-    front.y = sin(glm::radians(rotation.x));
-    front.z = sin(glm::radians(rotation.y)) * cos(glm::radians(rotation.x));
-    return glm::lookAt(position, position + glm::normalize(front), glm::vec3(0.0f, 1.0f, 0.0f));
-}
-
-static glm::mat4 BuildProjMatrix(float fovDeg, float aspect, float nearP, float farP)
-{
-    return glm::perspective(glm::radians(fovDeg), aspect, nearP, farP);
-}
-
-static glm::mat4 BuildWorldMatrix(const Point3D &pos, const Point3D &rot, const Point3D &scale)
-{
-    glm::mat4 world(1.0f);
-    world = glm::translate(world, glm::vec3(pos.x, pos.y, pos.z));
-    world = glm::rotate(world, glm::radians(rot.x), glm::vec3(1.0f, 0.0f, 0.0f));
-    world = glm::rotate(world, glm::radians(rot.y), glm::vec3(0.0f, 1.0f, 0.0f));
-    world = glm::rotate(world, glm::radians(rot.z), glm::vec3(0.0f, 0.0f, 1.0f));
-    world = glm::scale(world, glm::vec3(scale.x, scale.y, scale.z));
-    return world;
-}
 
 // ══════════════════════════════════════════════════════════════════════════════
 //  記憶體 / buffer / 貼圖上傳小工具
@@ -823,8 +798,6 @@ VulkanRenderer::VulkanRenderer()
       depthImageMemory(VK_NULL_HANDLE),
       depthImageView(VK_NULL_HANDLE),
       renderableGpuMap(),
-      transformStack(),
-      currentMaterialId(0),
       meshCache(),
       textDescriptorSet(VK_NULL_HANDLE),
       textSampler(VK_NULL_HANDLE),
@@ -1092,35 +1065,41 @@ bool VulkanRenderer::Execute(const Frame &frame)
     if (!device)
         return true; // 未初始化(如子視窗從未 Show):跳過本幀,避免空指標崩潰
 
-    for (size_t i = 0; i < frame.GetNumCommands(); i++)
+    // #84:執行 = FrameInterpreter(純解譯器,可 headless 測試)攤平命令銜 +
+    // 本函式逐 op 對映到 Vulkan 呼叫。transform stack / material / camera 狀態
+    // 已全部移入 interpreter;RecordRenderOp 不重複推導 — 純 GPU 端翻譯。
+    const DynamicArray<RenderOp> ops = interpreter.Interpret(frame);
+    for (size_t i = 0; i < ops.GetNElements(); i++)
     {
-        const Frame::CommandData &command = frame.GetCommand(i);
-        switch (command.command)
+        const RenderOp &op = ops[i];
+        switch (op.op)
         {
-            case Frame::Command::BeginFrame:
+            case RenderOp::Op::BeginFrame:
                 if (!BeginFrame())
                     return false;
-                // 幀起點重設 transform stack / material,避免上幀殘留狀態洩入本幀。
-                transformStack.RemoveAll();
-                currentMaterialId = 0;
                 break;
-            case Frame::Command::SetCamera:
-                pActiveCamera = command.pCamera;
+            case RenderOp::Op::EndFrame:
+                if (!EndFrame())
+                    return false;
                 break;
-            case Frame::Command::DrawRenderable:
-                if (command.pRenderable)
+            case RenderOp::Op::SetCamera:
+                if (op.pCamera)
+                    pActiveCamera = op.pCamera;
+                break;
+            case RenderOp::Op::DrawRenderable:
+                if (op.pRenderable)
                 {
-                    LoadRenderable(*command.pRenderable);
-                    RecordDrawCommands(commandBuffers[currentImageIndex], *command.pRenderable);
+                    LoadRenderable(*op.pRenderable);
+                    RecordDrawCommands(commandBuffers[currentImageIndex], *op.pRenderable);
                 }
                 break;
-            case Frame::Command::DrawGUILayout:
-                if (command.pLayout)
+            case RenderOp::Op::DrawGUILayout:
+                if (op.pLayout)
                 {
                     // P6(a):GUI 走 Frame — 佈局 = layers + 各自 components,全都是
                     // Rectangle(IRenderable),走與 DrawRenderable 相同的 renderable 管線。
                     // 正交投影的實際像素填充留待 P6(b)(需桌面人工驗收)。
-                    const DynamicArray<SharedPtr<GUILayer>> &layers = command.pLayout->GetLayers();
+                    const DynamicArray<SharedPtr<GUILayer>> &layers = op.pLayout->GetLayers();
                     for (size_t li = 0; li < layers.GetNElements(); li++)
                     {
                         LoadRenderable(*layers[li]);
@@ -1135,68 +1114,35 @@ bool VulkanRenderer::Execute(const Frame &frame)
                     }
                 }
                 break;
-            case Frame::Command::EndFrame:
-                if (!EndFrame())
-                    return false;
+            case RenderOp::Op::DrawMesh:
+                RecordMeshDrawCommands(commandBuffers[currentImageIndex], op.meshId, op.world, op.materialId);
                 break;
-            // ── P7d:新增命令──────────────────────────────────────
-            case Frame::Command::PushTransform:
-            {
-                const Point3D &pos = command.transform.position;
-                const Point3D &rot = command.transform.rotation;
-                const Point3D &scale = command.transform.scale;
-                const glm::mat4 world = BuildWorldMatrix(pos, rot, scale);
-                // 深度上限 64:溢出即 push 失敗/忽略,不讓 Sim bug 拖垮執行器。
-                if (transformStack.GetNElements() < VulkanRenderer::MaxTransformStackDepth)
-                    transformStack.Append(world);
-                break;
-            }
-            case Frame::Command::PopTransform:
-                if (!transformStack.IsEmpty())
-                    transformStack.RemoveLast();
-                break;
-            case Frame::Command::BindMaterial:
-                currentMaterialId = command.materialId;
-                // #55:材質管線。materialCache 有該 id → RecordMeshDrawCommands
-                // 綁 per-material descriptor set(UBO + 各自 texture);未註冊 fallback
-                // 到預設 descriptorSet。
-                boundMaterialId = currentMaterialId;
-                break;
-            case Frame::Command::DrawMesh:
-            {
-                const glm::mat4 world = transformStack.IsEmpty() ? glm::mat4(1.0f) : transformStack.GetLast();
-                RecordMeshDrawCommands(commandBuffers[currentImageIndex], command.meshId, world);
-                break;
-            }
-            case Frame::Command::SetViewport:
+            case RenderOp::Op::SetViewport:
             {
                 VkCommandBuffer cmdBuffer = commandBuffers[currentImageIndex];
                 VkViewport viewport = {};
-                viewport.x = command.viewport.x;
-                viewport.y = command.viewport.y;
-                viewport.width = command.viewport.width;
-                viewport.height = command.viewport.height;
+                viewport.x = op.viewport.x;
+                viewport.y = op.viewport.y;
+                viewport.width = op.viewport.width;
+                viewport.height = op.viewport.height;
                 viewport.minDepth = 0.0f;
                 viewport.maxDepth = 1.0f;
                 vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
 
                 VkRect2D scissor = {};
-                scissor.offset.x = static_cast<int32_t>(command.viewport.x);
-                scissor.offset.y = static_cast<int32_t>(command.viewport.y);
-                scissor.extent.width = static_cast<uint32_t>(command.viewport.width);
-                scissor.extent.height = static_cast<uint32_t>(command.viewport.height);
+                scissor.offset.x = static_cast<int32_t>(op.viewport.x);
+                scissor.offset.y = static_cast<int32_t>(op.viewport.y);
+                scissor.extent.width = static_cast<uint32_t>(op.viewport.width);
+                scissor.extent.height = static_cast<uint32_t>(op.viewport.height);
                 vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
                 break;
             }
-            case Frame::Command::DrawText:
-            {
+            case RenderOp::Op::DrawText:
                 // P7e:字型圖集 + TextLayout quad 序列 + 文字 vertex buffer。
-                // 以 transform stack top 的 world 矩陣繪製(與 DrawMesh 同構)。
-                const glm::mat4 world = transformStack.IsEmpty() ? glm::mat4(1.0f) : transformStack.GetLast();
-                RecordTextDrawCommands(commandBuffers[currentImageIndex], command.fontId,
-                                       command.text.CStr(), command.textSize, command.textColor, world);
+                // world 已由 interpreter 解析(stack top / identity)。
+                RecordTextDrawCommands(commandBuffers[currentImageIndex], op.fontId,
+                                       op.text.CStr(), op.textSize, op.textColor, op.world);
                 break;
-            }
         }
     }
     return true;
@@ -2011,7 +1957,7 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     const Point3D &pos = renderable.GetPosition();
     const Point3D &rot = renderable.GetRotation();
     const Point3D &scale = renderable.GetScale();
-    const glm::mat4 world = BuildWorldMatrix(pos, rot, scale);
+    const glm::mat4 world = RendererMath::BuildWorldMatrix(pos, rot, scale); // #84
 
     glm::mat4 view = glm::mat4(1.0f);
     glm::mat4 projection = glm::mat4(1.0f);
@@ -2030,23 +1976,23 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
         // clear 1.0 下,後加入的 layer/component(z 較大)得較小 depth→ 較近 →
         // 蓋住先畫的。若 zNear=1,zFar=-1,第一個畫的 layer 反而最「近」(0.025),
         // 之後的按鈕/rows/text 全被 depth cull → GUI 只剩兩個 layer 底色。
-        projection = glm::orthoRH_ZO(-1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f);
+        // #84:慣例集中到 RendererMath::BuildGuiOrtho。
+        projection = RendererMath::BuildGuiOrtho();
     }
     else if (pActiveCamera)
     {
-        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
+        view = RendererMath::BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
         const float aspect = static_cast<float>(swapchainExtent.width) /
                              static_cast<float>(swapchainExtent.height);
-        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                     pActiveCamera->GetDistanceToNearPlane(),
-                                     pActiveCamera->GetDistanceToFarPlane());
+        projection = RendererMath::BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
+                                                   pActiveCamera->GetDistanceToNearPlane(),
+                                                   pActiveCamera->GetDistanceToFarPlane());
     }
     else
     {
-        projection = glm::perspective(glm::radians(70.0f),
-                                      static_cast<float>(swapchainExtent.width) /
-                                          static_cast<float>(swapchainExtent.height),
-                                      0.001f, 100.0f);
+        // #84:無相機 fallback 集中到 RendererMath 統一慣例(70°,0.001,100)。
+        projection = RendererMath::BuildFallbackPerspective(
+            static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height));
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
     UpdateUniformBuffer(world, view, projection, useTexture);
@@ -2268,7 +2214,8 @@ void VulkanRenderer::CleanupMaterialCache()
     materialCache.Clear();
 }
 
-void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world)
+void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId,
+                                            const glm::mat4 &world, uint64_t materialId)
 {
     HashTable<uint64_t, GpuMesh>::Iterator itr = meshCache.Find(meshId);
     if (itr == meshCache.Last())
@@ -2276,11 +2223,11 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
 
     const GpuMesh &mesh = itr->Value();
 
-    // #55:per-material descriptor 綁定。BindMaterial 指定的 material 在
-    // materialCache 中 → 綁它的 descriptor set(UBO + 各自 texture);
-    // 未註冊材質(或從未 BindMaterial)= fallback 到預設 descriptorSet。
+    // #55:per-material descriptor 綁定。materialId(已由 interpreter 解析,即
+    // BindMaterial 當下狀態)在 materialCache 中 → 綁它的 descriptor set
+    // (UBO + 各自 texture);未註冊材質(或從未 BindMaterial)= fallback 到預設。
     VkDescriptorSet bindSet = descriptorSet;
-    HashTable<uint64_t, MaterialGpuData>::Iterator matItr = materialCache.Find(boundMaterialId);
+    HashTable<uint64_t, MaterialGpuData>::Iterator matItr = materialCache.Find(materialId);
     if (matItr != materialCache.Last())
         bindSet = matItr->Value().descriptorSet;
 
@@ -2288,19 +2235,18 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
                             0, 1, &bindSet, 0, nullptr);
 
+    // #84:矩陣慣例集中到 RendererMath;無相機 fallback 用統一慣例(70°,0.001,100)。
     glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::perspective(glm::radians(70.0f),
-                                             static_cast<float>(swapchainExtent.width) /
-                                                 static_cast<float>(swapchainExtent.height),
-                                             0.001f, 100.0f);
+    glm::mat4 projection = RendererMath::BuildFallbackPerspective(
+        static_cast<float>(swapchainExtent.width) / static_cast<float>(swapchainExtent.height));
     if (pActiveCamera)
     {
-        view = BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
+        view = RendererMath::BuildViewMatrix(pActiveCamera->GetPosition(), pActiveCamera->GetRotation());
         const float aspect = static_cast<float>(swapchainExtent.width) /
                              static_cast<float>(swapchainExtent.height);
-        projection = BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
-                                     pActiveCamera->GetDistanceToNearPlane(),
-                                     pActiveCamera->GetDistanceToFarPlane());
+        projection = RendererMath::BuildProjMatrix(pActiveCamera->GetAngleOfView(), aspect,
+                                                   pActiveCamera->GetDistanceToNearPlane(),
+                                                   pActiveCamera->GetDistanceToFarPlane());
     }
     UpdateUniformBuffer(world, view, projection, false);
 
@@ -2437,7 +2383,9 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     // (zNear=-1,zFar=1 才對;zNear=1,zFar=-1 時第一個 layer 佔最淺 depth,
     //  所有後畫的文字/rect 全被 cull。)
     glm::mat4 view = glm::mat4(1.0f);
-    glm::mat4 projection = glm::orthoRH_ZO(-1.0f, 1.0f, 1.0f, -1.0f, -1.0f, 1.0f);
+    // #84:文字與按鈕同為 NDC 空間 → 同一正交投影(RendererMath 慣例)。
+    // #67:depth=(1-z)/2:文字 z = 矩形 z + 0.01 → 略近於矩形,LESS depth 序正確。
+    glm::mat4 projection = RendererMath::BuildGuiOrtho();
     // 字形圖集:白字透明底,shader 以 useTexture>0 + cmode=1 乘上 textColor。
     UpdateUniformBuffer(world, view, projection, true);
 

@@ -8,6 +8,7 @@
 #include "FrameTest.hpp"
 #include "FrameSerializationTest.hpp"
 #include "RendererContractTest.hpp"
+#include "FrameInterpreterTest.hpp"
 #include "TextRenderingTest.hpp"
 
 SystemModuleStandalone::SystemModuleStandalone() : Module()
@@ -23,5 +24,6 @@ SystemModuleStandalone::SystemModuleStandalone() : Module()
     AddTest<FrameSerializationTest>();
     AddTest<TextRenderingTest>();
     AddTest<renderercontracttest::RendererContractTest>();
+    AddTest<frameinterpretertest::FrameInterpreterTest>(); // #84:真實 seam(純解譯器)
     AddTest<renderercontracttest::VulkanRendererTest>();
 }

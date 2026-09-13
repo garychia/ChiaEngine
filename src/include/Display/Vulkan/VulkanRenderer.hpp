@@ -3,6 +3,8 @@
 
 #include "Display/IRenderer.hpp"
 #include "Display/IFrameExecutor.hpp"
+#include "Display/FrameInterpreter.hpp" // #84:純解譯器 seam(transform stack / material / camera 狀態)
+#include "Display/RendererMath.hpp"     // #84:單一矩陣慣例模組
 #include "Display/Color.hpp"
 #include "Display/Text/GlyphAtlas.hpp"
 #include "Data/HashTable.hpp"
@@ -19,6 +21,10 @@ class Window;
 class VulkanRenderer : public IRenderer, public IFrameExecutor
 {
   private:
+    // #84:Frame → GPU 的純解譯器。Execute 透過它攤平命令銜(transform stack 64
+    // 上限、empty-pop、identity fallback、material/camera 狀態都在 interpreter 內),
+    // 本類只做逐 op 的 Vulkan 翻譯。headless 契約測試打這層(renderercontracttest)。
+    FrameInterpreter interpreter;
     // Instance
     VkInstance vulkanInstance;
     VkDebugUtilsMessengerEXT debugMessenger;
@@ -93,9 +99,8 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
         HashTable<size_t, RenderableGpuData> renderableGpuMap;
 
     // ── P7d:Frame 新命令狀態───────────────────────────────────────────────
-    static constexpr uint32_t MaxTransformStackDepth = 64; // PushTransform 深度上限(防 Sim bug 溢出)
-    DynamicArray<glm::mat4> transformStack;                // PushTransform 推入的 world 矩陣
-    uint64_t currentMaterialId = 0;                        // BindMaterial 記錄的材質 id(材質管線留待資產票)
+    // #84:transform stack / currentMaterialId / boundMaterialId 全部移入
+    // FrameInterpreter(interpreter 成員)。本類不再維護 Flatten 純狀態。
 
     struct GpuMesh
     {
@@ -117,7 +122,7 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     };
     static constexpr uint32_t MaxMaterials = 16;                // descriptor pool 預留額度
     HashTable<uint64_t, MaterialGpuData> materialCache;        // key = materialId(content-hash)
-    uint64_t boundMaterialId = 0;                              // BindMaterial 目前綁定的材質
+    // #84:boundMaterialId 移入 FrameInterpreter(Execute 以 op.materialId 傳入)。
 
     // ── P7e:文字渲染───────────────────────────────────────────────
     struct FontAtlasGpuData
@@ -201,7 +206,8 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor
     bool LoadTextureImage(const Texture &texture);            // 載入真實貼圖(單一 slot)
     void UpdateTextureDescriptor();                           // 重新寫 UBO + sampler 描述子
     void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace = false);
-    void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world);
+    void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world,
+                                uint64_t materialId); // materialId = interpreter 解析的當前綁定
     void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
                              const glm::mat4 &projection, bool useTexture);
 

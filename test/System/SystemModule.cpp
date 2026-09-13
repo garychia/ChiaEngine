@@ -15,6 +15,7 @@
 #include "SceneSystemTest.hpp"
 #include "ReplayTest.hpp"
 #include "RendererContractTest.hpp"
+#include "FrameInterpreterTest.hpp" // #84:真實 seam(純解譯器)契約測試
 #include "TextureAssetViewTest.hpp"
 #include "WorldTest.hpp"
 #include "AudioSystemTest.hpp"
@@ -47,6 +48,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<physicssystemtest::PhysicsSystemTest>();
     AddTest<scenesystemtest::SceneSystemTest>();
     AddTest<renderercontracttest::RendererContractTest>();
+    AddTest<frameinterpretertest::FrameInterpreterTest>(); // #84:真實 seam(純解譯器)
     AddTest<renderercontracttest::VulkanRendererTest>();
     AddTest<audiotest::AudioSystemTest>();
     AddTest<audiotest::AudioPlaybackTest>();
