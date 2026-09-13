@@ -95,14 +95,12 @@ void InspectorLayer::RebuildValueLabels()
         return;
     }
     const uint32_t idx = pSelection->entityIndex;
-    Entity e = pScene->world.GetEntityByIndex(idx);
-    if (!pScene->world.Alive(e))
+    // #82:經 SceneSystem seam 讀取(存活 + 元件檢查在 Sim 內),不直接碰 world。
+    TransformComponent tc;
+    if (!pScene->GetTransform(idx, tc))
         return;
-    TransformComponent *pT = pScene->world.GetComponent<TransformComponent>(e);
-    if (!pT)
-        return;
-    const float vals[9] = {pT->position.x, pT->position.y, pT->position.z, pT->rotation.x, pT->rotation.y,
-                            pT->rotation.z, pT->scale.x, pT->scale.y, pT->scale.z};
+    const float vals[9] = {tc.position.x, tc.position.y, tc.position.z, tc.rotation.x, tc.rotation.y,
+                           tc.rotation.z, tc.scale.x, tc.scale.y, tc.scale.z};
     for (size_t i = 0; i < 9; i++)
     {
         String label = String(AxisLabel(static_cast<InspectorAxis>(i)));

@@ -4,28 +4,24 @@
 
 void EditTransformComponent(SceneSystem *pScene, uint32_t entityIndex, InspectorAxis axis, float sign)
 {
+    // #82:軸→delta 的對應留在 View,實際寫入走 SceneSystem 的編輯器 seam
+    // (EditTransform),不再直接存取 pScene->world 的元件。
     if (!pScene)
         return;
-    Entity e = pScene->world.GetEntityByIndex(entityIndex);
-    TransformComponent *pT = pScene->world.GetComponent<TransformComponent>(e);
-    if (!pT)
-        return;
-    float step = 0.f;
-    float *pVal = nullptr;
+    TransformComponent delta; // 只填一個軸,其餘 0
     switch (axis)
     {
-        case InspectorAxis::PositionX: step = 0.5f; pVal = &pT->position.x; break;
-        case InspectorAxis::PositionY: step = 0.5f; pVal = &pT->position.y; break;
-        case InspectorAxis::PositionZ: step = 0.5f; pVal = &pT->position.z; break;
-        case InspectorAxis::RotationX: step = 5.0f; pVal = &pT->rotation.x; break;
-        case InspectorAxis::RotationY: step = 5.0f; pVal = &pT->rotation.y; break;
-        case InspectorAxis::RotationZ: step = 5.0f; pVal = &pT->rotation.z; break;
-        case InspectorAxis::ScaleX: step = 0.1f; pVal = &pT->scale.x; break;
-        case InspectorAxis::ScaleY: step = 0.1f; pVal = &pT->scale.y; break;
-        case InspectorAxis::ScaleZ: step = 0.1f; pVal = &pT->scale.z; break;
+        case InspectorAxis::PositionX: delta.position.x = sign * 0.5f; break;
+        case InspectorAxis::PositionY: delta.position.y = sign * 0.5f; break;
+        case InspectorAxis::PositionZ: delta.position.z = sign * 0.5f; break;
+        case InspectorAxis::RotationX: delta.rotation.x = sign * 5.0f; break;
+        case InspectorAxis::RotationY: delta.rotation.y = sign * 5.0f; break;
+        case InspectorAxis::RotationZ: delta.rotation.z = sign * 5.0f; break;
+        case InspectorAxis::ScaleX: delta.scale.x = sign * 0.1f; break;
+        case InspectorAxis::ScaleY: delta.scale.y = sign * 0.1f; break;
+        case InspectorAxis::ScaleZ: delta.scale.z = sign * 0.1f; break;
     }
-    if (pVal)
-        *pVal += sign * step;
+    pScene->EditTransform(entityIndex, delta);
 }
 
 InspectorButton::InspectorButton(const Point2D &windowSize, const Border &border, SceneSystem *pScene,

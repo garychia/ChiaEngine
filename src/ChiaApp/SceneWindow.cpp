@@ -32,14 +32,9 @@ bool SceneWindow::Initialize(Window *pParent)
     if (pController)
         pMainScene->ApplyCamera(pController->GetCamera());
     // #60 step 1 demo:建立節點階層(Sim 側)供 hierarchy 側欄顯示。
-    // 純 editor 演示資料 — 之後的 step 2/3 才把節點綁到 renderable。
+    // #82:整批移到 SceneSystem 的編輯器 seam,View 不再自行拼裝 scene 內容。
     if (pSceneSystem)
-    {
-        Entity root = pSceneSystem->CreateNode();
-        Entity childA = pSceneSystem->CreateNode(root);
-        pSceneSystem->CreateNode(root);
-        pSceneSystem->CreateNode(childA);
-    }
+        pSceneSystem->CreateEditorDemoHierarchy();
     return LoadScene(*pMainScene);
 }
 
