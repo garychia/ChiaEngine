@@ -2,36 +2,46 @@
 #define SCENE_WINDOW_HPP
 
 #include "Display/Window.hpp"
-#include "Scene/SceneSystem.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
+#include "System/Pong/PongHud.hpp"
+#include "System/Pong/PongSystem.hpp"
+#include "System/World/Entity.hpp"
 
-// 3D viewport 視窗 — View 層:
-// 真實鍵盤/滑鼠事件 → SimInput(錄進 SimRecorder),相機是 Sim 擁有的狀態
-// (CameraController),這裡不再直接改相機。F5 = 從頭重播錄音,F6 = 回到 live。
+// 3D viewport 視窗 — View 層(Pong demo):
+// 真實鍵盤事件 → SimInput(錄進 SimRecorder),Sim 的 PongSystem 每 tick 推進世界,
+// 這裡每幀把世界(PaddleComponent/BallComponent)投影成 Frame 的 DrawMesh,
+// 並把 PongHud 的確定性 HUD 內容(PongHudLine)投影成 DrawText。相機是 Sim 擁有的
+// 狀態(CameraController)— 本 demo 固定,不讀輸入。F5 = 從頭重播錄音,F6 = 回到
+// live,R = PongSystem::Reset()(整局重開)。
 class SceneWindow : public Window
 {
   private:
-    DynamicArray<SharedPtr<Texture>> pTextures;
+    pong::PongSystem *pPong;
 
-    SharedPtr<Scene> pMainScene;
+    pong::PongHud *pHud;
 
     SimRecorder *pRecorder;
 
     CameraController *pController;
 
-    // #60 step 1:demo 節點階層建在這裡(Sim 側),hierarchy 側欄顯示
-    SceneSystem *pSceneSystem;
+    SharedPtr<Scene> pMainScene;
 
-    bool replayKeyDown; // F5 邊緣偵測(按下觸發一次)
+    // PongSystem 接縫建立的 entity(每幀讀世界取位置)
+    Entity leftPaddleEntity;
+    Entity rightPaddleEntity;
+    Entity ballEntity;
 
-    // #55:multi-material 示範 — 註冊延到 Render 首次執行(renderer 已 init)。
-    bool materialsRegistered = false;
-    uint64_t meshId_ = 0; // 已註冊的 cube meshId(0 = 未註冊)
-    void EnsureMaterialDemoRegistered();
+    bool replayKeyDown;  // F5 邊緣偵測(按下觸發一次)
+    bool restartKeyDown; // R 邊緣偵測(按下觸發一次 Reset)
+
+    // 註冊延到 Render 首次執行(renderer 已 init)的 quad 資產。
+    bool quadAssetsRegistered = false;
+    uint64_t quadMeshId = 0; // 已註冊的 quad meshId(0 = 未註冊)
+    void EnsureQuadAssetsRegistered();
 
     SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
-                SceneSystem *pSceneSystem);
+                pong::PongSystem *pPong, pong::PongHud *pHud);
 
   public:
     ~SceneWindow();
