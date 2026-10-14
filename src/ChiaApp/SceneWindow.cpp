@@ -1,13 +1,19 @@
 #include "SceneWindow.hpp"
-#include "Paths.hpp"
 #include "Display/Frame.hpp"
 #include "Display/IRendererAssetRegistrar.hpp" // #83:資產註冊 seam(不再依賴 concrete VulkanRenderer)
+#include "Display/Text/GlyphAtlas.hpp"
 #include "Geometry/Primitives.hpp"
+#include "System/Input/KeyCodes.hpp"
+
+// #83 content-hash id:4-char ASCII 定址(拍/球的矩形幾何與固體色材質)。
+static const uint64_t kQuadMeshId = 0x504F4E51ull;       // "PONQ"
+static const uint64_t kPaddleMaterialId = 0x5050444Cull; // "PPDL"
+static const uint64_t kBallMaterialId = 0x5042414Cull;   // "PBAL"
 
 SceneWindow::SceneWindow(const WindowInfo &info, SimRecorder *pRecorder, CameraController *pController,
-                         SceneSystem *pSceneSystem)
-    : Window(info), pTextures(), pMainScene(), pRecorder(pRecorder), pController(pController),
-      pSceneSystem(pSceneSystem), replayKeyDown(false)
+                         pong::PongSystem *pPong, pong::PongHud *pHud)
+    : Window(info), pPong(pPong), pHud(pHud), pRecorder(pRecorder), pController(pController), pMainScene(),
+      leftPaddleEntity(), rightPaddleEntity(), ballEntity(), replayKeyDown(false), restartKeyDown(false)
 {
     pMainScene = SharedPtr<Scene>::Construct();
 }
@@ -20,101 +26,120 @@ bool SceneWindow::Initialize(Window *pParent)
 {
     if (!Window::Initialize(pParent))
         return false;
-    // #55:多材質示範 — 幾何/Material 註冊延到 Render() 首次執行時
-    // (Window::Show → renderer.Initialize 之後才能建 GPU 資源);
-    // 此處保留 legacy Scene 供既有 path 相容。
-    auto cube = SharedPtr<IRenderable>::Construct<Cube>();
-    auto pTexture = SharedPtr<Texture>::Construct(String(IMAGE_FILE_PATH) + "michael-sum-unsplash.jpg");
-    pTextures.Append(pTexture);
-    cube->SetTexture(pTexture.GetRaw());
-    pMainScene->AddRenderable(cube);
-    // 相機是 Sim 擁有的狀態(CameraController),View 只拿 WeakPtr 來渲染
     if (pController)
         pMainScene->ApplyCamera(pController->GetCamera());
-    // #60 step 1 demo:建立節點階層(Sim 側)供 hierarchy 側欄顯示。
-    // #82:整批移到 SceneSystem 的編輯器 seam,View 不再自行拼裝 scene 內容。
-    if (pSceneSystem)
-        pSceneSystem->CreateEditorDemoHierarchy();
+    // Sim 接縫:PongSystem 建立場上 entity(之後每 tick 由它推進;Reset 不銷毀 entity)。
+    if (pPong)
+    {
+        leftPaddleEntity = pPong->CreateLeftPaddle();
+        rightPaddleEntity = pPong->CreateRightPaddle();
+        ballEntity = pPong->CreateBall();
+    }
     return LoadScene(*pMainScene);
 }
 
-void SceneWindow::EnsureMaterialDemoRegistered()
+void SceneWindow::EnsureQuadAssetsRegistered()
 {
-    if (materialsRegistered)
+    if (quadAssetsRegistered)
         return; // 只註冊一次(renderer 資源全域共用)
-    materialsRegistered = true;
+    quadAssetsRegistered = true;
 
     // #83:經由 IRendererAssetRegistrar seam 註冊資產,不再 dynamic_cast 到 concrete
-    // VulkanRenderer。renderer 是 Renderer facade;facade 實作 IRendererAssetRegistrar
-    // 並 forward 到底下 Vulkan executor,故 cast 成立、多材質示範真正註冊。
-    // (修復 #55 的隱性 bug:舊代碼 dynamic_cast<VulkanRenderer*>(&renderer) 對
-    // facade 永遠回 null,多材質示範因此從未真正註冊、悄悄退回 legacy path。)
+    // VulkanRenderer(renderer 是 facade;facade 實作 IRendererAssetRegistrar 並 forward
+    // 到底下 Vulkan executor,故 cast 成立)。
     IRendererAssetRegistrar *pRegistrar = dynamic_cast<IRendererAssetRegistrar *>(&renderer);
     if (!pRegistrar)
         return;
 
-    // 幾何:content-hash meshId(固定常數;真實系統由 AssetManager 內容定址給)。
-    if (meshId_ == 0)
+    // 幾何:單位 quad(XY 平面、中心原點、半寬/半高各 0.5)→ PushTransform scale 成實際尺寸。
+    if (quadMeshId == 0)
     {
-        const uint64_t kCubeMeshId = 0x43554245ull; // "CUBE"
-        auto cube = SharedPtr<IRenderable>::Construct<Cube>();
-        if (pRegistrar->RegisterMeshGeometry(kCubeMeshId, cube->GetRenderInfo()))
-            meshId_ = kCubeMeshId;
+        auto quad = SharedPtr<IRenderable>::Construct<Rectangle>();
+        if (pRegistrar->RegisterMeshGeometry(kQuadMeshId, quad->GetRenderInfo()))
+            quadMeshId = kQuadMeshId;
     }
 
-    // 材質 1:原本的貓 JPG(磁碟資產,stbi 載入)。
-    MaterialSource mat1;
-    mat1.pTexture = pTextures.GetFirst().GetRaw();
-    pRegistrar->RegisterMaterial(0x4D415431ull /* "MAT1" */, mat1);
+    // 材質:inline 1x1 RGBA(inline raw RGBA — 不需磁碟資產)。
+    static const unsigned char kPaddleRgba[4] = {80, 200, 255, 255}; // 拍:固體淺藍
+    MaterialSource paddleMat;
+    paddleMat.pRawRGBA = kPaddleRgba;
+    paddleMat.width = 1;
+    paddleMat.height = 1;
+    pRegistrar->RegisterMaterial(kPaddleMaterialId, paddleMat);
 
-    // 材質 2:inline RGBA 棋盤格(2x2,紅/暗紅)— 展示 per-material texture 不需磁碟資產。
-    static const unsigned char kChecker[2 * 2 * 4] = {
-        255, 60, 40, 255, 120, 20, 15, 255,
-        120, 20, 15, 255, 255, 60, 40, 255,
-    };
-    MaterialSource mat2;
-    mat2.pRawRGBA = kChecker;
-    mat2.width = 2;
-    mat2.height = 2;
-    pRegistrar->RegisterMaterial(0x4D415432ull /* "MAT2" */, mat2);
+    static const unsigned char kBallRgba[4] = {255, 255, 255, 255}; // 球:白
+    MaterialSource ballMat;
+    ballMat.pRawRGBA = kBallRgba;
+    ballMat.width = 1;
+    ballMat.height = 1;
+    pRegistrar->RegisterMaterial(kBallMaterialId, ballMat);
 }
 
 void SceneWindow::Render()
 {
     // children(此視窗無子視窗)→ 略過
-    // 首次執行時註冊 multi-material 示範(renderer 已初始化)。
-    EnsureMaterialDemoRegistered();
+    // 首次執行時註冊 pong 資產(renderer 已初始化)。
+    EnsureQuadAssetsRegistered();
 
     Frame frame;
     frame.BeginFrame();
     if (pController)
         frame.SetCamera(pController->GetCamera());
-    // #55:走 DrawMesh + BindMaterial 路徑 — 2 顆 cube、2 種材質。
-    // #83:不再 dynamic_cast 到 concrete VulkanRenderer(對 facade 永遠 null)。
-    // meshId_ != 0 即代表資產已透過 IRendererAssetRegistrar seam 註冊成功。
-    if (meshId_ != 0)
+
+    // 場上幾何:拍/球位置讀自 Sim 世界(Sim 是狀態源,View 只投影)。
+    if (pPong && quadMeshId != 0)
     {
-        // 材質 1 cube(左):貓 JPG。
-        frame.BindMaterial(0x4D415431ull);
-        frame.PushTransform(Point3D(-1.2f, 0.0f, 0.0f), Point3D(), Point3D(0.9f));
-        frame.DrawMesh(meshId_);
-        frame.PopTransform();
-        // 材質 2 cube(右):紅色棋盤格。
-        frame.BindMaterial(0x4D415432ull);
-        frame.PushTransform(Point3D(1.2f, 0.0f, 0.0f), Point3D(), Point3D(0.9f));
-        frame.DrawMesh(meshId_);
-        frame.PopTransform();
-    }
-    else
-    {
-        // fallback:legacy renderable 路徑(renderer 非 Vulkan 或註冊失敗)。
-        if (pMainScene)
+        World &world = pPong->GetWorld();
+        const pong::PaddleComponent *pLeft = world.GetComponent<pong::PaddleComponent>(leftPaddleEntity);
+        const pong::PaddleComponent *pRight = world.GetComponent<pong::PaddleComponent>(rightPaddleEntity);
+        const pong::BallComponent *pBall = world.GetComponent<pong::BallComponent>(ballEntity);
+
+        // 兩根拍:quad 以 PaddleComponent.position 為中心,scale = (寬, 2×半高)。
+        if (pLeft)
         {
-            const DynamicArray<SharedPtr<IRenderable>> &renderables = pMainScene->GetRenderables();
-            for (size_t i = 0; i < renderables.GetNElements(); i++)
-                frame.DrawRenderable(*renderables[i]);
+            frame.BindMaterial(kPaddleMaterialId);
+            frame.PushTransform(pLeft->position, Point3D(),
+                                Point3D(2.0f * pong::PongSystem::PaddleHalfWidth, 2.0f * pLeft->halfHeight, 1.0f));
+            frame.DrawMesh(quadMeshId);
+            frame.PopTransform();
+        }
+        if (pRight)
+        {
+            frame.BindMaterial(kPaddleMaterialId);
+            frame.PushTransform(pRight->position, Point3D(),
+                                Point3D(2.0f * pong::PongSystem::PaddleHalfWidth, 2.0f * pRight->halfHeight, 1.0f));
+            frame.DrawMesh(quadMeshId);
+            frame.PopTransform();
+        }
+
+        // 球:小 quad,scale = 直徑(2×半徑)。
+        if (pBall)
+        {
+            frame.BindMaterial(kBallMaterialId);
+            frame.PushTransform(pBall->position, Point3D(), Point3D(2.0f * pong::PongSystem::BallRadius,
+                                                                    2.0f * pong::PongSystem::BallRadius, 1.0f));
+            frame.DrawMesh(quadMeshId);
+            frame.PopTransform();
         }
     }
+
+    // HUD:line.x/y 已是 NDC 左上錨點 → PushTransform 平移,再以 px→NDC scale
+    // 縮放字形(與 GUIFrameProjector 同一慣例)。
+    if (pHud)
+    {
+        const WindowInfo &win = GetWindowInfo();
+        const float ndcScaleX = 2.0f / win.GetWidth();
+        const float ndcScaleY = -2.0f / win.GetHeight();
+        const DynamicArray<pong::PongHudLine> &lines = pHud->GetLines();
+        for (size_t i = 0; i < lines.GetNElements(); i++)
+        {
+            const pong::PongHudLine &line = lines[i];
+            frame.PushTransform(Point3D(line.x, line.y, 0.0f), Point3D(), Point3D(ndcScaleX, ndcScaleY, 1.0f));
+            frame.DrawText(GlyphAtlas::DefaultFontId(), line.text, line.size, Color(line.r, line.g, line.b, line.a));
+            frame.PopTransform();
+        }
+    }
+
     frame.EndFrame();
     renderer.Execute(frame);
 }
@@ -125,34 +150,50 @@ bool SceneWindow::OnKeyboardInputReceived(const KeyCombination &combination)
         return false;
     SimInput &input = pRecorder->GetLiveInput();
 
-    // 從「目前按住的按鍵集合」直接推導 actionBits(stateless — 不需追蹤 press/release)
+    // 從「目前按住的按鍵集合」直接推導 actionBits(stateless — 不需追蹤 press/release)。
+    // W/S 或 ↑/↓ = 玩家拍;Space = 發球(PongSystem 以 BitLeft 觸發 launch);
+    // R = 整局 Reset;F5/F6 = replay/live。
     input.actionBits = 0;
-    bool hasF5 = false, hasF6 = false;
+    bool hasF5 = false, hasF6 = false, hasR = false;
     for (size_t i = 0; i < combination.keys.Length(); i++)
     {
         switch (combination.keys[i])
         {
-        case KeyCode::KeyCodeW:
-            input.actionBits |= CameraController::BitMoveForward;
+        case KeyCodeW:
+        case KeyCodeUpArrow:
+            input.actionBits |= pong::PongSystem::BitLeft;
             break;
-        case KeyCode::KeyCodeS:
-            input.actionBits |= CameraController::BitMoveBack;
+        case KeyCodeS:
+        case KeyCodeDownArrow:
+            input.actionBits |= pong::PongSystem::BitRight;
             break;
-        case KeyCode::KeyCodeA:
-            input.actionBits |= CameraController::BitMoveLeft;
+        case KeyCodeSpace:
+            input.actionBits |= pong::PongSystem::BitLeft; // 球未發射時觸發 launch
             break;
-        case KeyCode::KeyCodeD:
-            input.actionBits |= CameraController::BitMoveRight;
+        case KeyCodeR:
+            hasR = true;
             break;
-        case KeyCode::KeyCodeF5:
+        case KeyCodeF5:
             hasF5 = true;
             break;
-        case KeyCode::KeyCodeF6:
+        case KeyCodeF6:
             hasF6 = true;
             break;
         default:
             break;
         }
+    }
+
+    // R 邊緣:combination 含 R = 按下(ProcessKeyUp 已先移除 → 放開時不含)
+    if (hasR && !restartKeyDown)
+    {
+        restartKeyDown = true;
+        if (pPong)
+            pPong->Reset();
+    }
+    else if (!hasR && restartKeyDown)
+    {
+        restartKeyDown = false;
     }
 
     // F5 邊緣:combination 含 F5 = 按下(ProcessKeyUp 已先移除 → 放開時不含)
@@ -170,7 +211,7 @@ bool SceneWindow::OnKeyboardInputReceived(const KeyCombination &combination)
     if (hasF6)
         pRecorder->SetReplaying(false);
 
-    return input.actionBits != 0 || hasF5 || hasF6;
+    return input.actionBits != 0 || hasF5 || hasF6 || hasR;
 }
 
 bool SceneWindow::OnMouseInputReceived(const MouseInfo &mouseInfo)
@@ -179,7 +220,7 @@ bool SceneWindow::OnMouseInputReceived(const MouseInfo &mouseInfo)
         return false;
     if (mouseInfo.leftButtonDown)
     {
-        // look delta 累進 SimInput;CameraController 每 tick 讀完即消耗歸零
+        // look delta 累進 SimInput(本 demo 相機固定;保留軸向給 recorder/log)
         SimInput &input = pRecorder->GetLiveInput();
         input.axisX += mouseInfo.currentPosition.x - mouseInfo.lastMousePosition.x;
         input.axisY += mouseInfo.currentPosition.y - mouseInfo.lastMousePosition.y;

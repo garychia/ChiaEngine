@@ -20,6 +20,7 @@
 #include "TextureAssetViewTest.hpp"
 #include "WorldTest.hpp"
 #include "AudioSystemTest.hpp"
+#include "PongTest.hpp" // #89: Pong demo 無頭測試(Sim 層隔離,無 GPU)
 
 SystemModule::SystemModule(const String &ioTestPath)
 {
@@ -54,4 +55,5 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<renderercontracttest::VulkanRendererTest>();
     AddTest<audiotest::AudioSystemTest>();
     AddTest<audiotest::AudioPlaybackTest>();
+    AddTest<pongtest::PongTest>(); // #89: Pong demo 無頭測試
 }

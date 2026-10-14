@@ -5,7 +5,7 @@
 namespace
 {
 // Public-domain 8x8 點陣字型(0x20..0x7E),取材 font8x8_basic(CC0)。
-// 每 glyph 8 bytes,每一 byte 是一列 8 px(bit 7 = 最左)。全白字、無 antialiasing。
+// 每 glyph 8 bytes,每一 byte 是一列 8 px(bit 0 = 最左,LSB-first)。全白字、無 antialiasing。
 const uint8_t kFont8x8[][8] = {
     // 0x20 ' '
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
@@ -251,7 +251,7 @@ void GlyphAtlas::Rasterize()
             const uint8_t rowBits = kFont8x8[g][y];
             for (uint32_t x = 0; x < CellSize; x++)
             {
-                if ((rowBits >> (7 - x)) & 1u)
+                if ((rowBits >> x) & 1u)
                 {
                     const size_t idx = (static_cast<size_t>(cellY + y) * atlasWidth + (cellX + x)) * 4;
                     rgba[idx + 0] = 0xFF; // R
