@@ -77,6 +77,17 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor, public IRenderer
     VkBuffer uniformBuffer;
     VkDeviceMemory uniformBufferMemory;
 
+    // ── #91:per-draw UBO slots(dynamic uniform buffer)────────────────────
+    // 舊設計一個 UBO 全幀共用,Record 時 CPU 寫入、GPU 在 submit 時才讀 →
+    // 全幀所有 draw 共用「最後一次寫入」的矩陣(只有最後一個 draw 正確;
+    // Pong 的拍/球/分數因此全滅,只剩最後的 hint 文字)。改為 dynamic UBO:
+    // 每個 draw 在自己的 slot 寫矩陣,綁定時以 dynamic offset 選取。
+    // slot 以 frame-in-flight 切分(fence 保證重用時 GPU 已用完)。
+    static constexpr uint32_t MaxFrameSlots = 2;   // 與 CreateSyncObjects 一致
+    static constexpr uint32_t MaxDrawsPerFrame = 512; // 單幀 draw 上限(Pong 6,editor 數十)
+    VkDeviceSize uboAlignedSize = 0; // minUniformBufferOffsetAlignment 對齊後的 MatrixBuffer 大小
+    uint32_t uboDrawCursor = 0;      // 本幀已用 slot 數(BeginFrame 重置)
+
     // ── 材質 / 貼圖(單一 slot,v1)────────────────────────────────────────────
         VkImage textureImage;
         VkDeviceMemory textureImageMemory;
@@ -141,6 +152,10 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor, public IRenderer
     VkBuffer textVertexBuffer;
     VkDeviceMemory textVertexMemory;
     uint32_t textVertexCapacity = 0;
+    // #91:文字頂點同 UBO 有 last-wins 問題(全幀 DrawText 共用一份 buffer,
+    // 後寫入蓋掉先前的字形)。改為每幀 append:cursor 指向本幀已用頂點數,
+    // 綁定時以 vertex offset 選取;容量以 frame slot 切分。
+    uint32_t textVertexCursor = 0; // 本幀已用頂點數(BeginFrame 重置)
 
     // #66:文字 vertex buffer 固定容量(≈682 字形/單一 label)。
     // 執行期擴容會 destroy 仍被 in-flight command buffer 參照的舊 buffer
@@ -210,8 +225,10 @@ class VulkanRenderer : public IRenderer, public IFrameExecutor, public IRenderer
     void RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRenderable &renderable, bool guiSpace = false);
     void RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t meshId, const glm::mat4 &world,
                                 uint64_t materialId); // materialId = interpreter 解析的當前綁定
-    void UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
-                             const glm::mat4 &projection, bool useTexture);
+    // #91:在目前 frame slot 配發一個 UBO slot 並寫入矩陣,回傳 dynamic offset;
+    // 單幀 draw 超限回傳 UINT32_MAX(呼叫端略過該 draw)。
+    uint32_t AcquireUboSlot(const glm::mat4 &world, const glm::mat4 &view,
+                            const glm::mat4 &projection, bool useTexture);
 
     // ── P7e:文字渲染 helpers ─────────────────────────────────────────
     bool CreateTextSampler();
