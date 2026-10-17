@@ -7,7 +7,7 @@
 
 ChiaApp::ChiaApp(const AppInfo &info)
     : App(info), engine(1), simRecorder(), pongSystem(), pongHud(),
-      cameraController(Point3D(0.0f, 0.0f, 16.0f), Point3D(0.0f, 180.0f, 0.0f)) // 正視球場
+      cameraController(Point3D(0.0f, 0.0f, 16.0f), Point3D(0.0f, 0.0f, 0.0f)) // 正視球場
 {
     engine.Attach(&simRecorder); // 先附著:輸入先寫,sim 後讀
     engine.Attach(&pongSystem);

@@ -37,9 +37,12 @@ inline glm::mat4 BuildViewMatrix(const Point3D &pos, const Point3D &rot)
     glm::vec3 position(pos.x, pos.y, pos.z);
     glm::vec3 rotation(rot.x, rot.y, rot.z);
     glm::vec3 front;
-    front.x = std::cos(glm::radians(rotation.y)) * std::cos(glm::radians(rotation.x));
+    // 與 Camera::GetFrontVector 同一 Euler 慣例(yaw=0 → +Z);此前此處用
+    // cos(yaw)/sin(yaw) 錯位 90°(yaw=180 看向 -X 而非 -Z),導致 Pong
+    // demo 的場地被完整 clip(RendererMath 自稱與 Camera 同構,實則不然)。
+    front.x = std::sin(glm::radians(rotation.y)) * std::cos(glm::radians(rotation.x));
     front.y = std::sin(glm::radians(rotation.x));
-    front.z = std::sin(glm::radians(rotation.y)) * std::cos(glm::radians(rotation.x));
+    front.z = std::cos(glm::radians(rotation.y)) * std::cos(glm::radians(rotation.x));
     return glm::lookAt(position, position + glm::normalize(front), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 

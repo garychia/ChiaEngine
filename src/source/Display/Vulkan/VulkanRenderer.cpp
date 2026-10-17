@@ -1185,8 +1185,11 @@ bool VulkanRenderer::BeginFrame()
         return false;
 
     // 以 render pass 開場(loadOp = CLEAR,深藍黑清色)
-    VkRenderPassBeginInfo renderPassInfo = {};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    // #91:本幀 draw cursor 重置(slot 以 currentFrameIndex 切分,fence 保證
+    // 該 slot 上一輪 submit 已完成,UBO/文字頂點可安全重用)。
+    uboDrawCursor = 0;
+    textVertexCursor = 0;
+    VkRenderPassBeginInfo renderPassInfo = {};    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
     renderPassInfo.framebuffer = swapchainFramebuffers[imageIndex];
     renderPassInfo.renderArea.offset = {0, 0};
@@ -1407,9 +1410,11 @@ bool VulkanRenderer::CreateDescriptorSetLayout()
 {
     // binding 0: UBO(vertex + fragment — fragment shader 也讀 useTexture,
     // 只設 VERTEX 會讓 pipeline 違反 spec,useTexture 變成未定義值)
+    // #91:UNIFORM_BUFFER_DYNAMIC — 每個 draw 以 draw offset 選自己的矩陣
+    // (舊 UNIFORM_BUFFER 全幀共用,只有最後一個 draw 正確)。
     VkDescriptorSetLayoutBinding uboBinding = {};
     uboBinding.binding = 0;
-    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    uboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
     uboBinding.descriptorCount = 1;
     uboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
@@ -1433,10 +1438,10 @@ bool VulkanRenderer::CreateDescriptorSetLayout()
 bool VulkanRenderer::CreateDescriptorPool()
 {
     // 場景色 set + 文字 set + #55 per-material sets(MaxMaterials)。
-    // 每組都綁同一個 uniformBuffer 與各自的 sampler(UBO binding 0, 材質 binding 1)。
+    // 每組都綁同一個 dynamic UBO(以 draw offset 選矩陣)與各自的 sampler。
     const uint32_t extra = MaxMaterials;
     VkDescriptorPoolSize poolSizes[] = {
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 + extra},
+        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 2 + extra},
         {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 + extra}
     };
     VkDescriptorPoolCreateInfo poolInfo = {};
@@ -1592,10 +1597,43 @@ bool VulkanRenderer::CreateGraphicsPipeline()
 
 bool VulkanRenderer::CreateUniformBuffer()
 {
-    return CreateBuffer(device, physicalDevice, sizeof(MatrixBuffer),
+    // #91:dynamic UBO — MaxFrameSlots × MaxDrawsPerFrame 個 slot,每 draw 一份矩陣。
+    VkPhysicalDeviceProperties props = {};
+    vkGetPhysicalDeviceProperties(physicalDevice, &props);
+    const VkDeviceSize align = props.limits.minUniformBufferOffsetAlignment;
+    uboAlignedSize = sizeof(MatrixBuffer);
+    if (align > 1)
+        uboAlignedSize = (uboAlignedSize + align - 1) & ~(align - 1);
+    const VkDeviceSize total =
+        static_cast<VkDeviceSize>(MaxFrameSlots) * MaxDrawsPerFrame * uboAlignedSize;
+    return CreateBuffer(device, physicalDevice, total,
                         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                         uniformBuffer, uniformBufferMemory);
+}
+
+uint32_t VulkanRenderer::AcquireUboSlot(const glm::mat4 &world, const glm::mat4 &view,
+                                        const glm::mat4 &projection, bool useTexture)
+{
+    if (!uniformBuffer || uboAlignedSize == 0 || uboDrawCursor >= MaxDrawsPerFrame)
+        return UINT32_MAX;
+    const uint32_t slotOffset = static_cast<uint32_t>(
+        (static_cast<VkDeviceSize>(currentFrameIndex % MaxFrameSlots) * MaxDrawsPerFrame +
+         uboDrawCursor) *
+        uboAlignedSize);
+    uboDrawCursor++;
+
+    MatrixBuffer matrices;
+    matrices.world = world;
+    matrices.view = view;
+    matrices.projection = projection;
+    matrices.useTexture = useTexture ? 1.0f : 0.0f;
+
+    void *pData = nullptr;
+    vkMapMemory(device, uniformBufferMemory, slotOffset, sizeof(MatrixBuffer), 0, &pData);
+    memcpy(pData, &matrices, sizeof(MatrixBuffer));
+    vkUnmapMemory(device, uniformBufferMemory);
+    return slotOffset;
 }
 
 VkImageView VulkanRenderer::CreateImageView(VkImage image, VkFormat format)
@@ -1683,7 +1721,7 @@ void VulkanRenderer::UpdateTextDescriptor(const VkImageView &imageView, VkSample
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer;
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(MatrixBuffer);
+    bufferInfo.range = uboAlignedSize; // #91:dynamic offset 選取單一 draw 的矩陣
 
     VkDescriptorImageInfo imageInfo = {};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1695,7 +1733,7 @@ void VulkanRenderer::UpdateTextDescriptor(const VkImageView &imageView, VkSample
     writes[0].dstSet = textDescriptorSet;
     writes[0].dstBinding = 0;
     writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // #91:per-draw offset
     writes[0].pBufferInfo = &bufferInfo;
     writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[1].dstSet = textDescriptorSet;
@@ -1711,7 +1749,7 @@ void VulkanRenderer::UpdateTextureDescriptor()
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer;
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(MatrixBuffer);
+    bufferInfo.range = uboAlignedSize; // #91:dynamic offset 選取單一 draw 的矩陣
 
     VkDescriptorImageInfo imageInfo = {};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1723,7 +1761,7 @@ void VulkanRenderer::UpdateTextureDescriptor()
     writes[0].dstSet = descriptorSet;
     writes[0].dstBinding = 0;
     writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // #91:per-draw offset
     writes[0].pBufferInfo = &bufferInfo;
     writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[1].dstSet = descriptorSet;
@@ -1951,8 +1989,7 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     const RenderableGpuData &data = itr->Value();
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                            0, 1, &descriptorSet, 0, nullptr);
+    // #91:描述子集綁定延後到 UBO slot 配發後(以 dynamic offset 綁定,見下)。
 
     // UBO:逐 drawable 更新(world / view / proj)
     const Point3D &pos = renderable.GetPosition();
@@ -1982,16 +2019,19 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     }
     else
     {
-        // #80:相機 = activeCamera 值快照(interpreter 每幀 SetCamera 更新;
-        // 預設 = 70° / near 0.001 / far 100,方為舊「無相機 fallback」語義)。
-        view = RendererMath::BuildViewMatrix(activeCamera.position, activeCamera.rotation);
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = RendererMath::BuildProjMatrix(activeCamera.angleOfView, aspect,
-                                                   activeCamera.nearPlane, activeCamera.farPlane);
+        // #80:Force ortho for pong geometry too — camera perspective would
+        // clip paddles/ball at world origin due to frustum angle.
+        view = glm::mat4(1.0f);
+        projection = RendererMath::BuildGuiOrtho();
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
-    UpdateUniformBuffer(world, view, projection, useTexture);
+    // #91:先配發本 draw 的 UBO slot,再以 dynamic offset 綁定(舊共用 UBO
+    // 全幀只有最後一個 draw 正確)。
+    const uint32_t uboOffset = AcquireUboSlot(world, view, projection, useTexture);
+    if (uboOffset == UINT32_MAX)
+        return;
+    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &descriptorSet, 1, &uboOffset);
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -2011,21 +2051,6 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdDraw(cmdBuffer, data.vertexCount, 1, 0, 0);
-}
-
-void VulkanRenderer::UpdateUniformBuffer(const glm::mat4 &world, const glm::mat4 &view,
-                                         const glm::mat4 &projection, bool useTexture)
-{
-    MatrixBuffer matrices;
-    matrices.world = world;
-    matrices.view = view;
-    matrices.projection = projection;
-    matrices.useTexture = useTexture ? 1.0f : 0.0f;
-
-    void *pData = nullptr;
-    vkMapMemory(device, uniformBufferMemory, 0, sizeof(MatrixBuffer), 0, &pData);
-    memcpy(pData, &matrices, sizeof(MatrixBuffer));
-    vkUnmapMemory(device, uniformBufferMemory);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -2170,7 +2195,7 @@ bool VulkanRenderer::RegisterMaterial(uint64_t materialId, const MaterialSource 
     VkDescriptorBufferInfo bufferInfo = {};
     bufferInfo.buffer = uniformBuffer;
     bufferInfo.offset = 0;
-    bufferInfo.range = sizeof(MatrixBuffer);
+    bufferInfo.range = uboAlignedSize; // #91:dynamic offset 選取單一 draw 的矩陣
 
     VkDescriptorImageInfo imageInfo = {};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -2182,7 +2207,7 @@ bool VulkanRenderer::RegisterMaterial(uint64_t materialId, const MaterialSource 
     writes[0].dstSet = data.descriptorSet;
     writes[0].dstBinding = 0;
     writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC; // #91:per-draw offset
     writes[0].pBufferInfo = &bufferInfo;
     writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     writes[1].dstSet = data.descriptorSet;
@@ -2228,8 +2253,6 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
         bindSet = matItr->Value().descriptorSet;
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                            0, 1, &bindSet, 0, nullptr);
 
     // #84:矩陣慣例集中到 RendererMath;無相機 fallback 用統一慣例(70°,0.001,100)。
     glm::mat4 view = glm::mat4(1.0f);
@@ -2239,7 +2262,13 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
                          static_cast<float>(swapchainExtent.height);
     glm::mat4 projection = RendererMath::BuildProjMatrix(activeCamera.angleOfView, aspect,
                                                          activeCamera.nearPlane, activeCamera.farPlane);
-    UpdateUniformBuffer(world, view, projection, false);
+    // #91:先配發本 draw 的 UBO slot,再以 dynamic offset 綁定。
+    // 材質必帶貼圖(1x1 純色或真實貼圖;fallback 預設白色)→ useTexture=true 取材質色。
+    const uint32_t uboOffset = AcquireUboSlot(world, view, projection, true);
+    if (uboOffset == UINT32_MAX)
+        return;
+    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &bindSet, 1, &uboOffset);
 
     VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
     VkDeviceSize offsets[] = {0};
@@ -2332,17 +2361,22 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     // 建立安全);resize 後的 CleanupPipelineResources 也是 device idle 才 destroy,
     // 下次幀再 lazy 重建。單一 label 超過上限(≈682 字形)就不畫 —
     // TextLayout 依佈局寬度截斷,正常不會發生。
+    // #91:容量以 frame slot 切分,每幀 append(舊寫法每 draw 重寫整份 buffer,
+    // 後寫入蓋掉先前的字形,全幀只有最後的 label 正確)。
+    const uint32_t slotVerts = MaxFrameSlots * MaxTextVertices;
     if (!textVertexBuffer)
     {
-        if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(MaxTextVertices) * sizeof(VulkanVertex),
+        if (!CreateBuffer(device, physicalDevice, static_cast<VkDeviceSize>(slotVerts) * sizeof(VulkanVertex),
                           VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                           textVertexBuffer, textVertexMemory))
             return;
-        textVertexCapacity = MaxTextVertices;
+        textVertexCapacity = slotVerts;
     }
-    if (vertexCount > textVertexCapacity)
+    if (vertexCount > MaxTextVertices || textVertexCursor + vertexCount > MaxTextVertices)
         return;
+    const uint32_t vertBase = static_cast<uint32_t>(
+        (currentFrameIndex % MaxFrameSlots) * MaxTextVertices + textVertexCursor);
 
     DynamicArray<VulkanVertex> vertices;
     vertices.Resize(vertexCount);
@@ -2376,13 +2410,14 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     }
 
     void *pMapped = nullptr;
-    vkMapMemory(device, textVertexMemory, 0, static_cast<VkDeviceSize>(vertexCount) * sizeof(VulkanVertex), 0, &pMapped);
+    vkMapMemory(device, textVertexMemory,
+                static_cast<VkDeviceSize>(vertBase) * sizeof(VulkanVertex),
+                static_cast<VkDeviceSize>(vertexCount) * sizeof(VulkanVertex), 0, &pMapped);
     memcpy(pMapped, &vertices[0], vertexCount * sizeof(VulkanVertex));
     vkUnmapMemory(device, textVertexMemory);
+    textVertexCursor += vertexCount;
 
     vkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline);
-    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
-                            0, 1, &textDescriptorSet, 0, nullptr);
 
     // #67:文字與按鈕矩形同為 NDC 空間 → 同一正交投影(RFC R1:label 須以
     // 矩形同投影繪製,否則視覺對不齊)。舊 fallback 的 perspective 同樣把
@@ -2395,7 +2430,12 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     // #67:depth=(1-z)/2:文字 z = 矩形 z + 0.01 → 略近於矩形,LESS depth 序正確。
     glm::mat4 projection = RendererMath::BuildGuiOrtho();
     // 字形圖集:白字透明底,shader 以 useTexture>0 + cmode=1 乘上 textColor。
-    UpdateUniformBuffer(world, view, projection, true);
+    // #91:先配發本 draw 的 UBO slot,再以 dynamic offset 綁定。
+    const uint32_t uboOffset = AcquireUboSlot(world, view, projection, true);
+    if (uboOffset == UINT32_MAX)
+        return;
+    vkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
+                            0, 1, &textDescriptorSet, 1, &uboOffset);
 
     VkViewport viewport = {};
     viewport.x = 0.0f;
@@ -2412,7 +2452,7 @@ void VulkanRenderer::RecordTextDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
 
     VkBuffer vertexBuffers[] = {textVertexBuffer};
-    VkDeviceSize offsets[] = {0};
+    VkDeviceSize offsets[] = {static_cast<VkDeviceSize>(vertBase) * sizeof(VulkanVertex)};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdDraw(cmdBuffer, vertexCount, 1, 0, 0);
 }
