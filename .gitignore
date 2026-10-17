@@ -53,3 +53,7 @@ test/AllTests
 .cgr-*
 .qdrant_code_embeddings/
 .codegraph/
+
+# CMake-generated headers (configure_file from *.in templates)
+src/include/Paths.hpp
+test/TestInfo.h
