@@ -24,11 +24,13 @@ bool Panel::Initialize(Window *pParent)
                             GetWindowInfo().GetHeight() - PanelLayout::TopBarHeight,
                             static_cast<unsigned long>(regions.centerViewport.xPos));
     // ADR-0001 D4:pointer set 由 editorSession 擁有,View 從 session 取。
+    // (pong demo 的 SceneWindow 由 ChiaApp 直接建;pong 參數以 null 建立 → editor
+    //   scene window 僅畫 editor demo 內容,不跑 pong。)
     pSceneWindow = dynamic_cast<SceneWindow *>(
         WindowManager::GetSingleton().ConstructChildWindow<SceneWindow>(this, childWndInfo,
                                                                         editorSession.GetSimRecorder(),
                                                                         editorSession.GetCameraController(),
-                                                                        editorSession.GetSceneSystem()));
+                                                                        nullptr, nullptr));
     // P6:GUI 走 Frame — 佈局掛上視窗,由 Window::Render 錄成 DrawGUILayout 命令。
     // (取代 legacy renderer.LoadGUILayout/Render(layout),該路徑在 Vulkan 下是空實作,
     //  top bar 從未真正畫出來。Windows DX 仍走 legacy,不受影響。)

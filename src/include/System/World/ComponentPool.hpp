@@ -6,6 +6,8 @@
 #include "Data/HashTable.hpp"
 #include "System/Module/TypeId.hpp"
 
+#include <cstring> // std::memset
+
 // 元件池的型別消除介面:World 用同一份陣列管理所有型別的池。
 class IComponentPool
 {
@@ -62,11 +64,14 @@ template <class T> class ComponentPool : public IComponentPool
         if (Contains(entityIndex))
             return Get(entityIndex); // 已存在,回傳現有(冪等)
         lookup.Insert(entityIndex, static_cast<uint32_t>(data.GetNElements()));
-        // 先放零初始化的 slot,再成員指派 — padding 位元組保證為零,
-        // 讓 Hash() 對原始位元組雜湊時不會吃到未定義的記憶體。
-        T slot{};
-        slot = value;
-        data.Append(slot);
+        // 存進去之後把 padding 歸零:Append 的 copy 只寫 members,陣列容量
+        // 的未初始化記憶體會漏進 padding 位元組(空 struct 實測會留垃圾),
+        // 導致 Hash() 讀到未定義位元組 → 兩局同輸入不同 hash。
+        // 解法:先 Append,再 memset 整塊儲存,最後成員指派(assignment 只寫
+        // members、不動 padding)→ padding 永遠為零,Hash 逐 bit 確定。
+        data.Append(value);
+        std::memset(&data.GetLast(), 0, sizeof(T));
+        data.GetLast() = value;
         owners.Append(entityIndex);
         return &data.GetLast();
     }

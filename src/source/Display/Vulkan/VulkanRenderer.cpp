@@ -2244,6 +2244,23 @@ void VulkanRenderer::RecordMeshDrawCommands(VkCommandBuffer cmdBuffer, uint64_t 
     VkBuffer vertexBuffers[] = {mesh.vertexBuffer};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmdBuffer, 0, 1, vertexBuffers, offsets);
+
+    // pipeline 以 DYNAMIC viewport/scissor 建立,每次 draw 前必須顯式設定
+    // (與 DrawGUILayout/DrawText 路徑一致;缺省 vkCmdDraw 會觸發 VUID-07831/07832)。
+    VkViewport viewport = {};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(swapchainExtent.width);
+    viewport.height = static_cast<float>(swapchainExtent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(cmdBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor = {};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchainExtent;
+    vkCmdSetScissor(cmdBuffer, 0, 1, &scissor);
+
     vkCmdDraw(cmdBuffer, mesh.vertexCount, 1, 0, 0);
 }
 

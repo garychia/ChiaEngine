@@ -10,6 +10,7 @@
 #include "RendererContractTest.hpp"
 #include "FrameInterpreterTest.hpp"
 #include "TextRenderingTest.hpp"
+#include "PongTest.hpp" // #89: Pong demo 無頭測試(Sim 層隔離)
 
 SystemModuleStandalone::SystemModuleStandalone() : Module()
 {
@@ -26,4 +27,5 @@ SystemModuleStandalone::SystemModuleStandalone() : Module()
     AddTest<renderercontracttest::RendererContractTest>();
     AddTest<frameinterpretertest::FrameInterpreterTest>(); // #84:真實 seam(純解譯器)
     AddTest<renderercontracttest::VulkanRendererTest>();
+    AddTest<pongtest::PongTest>(); // #89: Pong demo 無頭測試
 }
