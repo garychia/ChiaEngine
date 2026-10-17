@@ -116,9 +116,9 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "Linux" ]; then
             # xvfb provides the headless display the windowing tests need
-            xvfb-run -a ./build/bin/ChiaEngineTests
+            xvfb-run -a ./build/bin/TestMain
           else
-            ./build/bin/ChiaEngineTests
+            ./build/bin/TestMain
           fi
 
       - name: Test ChiaApp build (link check)
@@ -390,7 +390,7 @@ jobs:
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
           cmake --build build -j$(nproc)
-          ./build/bin/ChiaEngineTests || echo "Tests failed (expected for nightly)"
+          ./build/bin/TestMain || echo "Tests failed (expected for nightly)"
 
       - name: Upload nightly artifacts
         if: always()
