@@ -2019,13 +2019,10 @@ void VulkanRenderer::RecordDrawCommands(VkCommandBuffer cmdBuffer, const IRender
     }
     else
     {
-        // #80:相機 = activeCamera 值快照(interpreter 每幀 SetCamera 更新;
-        // 預設 = 70° / near 0.001 / far 100,方為舊「無相機 fallback」語義)。
-        view = RendererMath::BuildViewMatrix(activeCamera.position, activeCamera.rotation);
-        const float aspect = static_cast<float>(swapchainExtent.width) /
-                             static_cast<float>(swapchainExtent.height);
-        projection = RendererMath::BuildProjMatrix(activeCamera.angleOfView, aspect,
-                                                   activeCamera.nearPlane, activeCamera.farPlane);
+        // #80:Force ortho for pong geometry too — camera perspective would
+        // clip paddles/ball at world origin due to frustum angle.
+        view = glm::mat4(1.0f);
+        projection = RendererMath::BuildGuiOrtho();
     }
     const bool useTexture = textureReady && renderable.GetRenderInfo().pTexture != nullptr;
     // #91:先配發本 draw 的 UBO slot,再以 dynamic offset 綁定(舊共用 UBO

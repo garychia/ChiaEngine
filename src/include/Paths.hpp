@@ -1,1 +1,1 @@
-#define IMAGE_FILE_PATH "/home/gary/Documents/github/ChiaEngine/src/include/Display/Images/"
+#define IMAGE_FILE_PATH "/home/gary/ChiaEngine/src/include/Display/Images/"
