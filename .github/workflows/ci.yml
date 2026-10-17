@@ -94,23 +94,23 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
+          # ccache is only installed on Linux/macOS runners; omit the
+          # launcher elsewhere (on Windows the missing ccache binary made
+          # every compile fail with "CreateProcess failed").
+          launcher_args=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          fi
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            "${launcher_args[@]}" \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
 
       - name: Build engine and tests
         run: cmake --build build -j$(nproc)
-
-      - name: Run syntax-only check (for headless CI)
-        if: runner.os == 'Linux' && matrix.compiler == 'gcc'
-        run: |
-          g++ -std=c++17 -fsyntax-only -I src/include -I test -c test/Data/DataModule.cpp
-          g++ -std=c++17 -fsyntax-only -I src/include -I test -c test/System/SystemModule.cpp
 
       - name: Run unit tests
         run: |
