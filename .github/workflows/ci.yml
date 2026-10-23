@@ -328,14 +328,14 @@ jobs:
           name: ChiaEngine ${{ github.ref_name }}
           body: |
             ChiaEngine release ${{ github.ref_name }}
-            
+
             ## Assets
             - Linux binaries (tar.gz)
-            
+
             ## Build Info
             - Built on: ${{ runner.os }}
             - Commit: ${{ github.sha }}
-            
+
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/release/CHANGELOG.md) for details.
           files: |
             release/*
