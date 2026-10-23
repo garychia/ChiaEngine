@@ -108,6 +108,13 @@ void Window::Render()
         renderer.Render(*pGUILayout); // DX legacy 直繪;Vulkan 走 Frame(pGUILayout 僅在此後端接地)
 }
 
+// GUI 佈局接點:與 GLFW 後端一致。缺少此定義會讓 ChiaApp 連結失敗
+// (Panel::Initialize 參照 Window::SetGUILayout → LNK2019/LNK1120,issue #109)。
+void Window::SetGUILayout(GUILayout *pLayout)
+{
+    this->pGUILayout = pLayout;
+}
+
 WindowHandle Window::GetHandle() const
 {
     return handle;

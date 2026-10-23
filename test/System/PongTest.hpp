@@ -278,6 +278,43 @@ class PongTest : public Test
                         "Reset 後球回中心.", true);
         }
 
+        // 10. 球拍反射(#100):左右拍都要把球彈回場內,且不塌陷速度。
+        {
+            PongFixture fx;
+            fx.Sys().CreateLeftPaddle();
+            fx.Sys().CreateRightPaddle();
+            Entity ball = fx.Sys().CreateBall(0.0f);
+            fx.TickInput(pong::PongSystem::BitLeft); // launch
+            pong::BallComponent *pBall = fx.Sys().GetWorld().GetComponent<pong::BallComponent>(ball);
+            EXPECT_TRUE(pBall != nullptr, "球有 BallComponent.", true);
+
+            // 左拍:球往左貼近拍面 → 下一 tick 必須往右。
+            if (pBall)
+            {
+                pBall->position = Point3D(-pong::PongSystem::PaddleX + pong::PongSystem::PaddleHalfWidth +
+                                              pong::PongSystem::BallRadius - 0.05f,
+                                          0.0f, 0.0f);
+                pBall->velocity = Point3D(-pong::PongSystem::BallSpeed, 0.0f, 0.0f);
+            }
+            fx.TickInput(0);
+            EXPECT_TRUE(pBall && pBall->velocity.x > 0.0f, "左拍反射後球往右(不穿拍).", true);
+            EXPECT_TRUE(pBall && Math::Abs(pBall->velocity.x) >= pong::PongSystem::BallSpeed,
+                        "左拍反射不塌陷球速.", true);
+
+            // 右拍:對稱(球往右貼近拍面 → 往左)。
+            if (pBall)
+            {
+                pBall->position = Point3D(pong::PongSystem::PaddleX - pong::PongSystem::PaddleHalfWidth -
+                                              pong::PongSystem::BallRadius + 0.05f,
+                                          0.0f, 0.0f);
+                pBall->velocity = Point3D(pong::PongSystem::BallSpeed, 0.0f, 0.0f);
+            }
+            fx.TickInput(0);
+            EXPECT_TRUE(pBall && pBall->velocity.x < 0.0f, "右拍反射後球往左(不穿拍).", true);
+            EXPECT_TRUE(pBall && Math::Abs(pBall->velocity.x) >= pong::PongSystem::BallSpeed,
+                        "右拍反射不塌陷球速.", true);
+        }
+
         SUCCESS_MESSAGE("PongSystem");
         return true;
     }

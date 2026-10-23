@@ -12,7 +12,7 @@
 struct ma_engine;
 
 // 一條已解碼的 PCM buffer(內容定址快取)。
-struct AudioBuffer
+struct PCMAudioBuffer
 {
     uint32_t id;
     char path[512];
@@ -59,13 +59,13 @@ class AudioSystem : public IAudioSystem
 
   private:
     // 內部:把 WAV bytes 解碼成 f32 PCM,填入 out。成功回傳 true。
-    bool DecodeWavToFloat(const unsigned char *bytes, size_t size, AudioBuffer &out);
+    bool DecodeWavToFloat(const unsigned char *bytes, size_t size, PCMAudioBuffer &out);
 
     ma_engine *m_pEngine;
     bool m_initialized;
     mutable std::mutex m_mutex;
 
-    HashTable<uint32_t, AudioBuffer *> m_buffers;  // id -> buffer
+    HashTable<uint32_t, PCMAudioBuffer *> m_buffers;  // id -> buffer
     HashTable<uint32_t, AudioSound *> m_sounds;     // id -> sound
     uint32_t m_nextBufferId;
     uint32_t m_nextSoundId;

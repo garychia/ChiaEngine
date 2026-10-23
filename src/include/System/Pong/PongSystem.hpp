@@ -381,14 +381,11 @@ class PongSystem : public IModule
 
     void ReflectBall(BallComponent &ball, bool leftPaddleHit)
     {
-        // 確保往反方向:left 拍反射後 velocity.x > 0;right 拍反射後 < 0。
-        const float minSpeed = BallSpeed * 0.5f;
-        ball.velocity.x = (leftPaddleHit ? 1.0f : -1.0f) * (ball.velocity.x > 0 ? 1.0f : -1.0f) *
-                          (minSpeed + Math::Abs(ball.velocity.x) * 0.3f);
-        // 依擊中點偏移改變 y 速度(可增加難度):-1..1 映射到 -3..3
-        const float hitOffset = (ball.position.y - clampY(ball, leftPaddleHit ? -1.0f : 1.0f)) * 0.0f; // 保持簡單:不額外偏轉
-        (void)hitOffset;
-        // 微幅加速(每次拍擊 +4%)
+        // 只反轉 X 方向:left 拍 → velocity.x > 0;right 拍 → velocity.x < 0。
+        // 不可再乘上入射方向的正負號,否則左拍會把球繼續往左送(穿拍)。
+        const float speedX = Math::Abs(ball.velocity.x);
+        ball.velocity.x = (leftPaddleHit ? 1.0f : -1.0f) * (speedX > 0.0f ? speedX : BallSpeed * 0.5f);
+        // 微幅加速(每次拍擊 +4%,速度上限 3×BallSpeed)
         const float speed = std::sqrt(ball.velocity.x * ball.velocity.x + ball.velocity.y * ball.velocity.y);
         if (speed > 0.0f)
         {
@@ -396,11 +393,6 @@ class PongSystem : public IModule
             ball.velocity.x *= scale;
             ball.velocity.y *= scale;
         }
-    }
-
-    static float clampY(const BallComponent &, float)
-    {
-        return 0.0f;
     }
 
     bool CheckWin()
