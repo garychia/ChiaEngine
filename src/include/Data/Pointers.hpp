@@ -248,7 +248,14 @@ template <class T> class SharedPtr
   public:
     using ValueType = T;
 
-    template <class SubclassType = T, class... Args> static SharedPtr<T> Construct(Args... args)
+    template <class... Args> static SharedPtr<T> Construct(Args... args)
+    {
+        SharedPtr<T> ptr;
+        ptr.pInfo = new PtrInfo(static_cast<void *>(new T(args...)), &PtrInfoDeleteTyped<T>);
+        return ptr;
+    }
+
+    template <class SubclassType, class... Args> static SharedPtr<T> Construct(Args... args)
     {
         SharedPtr<T> ptr;
         ptr.pInfo = new PtrInfo(static_cast<void *>(static_cast<T *>(new SubclassType(args...))),

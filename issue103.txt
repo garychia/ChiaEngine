@@ -1,0 +1,497 @@
+## Problem
+
+Several CI shell commands assume Linux and will fail or behave incorrectly on macOS/Windows:
+
+| Command | Line | Issue |
+|---|---|---|
+|  | ci.yml:103, 182, 389 | GNU/Linux-only; not available on macOS/Windows without coreutils |
+|  | ci.yml:108-109 | gcc/Linux-only syntax check |
+| Testing String Constructors...
+String Constructors - DONE
+Testing String Comparisons...
+String Comparisons - DONE
+Testing String Find Function...
+String Find Function - DONE
+Testing String SubStr Function...
+String SubStr Function - DONE
+Testing String Shrink Function...
+String Shrink Function - DONE
+Testing String FromInt Function...
+String FromInt Function - DONE
+Testing String FromFloat Function...
+String FromFloat Function - DONE
+Testing Array Default Constructor...
+Array Default Constructor - DONE
+Testing Array Size Constructor...
+Array Size Constructor - DONE
+Testing Array Initializer List...
+Array Initializer List - DONE
+Testing Array Copy Constructor...
+Array Copy Constructor - DONE
+Testing Array Move Constructor...
+Array Move Constructor - DONE
+Testing Array Element + Size Constructor...
+Array Element + Size Constructor - DONE
+Testing Array Copy Assign...
+Array Copy Assign - DONE
+Testing Array Move Assign...
+Array Move Assign - DONE
+Testing Array Equality...
+Array Equality - DONE
+Testing Array GetLast...
+Array GetLast - DONE
+Testing DynamicArray Default Constructor...
+DynamicArray Default Constructor - DONE
+Testing DynamicArray Append and Access...
+DynamicArray Append and Access - DONE
+Testing DynamicArray RemoveLast...
+DynamicArray RemoveLast - DONE
+Testing DynamicArray RemoveAll...
+DynamicArray RemoveAll - DONE
+Testing DynamicArray Resize...
+DynamicArray Resize - DONE
+Testing DynamicArray GetFirst/GetLast...
+DynamicArray GetFirst/GetLast - DONE
+Testing DynamicArray Copy & Move...
+DynamicArray Copy & Move - DONE
+Testing DynamicArray Equality...
+DynamicArray Equality - DONE
+Testing DynamicArray RemoveAll keeps capacity (#85)...
+Testing DynamicArray exponential shrink headroom (#85)...
+Testing DynamicArray RemoveAll then reuse full cycle (#85)...
+Testing DynamicArray empty GetFirst/GetLast asserts (#85)...
+Testing List Default Constructor...
+List Default Constructor - DONE
+Testing List Append...
+List Append - DONE
+Testing List Iteration...
+List Iteration - DONE
+Testing List Prepend...
+List Prepend - DONE
+Testing List Remove...
+List Remove - DONE
+Testing List RemoveFirst/RemoveLast...
+List RemoveFirst/RemoveLast - DONE
+Testing List Contains and Find...
+List Contains and Find - DONE
+Testing List RemoveAll...
+List RemoveAll - DONE
+Testing List Insert...
+List Insert - DONE
+Testing HashTable Default Constructor...
+HashTable Default Constructor - DONE
+Testing HashTable Insert and Contains...
+HashTable Insert and Contains - DONE
+Testing HashTable Access and Modify...
+HashTable Access and Modify - DONE
+Testing HashTable Remove...
+HashTable Remove - DONE
+Testing HashTable Clear...
+HashTable Clear - DONE
+Testing HashTable Iteration...
+HashTable Iteration - DONE
+Testing HashTable Copy and Move...
+HashTable Copy and Move - DONE
+Testing HashTable Value Retrieval...
+HashTable Value Retrieval - DONE
+Testing Ptr Default...
+Ptr Default - DONE
+Testing Ptr Construct...
+Ptr Construct - DONE
+Testing Ptr Release...
+Ptr Release - DONE
+Testing SharedPtr Construct...
+SharedPtr Construct - DONE
+Testing SharedPtr Copy...
+SharedPtr Copy - DONE
+Testing SharedPtr Release...
+SharedPtr Release - DONE
+Testing WeakPtr from SharedPtr...
+WeakPtr from SharedPtr - DONE
+Testing WeakPtr Lock...
+WeakPtr Lock - DONE
+Testing Pair Key and Value...
+Pair Key and Value - DONE
+Testing Pair Copy Assign...
+Pair Copy Assign - DONE
+Testing Ptr Copy Deleted...
+Ptr Copy Deleted - DONE
+Testing WeakPtr Lock After Free...
+WeakPtr Lock After Free - DONE
+Testing SharedPtr Cross-Thread Copy...
+SharedPtr Cross-Thread Copy - DONE
+Testing WeakPtr Lock Release Race...
+WeakPtr Lock Release Race - DONE
+Testing Asset async load + dedup + content-addressed byte sharing...
+AssetTest - DONE
+Testing MalformedCorpusTest: valid + truncated + corrupt + missing asset corpus -> clean handling (no crash / no UB / no hang, sane loaded/rejected state)...
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] corpus file written
+  [PASS] batch1: every request (incl. missing) fires exactly 1 completion event
+  [PASS] batch1: observer saw 10 events
+  [PASS] batch1: 10 keys registered
+  [PASS] batch1: only the 9 written files created shared blocks (missing -> none)
+  [PASS] [valid (64B, magic 'CHIA')] loaded == true (raw bytes always loadable)
+  [PASS] [valid (64B, magic 'CHIA')] bytes length == 64
+  [PASS] [valid (64B, magic 'CHIA')] loaded bytes byte-identical to file content
+  [PASS] [valid (64B, magic 'CHIA')] content hash == FNV1A64(bytes)
+  [PASS] [valid (64B, magic 'CHIA')] GetLoadedBytes finds it with identical bytes
+  [PASS] [valid (64B, magic 'CHIA')] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [empty file (0B, trunc at offset 0)] loaded == true (raw bytes always loadable)
+  [PASS] [empty file (0B, trunc at offset 0)] bytes length == 0
+  [PASS] [empty file (0B, trunc at offset 0)] loaded bytes byte-identical to file content
+  [PASS] [empty file (0B, trunc at offset 0)] content hash == FNV1A64(bytes)
+  [PASS] [empty file (0B, trunc at offset 0)] GetLoadedBytes finds it with identical bytes
+  [PASS] [empty file (0B, trunc at offset 0)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [truncated at offset 1 (1B)] loaded == true (raw bytes always loadable)
+  [PASS] [truncated at offset 1 (1B)] bytes length == 1
+  [PASS] [truncated at offset 1 (1B)] loaded bytes byte-identical to file content
+  [PASS] [truncated at offset 1 (1B)] content hash == FNV1A64(bytes)
+  [PASS] [truncated at offset 1 (1B)] GetLoadedBytes finds it with identical bytes
+  [PASS] [truncated at offset 1 (1B)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [truncated at offset 16 (16B)] loaded == true (raw bytes always loadable)
+  [PASS] [truncated at offset 16 (16B)] bytes length == 16
+  [PASS] [truncated at offset 16 (16B)] loaded bytes byte-identical to file content
+  [PASS] [truncated at offset 16 (16B)] content hash == FNV1A64(bytes)
+  [PASS] [truncated at offset 16 (16B)] GetLoadedBytes finds it with identical bytes
+  [PASS] [truncated at offset 16 (16B)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [truncated at offset 32 (32B)] loaded == true (raw bytes always loadable)
+  [PASS] [truncated at offset 32 (32B)] bytes length == 32
+  [PASS] [truncated at offset 32 (32B)] loaded bytes byte-identical to file content
+  [PASS] [truncated at offset 32 (32B)] content hash == FNV1A64(bytes)
+  [PASS] [truncated at offset 32 (32B)] GetLoadedBytes finds it with identical bytes
+  [PASS] [truncated at offset 32 (32B)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [truncated at offset 63 (size-1)] loaded == true (raw bytes always loadable)
+  [PASS] [truncated at offset 63 (size-1)] bytes length == 63
+  [PASS] [truncated at offset 63 (size-1)] loaded bytes byte-identical to file content
+  [PASS] [truncated at offset 63 (size-1)] content hash == FNV1A64(bytes)
+  [PASS] [truncated at offset 63 (size-1)] GetLoadedBytes finds it with identical bytes
+  [PASS] [truncated at offset 63 (size-1)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [corrupt magic (bad header)] loaded == true (raw bytes always loadable)
+  [PASS] [corrupt magic (bad header)] bytes length == 64
+  [PASS] [corrupt magic (bad header)] loaded bytes byte-identical to file content
+  [PASS] [corrupt magic (bad header)] content hash == FNV1A64(bytes)
+  [PASS] [corrupt magic (bad header)] GetLoadedBytes finds it with identical bytes
+  [PASS] [corrupt magic (bad header)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [corrupt byte (flipped)] loaded == true (raw bytes always loadable)
+  [PASS] [corrupt byte (flipped)] bytes length == 64
+  [PASS] [corrupt byte (flipped)] loaded bytes byte-identical to file content
+  [PASS] [corrupt byte (flipped)] content hash == FNV1A64(bytes)
+  [PASS] [corrupt byte (flipped)] GetLoadedBytes finds it with identical bytes
+  [PASS] [corrupt byte (flipped)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [garbage (128B pseudo-random)] loaded == true (raw bytes always loadable)
+  [PASS] [garbage (128B pseudo-random)] bytes length == 128
+  [PASS] [garbage (128B pseudo-random)] loaded bytes byte-identical to file content
+  [PASS] [garbage (128B pseudo-random)] content hash == FNV1A64(bytes)
+  [PASS] [garbage (128B pseudo-random)] GetLoadedBytes finds it with identical bytes
+  [PASS] [garbage (128B pseudo-random)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] [missing file (released after dispatch)] rejected state: loaded == false
+  [PASS] [missing file (released after dispatch)] rejected state: no block, ContentHash() == 0
+  [PASS] [missing file (released after dispatch)] rejected state: GetLoadedBytes returns false
+  [PASS] [missing file (released after dispatch)] loaded <=> pBlock consistent (no dangling state)
+  [PASS] batch2: early-released missing file fires no event
+  [PASS] batch2: observer count unchanged
+  [PASS] batch2: early-released key evicted cleanly (10 keys again)
+  [PASS] batch2: no block leaked for missing file
+  [PASS] share1 written
+  [PASS] share2 written
+  [PASS] share: 2 completion events for 2 keys
+  [PASS] share: observer saw 12 events total
+  [PASS] share: identical corrupt content -> same AssetBlock (pointer-equal)
+  [PASS] share: 12 keys registered
+  [PASS] share: identical contents counted once (10 blocks)
+  [PASS] share: block refcount == 2 (two keys)
+  [PASS] share: each key one consumer ref
+  [PASS] dedup: duplicate request returns same handle
+  [PASS] dedup: consumer refcount incremented to 2
+  [PASS] dedup: no duplicate completion event
+  [PASS] dedup: no new asset registered
+  [PASS] dedup: releasing the extra ref restores refcount 1
+  [PASS] share: releasing both keys evicts them (10 keys)
+  [PASS] share: shared block unloaded after last release (9 blocks)
+  [PASS] cleanup: all content blocks unloaded (0 blocks)
+  [PASS] cleanup: only the late-released missing-file key remains (never-loaded; documented engine behavior), no crash/leak
+  [PASS] cleanup: valid key gone after release
+  [PASS] cleanup: missing key reports not loaded
+  [PASS] all malformed loads completed within bounded WaitForIdle (no hang), no crash/UB
+  checks: 96 passed, 0 failed
+MalformedCorpusTest - DONE
+Testing AssetRoundtripTest: deterministic pseudo-random bytes (sizes incl. 0 and 1) -> file -> async load -> byte-identical roundtrip...
+  [PASS] roundtrip: file written
+  [PASS] rt[0 B]: loaded == true
+  [PASS] rt[0 B]: exactly 1 completion event
+  [PASS] rt[0 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[0 B]: handle bytes byte-identical to original
+  [PASS] rt[0 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[0 B]: duplicate request returns same handle
+  [PASS] rt[0 B]: dedup increments consumer refcount to 2
+  [PASS] rt[0 B]: dedup fires no duplicate event
+  [PASS] rt[0 B]: releasing extra ref restores refcount 1
+  [PASS] rt[0 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[1 B]: loaded == true
+  [PASS] rt[1 B]: exactly 1 completion event
+  [PASS] rt[1 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[1 B]: handle bytes byte-identical to original
+  [PASS] rt[1 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[1 B]: duplicate request returns same handle
+  [PASS] rt[1 B]: dedup increments consumer refcount to 2
+  [PASS] rt[1 B]: dedup fires no duplicate event
+  [PASS] rt[1 B]: releasing extra ref restores refcount 1
+  [PASS] rt[1 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[2 B]: loaded == true
+  [PASS] rt[2 B]: exactly 1 completion event
+  [PASS] rt[2 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[2 B]: handle bytes byte-identical to original
+  [PASS] rt[2 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[2 B]: duplicate request returns same handle
+  [PASS] rt[2 B]: dedup increments consumer refcount to 2
+  [PASS] rt[2 B]: dedup fires no duplicate event
+  [PASS] rt[2 B]: releasing extra ref restores refcount 1
+  [PASS] rt[2 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[3 B]: loaded == true
+  [PASS] rt[3 B]: exactly 1 completion event
+  [PASS] rt[3 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[3 B]: handle bytes byte-identical to original
+  [PASS] rt[3 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[3 B]: duplicate request returns same handle
+  [PASS] rt[3 B]: dedup increments consumer refcount to 2
+  [PASS] rt[3 B]: dedup fires no duplicate event
+  [PASS] rt[3 B]: releasing extra ref restores refcount 1
+  [PASS] rt[3 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[16 B]: loaded == true
+  [PASS] rt[16 B]: exactly 1 completion event
+  [PASS] rt[16 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[16 B]: handle bytes byte-identical to original
+  [PASS] rt[16 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[16 B]: duplicate request returns same handle
+  [PASS] rt[16 B]: dedup increments consumer refcount to 2
+  [PASS] rt[16 B]: dedup fires no duplicate event
+  [PASS] rt[16 B]: releasing extra ref restores refcount 1
+  [PASS] rt[16 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[255 B]: loaded == true
+  [PASS] rt[255 B]: exactly 1 completion event
+  [PASS] rt[255 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[255 B]: handle bytes byte-identical to original
+  [PASS] rt[255 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[255 B]: duplicate request returns same handle
+  [PASS] rt[255 B]: dedup increments consumer refcount to 2
+  [PASS] rt[255 B]: dedup fires no duplicate event
+  [PASS] rt[255 B]: releasing extra ref restores refcount 1
+  [PASS] rt[255 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[256 B]: loaded == true
+  [PASS] rt[256 B]: exactly 1 completion event
+  [PASS] rt[256 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[256 B]: handle bytes byte-identical to original
+  [PASS] rt[256 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[256 B]: duplicate request returns same handle
+  [PASS] rt[256 B]: dedup increments consumer refcount to 2
+  [PASS] rt[256 B]: dedup fires no duplicate event
+  [PASS] rt[256 B]: releasing extra ref restores refcount 1
+  [PASS] rt[256 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[1024 B]: loaded == true
+  [PASS] rt[1024 B]: exactly 1 completion event
+  [PASS] rt[1024 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[1024 B]: handle bytes byte-identical to original
+  [PASS] rt[1024 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[1024 B]: duplicate request returns same handle
+  [PASS] rt[1024 B]: dedup increments consumer refcount to 2
+  [PASS] rt[1024 B]: dedup fires no duplicate event
+  [PASS] rt[1024 B]: releasing extra ref restores refcount 1
+  [PASS] rt[1024 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[4096 B]: loaded == true
+  [PASS] rt[4096 B]: exactly 1 completion event
+  [PASS] rt[4096 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[4096 B]: handle bytes byte-identical to original
+  [PASS] rt[4096 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[4096 B]: duplicate request returns same handle
+  [PASS] rt[4096 B]: dedup increments consumer refcount to 2
+  [PASS] rt[4096 B]: dedup fires no duplicate event
+  [PASS] rt[4096 B]: releasing extra ref restores refcount 1
+  [PASS] rt[4096 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[65536 B]: loaded == true
+  [PASS] rt[65536 B]: exactly 1 completion event
+  [PASS] rt[65536 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[65536 B]: handle bytes byte-identical to original
+  [PASS] rt[65536 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[65536 B]: duplicate request returns same handle
+  [PASS] rt[65536 B]: dedup increments consumer refcount to 2
+  [PASS] rt[65536 B]: dedup fires no duplicate event
+  [PASS] rt[65536 B]: releasing extra ref restores refcount 1
+  [PASS] rt[65536 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip: file written
+  [PASS] rt[65537 B]: loaded == true
+  [PASS] rt[65537 B]: exactly 1 completion event
+  [PASS] rt[65537 B]: GetLoadedBytes byte-identical to original
+  [PASS] rt[65537 B]: handle bytes byte-identical to original
+  [PASS] rt[65537 B]: content hash == FNV1A64(original bytes)
+  [PASS] rt[65537 B]: duplicate request returns same handle
+  [PASS] rt[65537 B]: dedup increments consumer refcount to 2
+  [PASS] rt[65537 B]: dedup fires no duplicate event
+  [PASS] rt[65537 B]: releasing extra ref restores refcount 1
+  [PASS] rt[65537 B]: clean teardown (0 live assets, 0 blocks)
+  [PASS] roundtrip covered 11 sizes, 136726 total deterministic bytes
+  checks: 122 passed, 0 failed
+AssetRoundtripTest - DONE
+Testing TextureViewHookTest: renderer hook fires with correct bytes on valid load; safe on malformed / empty / missing assets...
+  [PASS] valid file written
+  [PASS] corrupt file written
+  [PASS] empty file written
+  [PASS] view attached to AssetManager
+  [PASS] S1 valid: 1 completion event
+  [PASS] S1 valid: hook fired once
+  [PASS] S1 valid: hook bytes length matches
+  [PASS] S1 valid: hook bytes content matches file
+  [PASS] S1 valid: hook content hash matches FNV1A64(bytes)
+  [PASS] S2 corrupt: 1 completion event
+  [PASS] S2 corrupt: hook fired once more
+  [PASS] S2 corrupt: hook bytes byte-identical to corrupt content
+  [PASS] S2 corrupt: hook hash matches corrupt bytes
+  [PASS] S3 empty: 1 completion event
+  [PASS] S3 empty: hook fired once more
+  [PASS] S3 empty: hook received 0-length bytes (safe)
+  [PASS] S3 empty: hook hash == FNV1A64_OFFSET (empty content)
+  [PASS] S4 missing: completion event still fires (consumer observes failure)
+  [PASS] S4 missing: rejected state (loaded == false, no block)
+  [PASS] S4 missing: hook NOT fired for failed load
+  [PASS] S5: not-loaded asset -> hook skipped safely
+  [PASS] S5: loaded-with-null-block asset -> hook skipped safely
+  [PASS] S5: null asset -> hook skipped safely
+  [PASS] S5: loaded empty-content asset -> hook fires with 0 bytes (safe)
+  [PASS] S5: empty hook payload correct
+  [PASS] S5: loaded corrupt-content asset -> hook fires (safe)
+  [PASS] S5: corrupt hook payload byte-identical
+  [PASS] S6: unsubscribed cleanly
+  [PASS] S6: detached load completes (1 event)
+  [PASS] S6: detached view received nothing
+  [PASS] S6: re-attached to manager
+  [PASS] S6: reattach file written
+  [PASS] S6: re-attached load completes
+  [PASS] S6: hook fires again after re-subscribe
+  [PASS] S6: re-attached hook bytes correct
+  [PASS] S6: final unsubscribe clean
+  checks: 36 passed, 0 failed
+TextureViewHookTest - DONE
+Testing TextureAssetView: typed LoadedEvent -> renderer decode/upload bridge (principle #4)...
+TextureAssetViewTest - DONE
+Testing FileIO ReadBytes Function...
+FileIO ReadBytes Function - DONE
+Testing FileIO ReadLine Function...
+FileIO ReadLine Function - DONE
+Testing Function default ctor...
+Testing Function with free function...
+Testing Function with params and return...
+Testing MemberFunction default ctor...
+Testing MemberFunction call...
+Testing Callback with member function...
+Testing Callback::Set with free function...
+Testing Event subscribe and invoke...
+Testing Event unsubscribe...
+Testing Event with args...
+Testing Event clear...
+Testing Event dispatch in SUBSCRIPTION order (#79)...
+Testing Event duplicate subscribe replaces, not adds (#79)...
+Testing Event unsubscribe removes ONLY the target (#79)...
+Testing Event Clear then reuse stays empty (#79)...
+Testing Event lifetime: dtor cleans up all callbacks (#79)...
+SystemOperation - DONE
+Testing Engine module lifecycle...
+Testing Engine fixed-step tick...
+Testing EngineContext service register/resolve...
+Testing EngineContext type isolation...
+Testing Module-to-module event bus...
+SystemModule - DONE
+Testing Entity create and alive...
+Testing Entity destroy and generation reuse...
+Testing Component add/get/has/remove...
+Testing Multiple components and isolation...
+Testing DestroyEntity removes all components...
+Testing Component swap-remove consistency...
+Testing View filters and mutates...
+Testing View after destroy and slot reuse...
+Testing Deterministic system tick (Engine + World)...
+SystemWorld - DONE
+Testing FrameCounter emits 0 then +1 per tick; subscriber sees sequence...
+Testing Detach unsubscribes; fresh counter restarts at 0...
+SystemFrameCounter - DONE
+Testing GUITest...
+GUITest - DONE
+Testing GUIHierarchyRow...
+GUIHierarchyRow - DONE
+Inspector - DONE
+EditorSession: selection / undo-redo / pointer set / shortcuts / pane registry 全部通過. - DONE
+PanelRegions: ComputePanelRegions contract 全部通過. - DONE
+DockRegistry: named docks / PanelPane registry / SetRegions 定位 全部通過. - DONE
+Testing Record → replay → per-tick state hash equality...
+Testing Tampered input → hash diverges (replay 真的吃錄音)...
+Testing Padding 元件:零初始化讓 hash 確定...
+SystemReplay - DONE
+Testing Record → replay → per-tick camera path identical...
+Testing Tampered input → camera path diverges...
+Testing Reset restores initial pose...
+SystemCameraController - DONE
+Testing KeyCombination: 建構 / 相等性 / 空組合...
+InputKeyCombination - DONE
+Testing KeyboardHandler: 按鍵狀態轉移 / 組合組合 / 重設...
+InputKeyboardHandler - DONE
+Testing MouseInput: 位置追蹤 / 按鍵狀態 / 滾輪 / 重設...
+InputMouseInput - DONE
+Testing InputHandler: layer 註冊與輸入路由...
+InputInputHandler - DONE
+Testing WindowManager: BLOCKED headless — GLFW required (see class comment)...
+InputWindowManager (documented skip) - DONE
+Testing AABB-AABB separating...
+Testing AABB-AABB touching(邊界包含)...
+Testing AABB-AABB overlapping...
+Testing Sphere-sphere separating...
+Testing Sphere-sphere touching(邊界包含)...
+Testing Sphere-sphere overlapping...
+Testing AABB-sphere separating...
+Testing AABB-sphere touching(邊界包含)...
+Testing AABB-sphere overlapping...
+PhysicsOverlap - DONE
+PhysicsSystem - DONE
+SceneSystem - DONE
+Testing RendererContract: executor dispatch contract (lifecycle + all command types in order)...
+Testing RendererContract: payload fidelity (value commands reach executor unchanged)...
+Testing RendererContract: legacy pointer commands (stream + semantic Serialize + nulled round-trip)...
+Testing RendererContract: transform stack contract (unbalanced push / pop-on-empty / 65 pushes)...
+RendererContract - DONE
+Testing FrameInterpreter: op dispatch order + payload fidelity...
+Testing FrameInterpreter: transform stack contract (depth 64 / empty-pop / reset)...
+Testing FrameInterpreter: world resolution (PushTransform → RendererMath, DrawText same)...
+FrameInterpreter - DONE
+Testing RendererVulkanRenderer: BLOCKED headless — GPU/Vulkan required (see class comment)...
+RendererVulkanRenderer (documented skip) - DONE
+AudioSystem headless tests passed - DONE
+AudioSystem playback test passed - DONE
+PongSystem - DONE | ci.yml:112, 390 | Windows produces  |
+|  | ci.yml:307-314 | Linux-only; Windows zip commented out |
+|  | ci.yml:113-117 | Linux headless display assumption |
+
+## Affected file
+- 
+
+## Fix
+- Replace  with a cross-platform core count (CMake can compute it, or shell fallback)
+- Make syntax check conditional on Linux/gcc
+- Use  or CMake target name
+- Split tar/zip artifact creation by OS
+
+## Labels
+build
