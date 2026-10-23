@@ -68,7 +68,7 @@ void AudioSystem::Shutdown()
     // 釋放所有 buffer 的 PCM
     while (m_buffers.First() != m_buffers.Last())
     {
-        AudioBuffer *b = m_buffers.First()->Value();
+        PCMAudioBuffer *b = m_buffers.First()->Value();
         if (b)
         {
             delete[] b->pPcm;
@@ -94,7 +94,7 @@ uint32_t AudioSystem::LoadSound(const char *path)
     std::lock_guard<std::mutex> lock(m_mutex);
 
     // 內容定址:相同 path 直接回傳既有 buffer(並 +1 引用)
-    HashTable<uint32_t, AudioBuffer *>::Iterator it = m_buffers.First();
+    HashTable<uint32_t, PCMAudioBuffer *>::Iterator it = m_buffers.First();
     while (it != m_buffers.Last())
     {
         if (std::strcmp(it->Value()->path, path) == 0)
@@ -123,10 +123,10 @@ uint32_t AudioSystem::LoadSound(const char *path)
     if (raw.Length() == 0)
         return 0;
 
-    AudioBuffer *b = new (std::nothrow) AudioBuffer;
+    PCMAudioBuffer *b = new (std::nothrow) PCMAudioBuffer;
     if (!b)
         return 0;
-    std::memset(b, 0, sizeof(AudioBuffer));
+    std::memset(b, 0, sizeof(PCMAudioBuffer));
     b->id = m_nextBufferId++;
     std::strncpy(b->path, path, sizeof(b->path) - 1);
     b->refCount = 1;
@@ -142,7 +142,7 @@ uint32_t AudioSystem::LoadSound(const char *path)
     return b->id;
 }
 
-bool AudioSystem::DecodeWavToFloat(const unsigned char *bytes, size_t size, AudioBuffer &out)
+bool AudioSystem::DecodeWavToFloat(const unsigned char *bytes, size_t size, PCMAudioBuffer &out)
 {
     // 同步讀檔保證 size>0 時 bytes 有效;size==0 直接失敗
     if (size == 0)
@@ -197,11 +197,11 @@ uint32_t AudioSystem::Play(uint32_t buffer, bool loop)
     if (!m_initialized || !m_pEngine)
         return 0;
 
-    HashTable<uint32_t, AudioBuffer *>::Iterator bit = m_buffers.Find(buffer);
+    HashTable<uint32_t, PCMAudioBuffer *>::Iterator bit = m_buffers.Find(buffer);
     if (bit == m_buffers.Last() || !bit->Value()->loaded)
         return 0;
 
-    AudioBuffer *b = bit->Value();
+    PCMAudioBuffer *b = bit->Value();
 
     // in-memory audio buffer datasource(miniaudio 不接管,我們在 Stop 裡手動 uninit)
     // ma_audio_buffer 必須是「已配置的結構」— ma_audio_buffer_init 寫入它,
@@ -276,7 +276,7 @@ void AudioSystem::Stop(uint32_t sound)
             delete static_cast<ma_audio_buffer *>(s->pMaBuffer);
         }
         // 歸還 buffer 引用
-        HashTable<uint32_t, AudioBuffer *>::Iterator bit = m_buffers.Find(s->bufferId);
+        HashTable<uint32_t, PCMAudioBuffer *>::Iterator bit = m_buffers.Find(s->bufferId);
         if (bit != m_buffers.Last() && bit->Value()->refCount > 0)
             bit->Value()->refCount--;
         delete s;
@@ -322,10 +322,10 @@ void AudioSystem::SetMasterVolume(float volume)
 void AudioSystem::ReleaseBuffer(uint32_t buffer)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
-    HashTable<uint32_t, AudioBuffer *>::Iterator it = m_buffers.Find(buffer);
+    HashTable<uint32_t, PCMAudioBuffer *>::Iterator it = m_buffers.Find(buffer);
     if (it == m_buffers.Last() || !it->Value())
         return;
-    AudioBuffer *b = it->Value();
+    PCMAudioBuffer *b = it->Value();
     if (b->refCount > 0)
         b->refCount--;
     if (b->refCount == 0)
@@ -340,7 +340,7 @@ uint32_t AudioSystem::GetBufferCount() const
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     uint32_t c = 0;
-    HashTable<uint32_t, AudioBuffer *>::Iterator it = m_buffers.First();
+    HashTable<uint32_t, PCMAudioBuffer *>::Iterator it = m_buffers.First();
     while (it != m_buffers.Last())
     {
         c++;
