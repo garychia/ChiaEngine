@@ -6,6 +6,8 @@ on:
     tags: [ 'v*' ]  # Push tags starting with v
   pull_request:
     branches: [ main, develop ]
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM UTC daily (see the nightly job)
 
 env:
   # Build type
@@ -18,11 +20,14 @@ jobs:
   build-and-test:
     name: Build and Test (${{ matrix.os }} / ${{ matrix.compiler }})
     runs-on: ${{ matrix.os }}
+    # Scheduled runs are handled by the nightly job instead
+    if: github.event_name != 'schedule'
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2022, macos-14]
-        compiler: [gcc, clang, msvc]  # Will be filtered per OS
+        # Include-only matrix: each entry is one exact OS/compiler combo.
+        # (A base os/compiler cross-product would emit unsupported combos
+        # such as windows/gcc and ubuntu/msvc.)
         include:
           # Linux: gcc and clang
           - os: ubuntu-24.04
@@ -58,7 +63,7 @@ jobs:
           sudo apt-get install -y -qq --no-install-recommends \
             cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache \
-            clang-tidy clang-format lcov
+            clang-tidy clang-format lcov xvfb
 
       - name: Setup dependencies (macOS)
         if: runner.os == 'macOS'
@@ -69,11 +74,10 @@ jobs:
           brew install glm
           brew install clang-format clang-tidy
 
-      - name: Setup Ninja
-        if: runner.os != 'Windows'
-        run: |
-          sudo apt-get install -y ninja-build  # Linux
-          # macOS: brew install ninja (already done above)
+      - name: Setup Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ninja-build
+        # macOS: brew install ninja (already done above)
 
       - name: Setup ccache
         uses: actions/cache@v4
@@ -90,11 +94,17 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
         run: |
+          # ccache is only installed on Linux/macOS runners; omit the
+          # launcher elsewhere (on Windows the missing ccache binary made
+          # every compile fail with "CreateProcess failed").
+          launcher_args=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          fi
           cmake -B build \
             -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            "${launcher_args[@]}" \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
@@ -102,19 +112,14 @@ jobs:
       - name: Build engine and tests
         run: cmake --build build -j$(nproc)
 
-      - name: Run syntax-only check (for headless CI)
-        if: runner.os == 'Linux' && matrix.compiler == 'gcc'
-        run: |
-          g++ -std=c++17 -fsyntax-only -I src/include -I test -c test/Data/DataModule.cpp
-          g++ -std=c++17 -fsyntax-only -I src/include -I test -c test/System/SystemModule.cpp
-
       - name: Run unit tests
-        run: ./build/bin/ChiaEngineTests
-        env:
-          # For headless testing on Linux
-          DISPLAY: :99
-        # Start virtual display for Linux headless testing
-        continue-on-error: true  # Allow test failures for now to see what breaks
+        run: |
+          if [ "${{ runner.os }}" = "Linux" ]; then
+            # xvfb provides the headless display the windowing tests need
+            xvfb-run -a ./build/bin/TestMain
+          else
+            ./build/bin/TestMain
+          fi
 
       - name: Test ChiaApp build (link check)
         run: cmake --build build -j$(nproc) --target ChiaApp
@@ -145,7 +150,7 @@ jobs:
     name: Code Quality
     runs-on: ubuntu-24.04
     needs: [build-and-test]
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout repository
@@ -163,9 +168,9 @@ jobs:
       - name: Run clang-format check
         run: |
           # Find all source files
-          find src -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" | sort | uniq > files.txt || true
+          find src \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) | sort -u > files.txt || true
           if [ -s files.txt ]; then
-            clang-format --dry-run --Werror -files files.txt
+            xargs -r clang-format --dry-run --Werror < files.txt
           else
             echo "No source files found"
             exit 1
@@ -173,7 +178,7 @@ jobs:
 
       - name: Run clang-tidy
         run: |
-          find src -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" | sort | uniq > files.txt || true
+          find src \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) | sort -u > files.txt || true
           if [ -s files.txt ]; then
             # Run clang-tidy with a compile_commands.json from our build
             mkdir -p build-tidy
@@ -203,7 +208,7 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-24.04
     needs: [build-and-test]
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout repository
@@ -227,7 +232,8 @@ jobs:
 
       - name: Check for dangerous functions
         run: |
-          if grep -r -E "gets|strcpy|sprintf|vsprintf" src/ --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c"; then
+          if grep -r -nE '\b(gets|strcpy|strcat|sprintf|vsprintf)[[:space:]]*\(' src/ \
+               --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c"; then
             echo "Warning: Found potentially dangerous C functions"
             exit 1
           fi
@@ -237,7 +243,7 @@ jobs:
     name: Documentation Check
     runs-on: ubuntu-24.04
     needs: [build-and-test]
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/v')
 
     steps:
       - name: Checkout repository
@@ -347,17 +353,14 @@ jobs:
 
   # Nightly builds (for develop branch)
   nightly:
-    name: Nightly Build (Develop)
+    name: Nightly Build
     runs-on: ubuntu-24.04
-    schedule:
-      - cron: '0 2 * * *'  # 2 AM UTC daily
-    if: github.ref == 'refs/heads/develop'
+    # Runs from the top-level `schedule` trigger, or on pushes to develop
+    if: github.event_name == 'schedule' || github.ref == 'refs/heads/develop'
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: develop
 
       - name: Setup dependencies
         run: |
@@ -387,7 +390,7 @@ jobs:
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
           cmake --build build -j$(nproc)
-          ./build/bin/ChiaEngineTests || echo "Tests failed (expected for nightly)"
+          ./build/bin/TestMain || echo "Tests failed (expected for nightly)"
 
       - name: Upload nightly artifacts
         if: always()
