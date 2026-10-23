@@ -29,17 +29,10 @@ template <class T> class Ptr
   public:
     using ValueType = T;
 
-    template <class... Args> static Ptr<T> Construct(Args... args)
+    template <class Subclass = T, class... Args> static Ptr<T> Construct(Args... args)
     {
         Ptr<T> ptr;
-        ptr.rawPtr = new T(args...);
-        return ptr;
-    }
-
-    template <class Subclass, class... Args> static Ptr<T> Construct(Args... args)
-    {
-        Ptr<T> ptr;
-        ptr.rawPtr = dynamic_cast<Subclass *>(new Subclass(args...));
+        ptr.rawPtr = static_cast<Subclass *>(new Subclass(args...));
         return ptr;
     }
 
@@ -255,14 +248,7 @@ template <class T> class SharedPtr
   public:
     using ValueType = T;
 
-    template <class... Args> static SharedPtr<T> Construct(Args... args)
-    {
-        SharedPtr<T> ptr;
-        ptr.pInfo = new PtrInfo(new T(args...), &PtrInfoDeleteTyped<T>);
-        return ptr;
-    }
-
-    template <class SubclassType, class... Args> static SharedPtr<T> Construct(Args... args)
+    template <class SubclassType = T, class... Args> static SharedPtr<T> Construct(Args... args)
     {
         SharedPtr<T> ptr;
         ptr.pInfo = new PtrInfo(static_cast<void *>(static_cast<T *>(new SubclassType(args...))),
