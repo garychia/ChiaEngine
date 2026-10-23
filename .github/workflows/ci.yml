@@ -143,7 +143,13 @@ jobs:
         if: failure() && runner.os == 'macOS'
         continue-on-error: true
         run: |
-          lldb -b -o run -o "process status" -o "thread backtrace all" -o quit -- ./build/bin/TestMain \
+          # Even when lldb cannot unwind, the link register identifies the caller
+          # and the disassembly shows the trap instruction itself.
+          lldb -b -o run -o "process status" \
+            -o "register read pc sp fp lr x0 x1 x2" \
+            -o 'image lookup --address $lr' \
+            -o "disassemble --frame" \
+            -o "thread backtrace all" -o quit -- ./build/bin/TestMain \
             > lldb-crash.log 2>&1 || true
           # The backtrace is at the end, after the full test output.
           tail -n 400 lldb-crash.log || true
