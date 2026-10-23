@@ -36,6 +36,8 @@ FetchContent_Declare(
     GIT_TAG 0.9.9.8
 )
 FetchContent_MakeAvailable(glm)
+# GLM is header-only; old CMakeLists doesn't set up include dirs, so add globally
+include_directories(${glm_SOURCE_DIR})
 
 if (NOT DIRECTX_ENABLED)
     set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
