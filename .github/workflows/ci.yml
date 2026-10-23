@@ -41,6 +41,8 @@ jobs:
           # Windows: MSVC only (default)
           - os: windows-2022
             compiler: msvc
+            cc: cl
+            cxx: cl
           # macOS: AppleClang
           - os: macos-14
             compiler: appleclang
@@ -65,14 +67,26 @@ jobs:
             libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache \
             clang-tidy clang-format lcov xvfb
 
+      - name: Setup MSVC (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Setup dependencies (macOS)
         if: runner.os == 'macOS'
+        timeout-minutes: 20
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: |
-          brew update
-          brew install cmake ninja pkg-config ccache
-          brew install vulkan-sdk
-          brew install glm
-          brew install clang-format clang-tidy
+          # vulkan-sdk is a cask whose installer needs an interactive sudo
+          # password, so it hangs on unattended runners. Headers + loader +
+          # MoltenVK come from formulas and are enough for find_package(Vulkan).
+          brew install cmake ninja pkg-config ccache \
+            vulkan-headers vulkan-loader molten-vk
+          # Point FindVulkan at the Homebrew prefix (headers and libvulkan).
+          echo "VULKAN_SDK=$(brew --prefix)" >> "$GITHUB_ENV"
 
       - name: Setup Ninja (Linux)
         if: runner.os == 'Linux'
@@ -110,19 +124,21 @@ jobs:
             -GNinja
 
       - name: Build engine and tests
-        run: cmake --build build -j$(nproc)
+        run: cmake --build build --parallel
 
       - name: Run unit tests
         run: |
+          test_bin=./build/bin/TestMain
+          if [ "${{ runner.os }}" = "Windows" ]; then test_bin="${test_bin}.exe"; fi
           if [ "${{ runner.os }}" = "Linux" ]; then
             # xvfb provides the headless display the windowing tests need
-            xvfb-run -a ./build/bin/TestMain
+            xvfb-run -a "${test_bin}"
           else
-            ./build/bin/TestMain
+            "${test_bin}"
           fi
 
       - name: Test ChiaApp build (link check)
-        run: cmake --build build -j$(nproc) --target ChiaApp
+        run: cmake --build build --parallel --target ChiaApp
 
       - name: Upload build artifacts
         if: always()
@@ -183,10 +199,15 @@ jobs:
             # Run clang-tidy with a compile_commands.json from our build
             mkdir -p build-tidy
             cd build-tidy
-            cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -GNinja
-            cmake --build . -j$(nproc)
+            # ccache may not be installed; omit the launcher then.
+            launcher_args=()
+            if command -v ccache >/dev/null 2>&1; then
+              launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+            fi
+            cmake .. -DCMAKE_BUILD_TYPE=Debug "${launcher_args[@]}" -GNinja
+            cmake --build . --parallel
             # Now run clang-tidy
-            run-clang-tidy -p . -header-filter='.*' -jobs=$(nproc) || echo "Clang-tidy found issues (expected during development)"
+            run-clang-tidy -p . -header-filter='.*' || echo "Clang-tidy found issues (expected during development)"
           else
             echo "No source files found"
             exit 1
@@ -282,7 +303,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
             cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
-            libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache
+            libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache zip
 
       - name: Setup ccache
         uses: actions/cache@v4
@@ -296,15 +317,35 @@ jobs:
 
       - name: Configure and build (Release)
         run: |
+          # ccache may not be installed; omit the launcher then.
+          launcher_args=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          fi
           cmake -B build-release \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            "${launcher_args[@]}" \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
-          cmake --build build-release -j$(nproc)
+          cmake --build build-release --parallel
+
+      # shortcut: packages the build-and-test artifacts (Debug); build Release
+      # per-platform when optimized binaries are needed.
+      - name: Download Windows build
+        uses: actions/download-artifact@v4
+        with:
+          pattern: chiaengine-windows-*-${{ github.sha }}
+          path: artifacts/windows
+          merge-multiple: true
+
+      - name: Download macOS build
+        uses: actions/download-artifact@v4
+        with:
+          pattern: chiaengine-macos-*-${{ github.sha }}
+          path: artifacts/macos
+          merge-multiple: true
 
       - name: Create release assets
         run: |
@@ -318,8 +359,14 @@ jobs:
           git log --oneline --no-merges $(git describe --tags --abbrev=0)..HEAD > release/CHANGELOG.md || echo "No changelog entries" > release/CHANGELOG.md
           # Create tarball
           tar -czf chiaengine-${{ github.ref_name }}-linux.tar.gz -C release .
-          # Also create Windows zip if we had Windows builds
-          # zip -r chiaengine-${{ github.ref_name }}-windows.zip release/
+
+      - name: Create Windows zip
+        run: |
+          cd artifacts/windows
+          zip -r ../../chiaengine-${{ github.ref_name }}-windows.zip .
+
+      - name: Create macOS tarball
+        run: tar -czf chiaengine-${{ github.ref_name }}-macos.tar.gz -C artifacts/macos .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -331,14 +378,18 @@ jobs:
 
             ## Assets
             - Linux binaries (tar.gz)
+            - Windows binaries (zip)
+            - macOS binaries (tar.gz)
 
             ## Build Info
-            - Built on: ${{ runner.os }}
+            - Built on: ubuntu-24.04 (Linux), windows-2022 (Windows), macos-14 (macOS)
             - Commit: ${{ github.sha }}
 
             See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/release/CHANGELOG.md) for details.
           files: |
             release/*
+            chiaengine-*.tar.gz
+            chiaengine-*.zip
           draft: false
           prerelease: false
 
@@ -349,6 +400,7 @@ jobs:
           path: |
             release/*
             chiaengine-*.tar.gz
+            chiaengine-*.zip
           retention-days: 90
 
   # Nightly builds (for develop branch)
@@ -381,15 +433,19 @@ jobs:
 
       - name: Build and test
         run: |
+          # ccache may not be installed; omit the launcher then.
+          launcher_args=()
+          if command -v ccache >/dev/null 2>&1; then
+            launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
+          fi
           cmake -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            "${launcher_args[@]}" \
             -DGLFW_BUILD_TESTS=OFF \
             -DGLFW_BUILD_EXAMPLES=OFF \
             -GNinja
-          cmake --build build -j$(nproc)
+          cmake --build build --parallel
           ./build/bin/TestMain || echo "Tests failed (expected for nightly)"
 
       - name: Upload nightly artifacts
