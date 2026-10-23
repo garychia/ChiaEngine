@@ -54,7 +54,10 @@ void SceneWindow::EnsureQuadAssetsRegistered()
     // 幾何:單位 quad(XY 平面、中心原點、半寬/半高各 0.5)→ PushTransform scale 成實際尺寸。
     if (quadMeshId == 0)
     {
-        auto quad = SharedPtr<IRenderable>::Construct<Rectangle>();
+        // Windows: <Windows.h>(PCH)宣告 GDI 函式 Rectangle(),於 ordinary lookup 中
+        // 遮蔽 engine 的 class Rectangle → template 引數位置須用 elaborated specifier
+        // (`class Rectangle`),否則 MSVC 報 C2672「invalid template argument, type expected」。
+        auto quad = SharedPtr<IRenderable>::Construct<class Rectangle>();
         if (pRegistrar->RegisterMeshGeometry(kQuadMeshId, quad->GetRenderInfo()))
             quadMeshId = kQuadMeshId;
     }
