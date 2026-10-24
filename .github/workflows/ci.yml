@@ -323,9 +323,20 @@ jobs:
 
       - name: Validate CMakeLists.txt syntax
         run: |
-          mkdir -p build
-          cd build
-          cmake .. >/dev/null 2>&1 && echo "CMake configuration successful" || (echo "CMake configuration failed" && exit 1)
+          # Configuring needs the same dev packages as build-and-test (X11,
+          # Vulkan, pkg-config); without them this job could never pass.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev pkg-config libvulkan-dev
+          # Keep the configure log: its tail is the only real error output.
+          if cmake -S . -B build-validate > cmake-configure.log 2>&1; then
+            echo "CMake configuration successful"
+          else
+            echo "CMake configuration failed - last 40 lines of the configure log:"
+            tail -n 40 cmake-configure.log
+            exit 1
+          fi
 
   # Release workflow
   release:
