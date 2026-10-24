@@ -200,9 +200,14 @@ jobs:
 
       - name: Setup dependencies
         run: |
+          # clang-tidy needs to configure the project to produce a compile database, so
+          # this job needs the same dev packages as build-and-test (X11 for GLFW, Vulkan,
+          # pkg-config) plus ninja for the generator. See #119.
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            clang-format-18 clang-tidy python3-pip
+            clang-format-18 clang-tidy python3-pip \
+            cmake g++ git pkg-config ninja-build \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libvulkan-dev
 
       - name: Install cppcheck
         run: sudo apt-get install -y cppcheck
@@ -236,24 +241,24 @@ jobs:
 
       - name: Run clang-tidy
         run: |
-          find src \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) | sort -u > files.txt || true
-          if [ -s files.txt ]; then
-            # Run clang-tidy with a compile_commands.json from our build
-            mkdir -p build-tidy
-            cd build-tidy
-            # ccache may not be installed; omit the launcher then.
-            launcher_args=()
-            if command -v ccache >/dev/null 2>&1; then
-              launcher_args+=(-DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache)
-            fi
-            cmake .. -DCMAKE_BUILD_TYPE=Debug "${launcher_args[@]}" -GNinja
-            cmake --build . --parallel
-            # Now run clang-tidy
-            run-clang-tidy -p . -header-filter='.*' || echo "Clang-tidy found issues (expected during development)"
-          else
-            echo "No source files found"
+          # clang-tidy needs a compile database, not a built tree. This step used to
+          # configure AND build the whole engine just to lint it, duplicating what
+          # build-and-test already does on the same runner (#119). Configure with the
+          # database exported and the PCH disabled instead: the PCH is what makes a
+          # configure-only database unusable, since its GCC .gch artifact only exists
+          # after a build and clang-tidy could not consume it anyway. Verified locally:
+          # 70 translation units, zero references to generated artifacts.
+          TIDY_RUNNER=$(command -v run-clang-tidy-18 || command -v run-clang-tidy || true)
+          if [ -z "$TIDY_RUNNER" ]; then
+            echo "No run-clang-tidy binary found (checked run-clang-tidy-18 and run-clang-tidy)."
+            echo "clang-tidy files present in /usr/bin:"; ls /usr/bin | grep -i clang-tidy || true
             exit 1
           fi
+          cmake -S . -B build-tidy -GNinja -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON
+          echo "Compile database: $(grep -c '"file"' build-tidy/compile_commands.json) translation unit(s)"
+          "$TIDY_RUNNER" -p build-tidy -header-filter='.*' || echo "Clang-tidy found issues (expected during development)"
 
       - name: Run cppcheck
         run: |
