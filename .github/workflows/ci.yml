@@ -300,9 +300,15 @@ jobs:
       - name: Check for broken links in markdown
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq python3-pip
-          pip3 install markdown-link-check
-          markdown-link-check README.md docs/**/*.md || echo "Link check completed"
+          sudo apt-get install -y -qq
+          npm install -g markdown-link-check
+          shopt -s globstar nullglob
+          files=(README.md docs/**/*.md)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No markdown files found"
+            exit 1
+          fi
+          markdown-link-check "${files[@]}"
 
       - name: Validate CMakeLists.txt syntax
         run: |
