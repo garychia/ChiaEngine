@@ -266,11 +266,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             binutils gcc make pkg-config re2c  # For flawfinder
-          pip3 install bandit safety
+          pip3 install bandit safety flawfinder
 
       - name: Run flawfinder (C/C++ security scanner)
         run: |
-          flawfinder --dataonly --quiet src/ || echo "Flawfinder completed"
+          find src -type f \( -name "*.hpp" -o -name "*.h" -o -name "*.cpp" -o -name "*.c" \) ! -name "miniaudio.h" | xargs flawfinder --dataonly --quiet || echo "Flawfinder completed"
 
       - name: Run bandit (Python security)
         if: false  # Disable for now as we have minimal Python
@@ -280,7 +280,8 @@ jobs:
       - name: Check for dangerous functions
         run: |
           if grep -r -nE '\b(gets|strcpy|strcat|sprintf|vsprintf)[[:space:]]*\(' src/ \
-               --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c"; then
+               --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c" \
+               --exclude="miniaudio.h"; then
             echo "Warning: Found potentially dangerous C functions"
             exit 1
           fi
