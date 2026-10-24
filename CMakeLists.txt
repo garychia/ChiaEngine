@@ -35,6 +35,12 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/g-truc/glm.git
     GIT_TAG 0.9.9.8
 )
+# glm 0.9.9.8 declares cmake_minimum_required(VERSION 3.2), and CMake >= 4.0 rejects
+# anything below 3.5 outright ("Compatibility with CMake < 3.5 has been removed"), which
+# made every fresh configure fail. This tells CMake to configure it anyway; the variable
+# is ignored by CMake older than 3.31, so it cannot regress older toolchains.
+# See #118. glm is fetched only for its headers (see the include_directories below).
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 FetchContent_MakeAvailable(glm)
 # GLM is header-only; old CMakeLists doesn't set up include dirs, so add globally
 include_directories(${glm_SOURCE_DIR})
