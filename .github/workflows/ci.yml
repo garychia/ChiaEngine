@@ -137,6 +137,32 @@ jobs:
             "${test_bin}"
           fi
 
+      # Diagnostic for #108: capture the macOS SIGTRAP (exit 133) backtrace.
+      # continue-on-error + `|| true` guarantee this can never fail the job.
+      - name: Capture macOS crash backtrace
+        if: failure() && runner.os == 'macOS'
+        continue-on-error: true
+        run: |
+          # Even when lldb cannot unwind, the link register identifies the caller
+          # and the disassembly shows the trap instruction itself.
+          lldb -b -o run -o "process status" \
+            -o "register read pc sp fp lr x0 x1 x2" \
+            -o 'image lookup --address $lr' \
+            -o "disassemble --frame" \
+            -o "thread backtrace all" -o quit -- ./build/bin/TestMain \
+            > lldb-crash.log 2>&1 || true
+          # The backtrace is at the end, after the full test output.
+          tail -n 400 lldb-crash.log || true
+
+      - name: Upload macOS crash backtrace
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-lldb-backtrace-${{ matrix.compiler }}-${{ github.sha }}
+          path: lldb-crash.log
+          if-no-files-found: warn
+          retention-days: 7
+
       - name: Test ChiaApp build (link check)
         run: cmake --build build --parallel --target ChiaApp
 

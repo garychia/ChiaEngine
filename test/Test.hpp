@@ -38,6 +38,9 @@ class Test
         return name;
     }
 
+    // Module owns std::vector<Test*> and deletes through Test*, so this must be virtual.
+    virtual ~Test() = default;
+
     virtual bool Run() = 0;
 };
 
