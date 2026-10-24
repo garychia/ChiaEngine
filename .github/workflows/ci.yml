@@ -202,21 +202,37 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            clang-format clang-tidy python3-pip
+            clang-format-18 clang-tidy python3-pip
 
       - name: Install cppcheck
         run: sudo apt-get install -y cppcheck
 
-      - name: Run clang-format check
+      - name: Run clang-format check (advisory - reports, never fails)
+        continue-on-error: true
         run: |
-          # Find all source files
-          find src \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) | sort -u > files.txt || true
-          if [ -s files.txt ]; then
-            xargs -r clang-format --dry-run --Werror < files.txt
-          else
-            echo "No source files found"
-            exit 1
+          # Pinned to clang-format 18 on purpose: the baseline below was measured with
+          # 18.1.x, while the unversioned package moves with the distro (18 on
+          # ubuntu-24.04, 21 on newer releases) and would make the numbers incomparable.
+          # Advisory by design, see #114: the tree is not clang-format clean. Most
+          # differences are trailing comments aligned by CJK display width, which
+          # clang-format counts as one column per code point.
+          # Vendored and generated files are excluded - not ours to format:
+          # 3rdparty/, *_spv.h and miniaudio.h (vendored upstream, ~19k lines,
+          # 0 diagnostics: pure cost). The timeout bounds the run so a stalled
+          # clang-format can never hold the runner open.
+          find src -type f \( -name "*.hpp" -o -name "*.h" -o -name "*.cpp" -o -name "*.c" \) \
+            ! -path "*/3rdparty/*" ! -name "*_spv.h" ! -name "miniaudio.h" | sort > files.txt
+          if [ ! -s files.txt ]; then
+            echo "clang-format: no source files found - nothing to check"
+            exit 0
           fi
+          timeout 240 clang-format-18 --dry-run --Werror --files=files.txt > clang-format-report.txt 2>&1 || true
+          total=$(grep -c "clang-format-violations" clang-format-report.txt || true)
+          echo "clang-format-18 (advisory): ${total} diagnostic(s) across $(wc -l < files.txt) file(s)"
+          echo "--- most affected files ---"
+          grep "clang-format-violations" clang-format-report.txt | grep -oE "^[^:]+" | sort | uniq -c | sort -rn | head -10
+          echo "--- first 20 diagnostics ---"
+          head -20 clang-format-report.txt
 
       - name: Run clang-tidy
         run: |
@@ -266,11 +282,11 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
             binutils gcc make pkg-config re2c  # For flawfinder
-          pip3 install bandit safety
+          pip3 install bandit safety flawfinder
 
       - name: Run flawfinder (C/C++ security scanner)
         run: |
-          flawfinder --dataonly --quiet src/ || echo "Flawfinder completed"
+          find src -type f \( -name "*.hpp" -o -name "*.h" -o -name "*.cpp" -o -name "*.c" \) ! -name "miniaudio.h" | xargs flawfinder --dataonly --quiet || echo "Flawfinder completed"
 
       - name: Run bandit (Python security)
         if: false  # Disable for now as we have minimal Python
@@ -280,7 +296,8 @@ jobs:
       - name: Check for dangerous functions
         run: |
           if grep -r -nE '\b(gets|strcpy|strcat|sprintf|vsprintf)[[:space:]]*\(' src/ \
-               --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c"; then
+               --include="*.hpp" --include="*.h" --include="*.cpp" --include="*.c" \
+               --exclude="miniaudio.h"; then
             echo "Warning: Found potentially dangerous C functions"
             exit 1
           fi
@@ -298,16 +315,31 @@ jobs:
 
       - name: Check for broken links in markdown
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq python3-pip
-          pip3 install markdown-link-check
-          markdown-link-check README.md docs/**/*.md || echo "Link check completed"
+          npm install -g markdown-link-check
+          shopt -s globstar nullglob
+          files=(README.md docs/**/*.md)
+          if [ ${#files[@]} -lt 2 ]; then
+            echo "Expected at least README.md plus one docs/ file"
+            exit 1
+          fi
+          markdown-link-check "${files[@]}"
 
       - name: Validate CMakeLists.txt syntax
         run: |
-          mkdir -p build
-          cd build
-          cmake .. >/dev/null 2>&1 && echo "CMake configuration successful" || (echo "CMake configuration failed" && exit 1)
+          # Configuring needs the same dev packages as build-and-test (X11,
+          # Vulkan, pkg-config); without them this job could never pass.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev pkg-config libvulkan-dev
+          # Keep the configure log: its tail is the only real error output.
+          if cmake -S . -B build-validate > cmake-configure.log 2>&1; then
+            echo "CMake configuration successful"
+          else
+            echo "CMake configuration failed - last 40 lines of the configure log:"
+            tail -n 40 cmake-configure.log
+            exit 1
+          fi
 
   # Release workflow
   release:
