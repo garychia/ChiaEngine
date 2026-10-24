@@ -216,14 +216,17 @@ jobs:
           # Advisory by design, see #114: the tree is not clang-format clean. Most
           # differences are trailing comments aligned by CJK display width, which
           # clang-format counts as one column per code point.
-          # Vendored and generated files are excluded - not ours to format.
+          # Vendored and generated files are excluded - not ours to format:
+          # 3rdparty/, *_spv.h and miniaudio.h (vendored upstream, ~19k lines,
+          # 0 diagnostics: pure cost). The timeout bounds the run so a stalled
+          # clang-format can never hold the runner open.
           find src -type f \( -name "*.hpp" -o -name "*.h" -o -name "*.cpp" -o -name "*.c" \) \
-            ! -path "*/3rdparty/*" ! -name "*_spv.h" | sort > files.txt
+            ! -path "*/3rdparty/*" ! -name "*_spv.h" ! -name "miniaudio.h" | sort > files.txt
           if [ ! -s files.txt ]; then
             echo "clang-format: no source files found - nothing to check"
             exit 0
           fi
-          clang-format-18 --dry-run --Werror --files=files.txt > clang-format-report.txt 2>&1 || true
+          timeout 240 clang-format-18 --dry-run --Werror --files=files.txt > clang-format-report.txt 2>&1 || true
           total=$(grep -c "clang-format-violations" clang-format-report.txt || true)
           echo "clang-format-18 (advisory): ${total} diagnostic(s) across $(wc -l < files.txt) file(s)"
           echo "--- most affected files ---"
