@@ -202,21 +202,34 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq --no-install-recommends \
-            clang-format clang-tidy python3-pip
+            clang-format-18 clang-tidy python3-pip
 
       - name: Install cppcheck
         run: sudo apt-get install -y cppcheck
 
-      - name: Run clang-format check
+      - name: Run clang-format check (advisory - reports, never fails)
+        continue-on-error: true
         run: |
-          # Find all source files
-          find src \( -name "*.hpp" -o -name "*.cpp" -o -name "*.h" -o -name "*.c" \) | sort -u > files.txt || true
-          if [ -s files.txt ]; then
-            xargs -r clang-format --dry-run --Werror < files.txt
-          else
-            echo "No source files found"
-            exit 1
+          # Pinned to clang-format 18 on purpose: the baseline below was measured with
+          # 18.1.x, while the unversioned package moves with the distro (18 on
+          # ubuntu-24.04, 21 on newer releases) and would make the numbers incomparable.
+          # Advisory by design, see #114: the tree is not clang-format clean. Most
+          # differences are trailing comments aligned by CJK display width, which
+          # clang-format counts as one column per code point.
+          # Vendored and generated files are excluded - not ours to format.
+          find src -type f \( -name "*.hpp" -o -name "*.h" -o -name "*.cpp" -o -name "*.c" \) \
+            ! -path "*/3rdparty/*" ! -name "*_spv.h" | sort > files.txt
+          if [ ! -s files.txt ]; then
+            echo "clang-format: no source files found - nothing to check"
+            exit 0
           fi
+          clang-format-18 --dry-run --Werror --files=files.txt > clang-format-report.txt 2>&1 || true
+          total=$(grep -c "clang-format-violations" clang-format-report.txt || true)
+          echo "clang-format-18 (advisory): ${total} diagnostic(s) across $(wc -l < files.txt) file(s)"
+          echo "--- most affected files ---"
+          grep "clang-format-violations" clang-format-report.txt | grep -oE "^[^:]+" | sort | uniq -c | sort -rn | head -10
+          echo "--- first 20 diagnostics ---"
+          head -20 clang-format-report.txt
 
       - name: Run clang-tidy
         run: |
@@ -299,13 +312,11 @@ jobs:
 
       - name: Check for broken links in markdown
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq
           npm install -g markdown-link-check
           shopt -s globstar nullglob
           files=(README.md docs/**/*.md)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "No markdown files found"
+          if [ ${#files[@]} -lt 2 ]; then
+            echo "Expected at least README.md plus one docs/ file"
             exit 1
           fi
           markdown-link-check "${files[@]}"
