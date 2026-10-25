@@ -39,8 +39,8 @@ class TextureAssetViewTest : public Test
     {
         TEST_MESSAGE("TextureAssetView: typed LoadedEvent -> renderer decode/upload bridge (principle #4)");
 
-        const char *pathA = "/tmp/chia_view_a.bin";
-        const char *pathB = "/tmp/chia_view_b.bin";
+        const char *pathA = TestTempFilePath("chia_view_a.bin");
+        const char *pathB = TestTempFilePath("chia_view_b.bin");
         WriteTestFile(pathA, "TEX-A-BYTES");
         WriteTestFile(pathB, "TEX-B-BYTES");
 

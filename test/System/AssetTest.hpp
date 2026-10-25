@@ -36,9 +36,9 @@ class AssetTest : public Test
     {
         TEST_MESSAGE("Asset async load + dedup + content-addressed byte sharing");
 
-        const char *pathA = "/tmp/chia_asset_a.bin";
-        const char *pathB = "/tmp/chia_asset_b.bin";
-        const char *pathCopy = "/tmp/chia_asset_a_copy.bin"; // 內容與 A 相同,不同 key
+        const char *pathA = TestTempFilePath("chia_asset_a.bin");
+        const char *pathB = TestTempFilePath("chia_asset_b.bin");
+        const char *pathCopy = TestTempFilePath("chia_asset_a_copy.bin"); // 內容與 A 相同,不同 key
         WriteTestFile(pathA, "AAA");
         WriteTestFile(pathB, "BBBB");
         WriteTestFile(pathCopy, "AAA"); // byte-identical to A
