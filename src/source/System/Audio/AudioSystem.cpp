@@ -54,7 +54,12 @@ void AudioSystem::Shutdown()
         if (s)
         {
             if (s->pMaSound)
+            {
                 ma_sound_uninit(static_cast<ma_sound *>(s->pMaSound));
+                // #126:ma_sound 是 new 出來的;uninit 只釋放 miniaudio 內部資源,物件本身要 delete
+                // (同一段的 pMaBuffer 兩者都做了,這裡先前漏了 delete)
+                delete static_cast<ma_sound *>(s->pMaSound);
+            }
             if (s->pMaBuffer)
             {
                 ma_audio_buffer_uninit(static_cast<ma_audio_buffer *>(s->pMaBuffer));
@@ -269,7 +274,11 @@ void AudioSystem::Stop(uint32_t sound)
     if (s)
     {
         if (s->pMaSound)
+        {
             ma_sound_uninit(static_cast<ma_sound *>(s->pMaSound));
+            // #126:同 Shutdown —— uninit 之後要釋放 new 出來的 ma_sound 物件
+            delete static_cast<ma_sound *>(s->pMaSound);
+        }
         if (s->pMaBuffer)
         {
             ma_audio_buffer_uninit(static_cast<ma_audio_buffer *>(s->pMaBuffer));

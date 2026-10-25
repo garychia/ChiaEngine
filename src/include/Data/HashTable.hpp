@@ -88,7 +88,7 @@ template <class Key, class Value> class HashTable
         {
             if (!oldInsertMarks[i] || oldDeleteMarks[i])
                 continue;
-            Insert(oldPairs[i].Key(), oldPairs[i].Value());
+            Place(oldPairs[i].Key(), oldPairs[i].Value());
         }
         delete[] oldPairs;
         delete[] oldInsertMarks;
@@ -124,7 +124,7 @@ template <class Key, class Value> class HashTable
         {
             if (!oldInsertMarks[i] || oldDeleteMarks[i])
                 continue;
-            Insert(oldPairs[i].Key(), oldPairs[i].Value());
+            Place(oldPairs[i].Key(), oldPairs[i].Value());
         }
         delete[] oldPairs;
         delete[] oldInsertMarks;
@@ -320,13 +320,22 @@ template <class Key, class Value> class HashTable
         ReleaseMemory();
     }
 
-    template <class KeyType, class ValueType> void Insert(KeyType &&key, ValueType &&value)
+    // 只把鍵值放進桶裡:不碰 nElements、不觸發自動擴縮。
+    // Insert()(單筆寫入)與 Expand()/Shrink()(重建)共用它 —— 重建若走 Insert(),
+    // 一來 nElements 會被再累加一次(實測 512 筆變 1155,#127),二來每次重插都會
+    // 再喊一次 DynamicallyResize(),在重建途中引發巢狀擴縮。
+    template <class KeyType, class ValueType> void Place(KeyType &&key, ValueType &&value)
     {
         const auto idx = FindPosition(key, false);
         insertMarks[idx] = true;
         deleteMarks[idx] = false;
         pairs[idx].Key() = Types::Forward<decltype(key)>(key);
         pairs[idx].Value() = Types::Forward<decltype(value)>(value);
+    }
+
+    template <class KeyType, class ValueType> void Insert(KeyType &&key, ValueType &&value)
+    {
+        Place(Types::Forward<decltype(key)>(key), Types::Forward<decltype(value)>(value));
         nElements++;
         DynamicallyResize();
     }

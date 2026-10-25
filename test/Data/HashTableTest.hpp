@@ -82,6 +82,38 @@ class HashTableTest : public Test
         EXPECT_TRUE(ht10[3] == 30, "ht10[3] should be 30.", true);
         SUCCESS_MESSAGE("HashTable Value Retrieval");
 
+        TEST_MESSAGE("HashTable length across resize (regression #127)");
+        {
+            // 前面的案例都只放 1~3 個鍵,永遠碰不到 Expand/Shrink。這裡刻意塞超過
+            // 初始桶數,逼出重建路徑:重建若走會累加計數的 Insert(),Length() 就會
+            // 變成「實際元素數 + 重建時重插的數量」,而且是 2 倍負載率 → 提早擴張。
+            HashTable<int, int> htBig;
+            const int n = 512;
+            for (int i = 0; i < n; i++)
+                htBig.Insert(i, i * 10);
+
+            EXPECT_TRUE(htBig.Length() == static_cast<size_t>(n),
+                        "Length must stay equal to the number of live elements after Expand.", true);
+
+            bool allFound = true;
+            for (int i = 0; i < n; i++)
+            {
+                if (!htBig.Contains(i) || htBig[i] != i * 10)
+                {
+                    allFound = false;
+                    break;
+                }
+            }
+            EXPECT_TRUE(allFound, "Every key and value must survive the rebuild.", true);
+
+            // 移除一半 → 負載率掉到 0.3 以下 → 觸發 Shrink 重建,計數同樣不得重複累加
+            for (int i = 0; i < n / 2; i++)
+                htBig.Remove(i);
+            EXPECT_TRUE(htBig.Length() == static_cast<size_t>(n / 2),
+                        "Length must track removals across rebuilds (Shrink path).", true);
+        }
+        SUCCESS_MESSAGE("HashTable length across resize (regression #127)");
+
         return true;
     }
 };
