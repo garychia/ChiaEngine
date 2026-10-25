@@ -120,17 +120,17 @@ class MalformedCorpusTest : public Test
             garbage[i] = NextRngByte(); // 全亂數垃圾
 
         std::vector<CorpusEntry> entries;
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_valid.bin", "valid (64B, magic 'CHIA')", valid, true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_empty.bin", "empty file (0B, trunc at offset 0)", DynamicArray<unsigned char>(), true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_trunc1.bin", "truncated at offset 1 (1B)", DynamicArray<unsigned char>(&valid[0], 1), true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_trunc16.bin", "truncated at offset 16 (16B)", DynamicArray<unsigned char>(&valid[0], 16), true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_trunc32.bin", "truncated at offset 32 (32B)", DynamicArray<unsigned char>(&valid[0], 32), true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_trunc63.bin", "truncated at offset 63 (size-1)", DynamicArray<unsigned char>(&valid[0], 63), true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_badmagic.bin", "corrupt magic (bad header)", corruptMagic, true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_badbyte.bin", "corrupt byte (flipped)", corruptFlip, true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_garbage.bin", "garbage (128B pseudo-random)", garbage, true, true});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_missing_late.bin", "missing file (released after dispatch)", DynamicArray<unsigned char>(), false, false});
-        entries.push_back(CorpusEntry{"/tmp/chia_corpus_missing_early.bin", "missing file (released before dispatch)", DynamicArray<unsigned char>(), false, false});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_valid.bin"), "valid (64B, magic 'CHIA')", valid, true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_empty.bin"), "empty file (0B, trunc at offset 0)", DynamicArray<unsigned char>(), true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_trunc1.bin"), "truncated at offset 1 (1B)", DynamicArray<unsigned char>(&valid[0], 1), true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_trunc16.bin"), "truncated at offset 16 (16B)", DynamicArray<unsigned char>(&valid[0], 16), true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_trunc32.bin"), "truncated at offset 32 (32B)", DynamicArray<unsigned char>(&valid[0], 32), true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_trunc63.bin"), "truncated at offset 63 (size-1)", DynamicArray<unsigned char>(&valid[0], 63), true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_badmagic.bin"), "corrupt magic (bad header)", corruptMagic, true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_badbyte.bin"), "corrupt byte (flipped)", corruptFlip, true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_garbage.bin"), "garbage (128B pseudo-random)", garbage, true, true});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_missing_late.bin"), "missing file (released after dispatch)", DynamicArray<unsigned char>(), false, false});
+        entries.push_back(CorpusEntry{TestTempFilePath("chia_corpus_missing_early.bin"), "missing file (released before dispatch)", DynamicArray<unsigned char>(), false, false});
 
         // 寫檔(只寫 writeFile 的;missing 不寫)
         for (size_t i = 0; i < entries.size(); i++)
@@ -202,8 +202,8 @@ class MalformedCorpusTest : public Test
         Check(manager.GetNumSharedBlocks() == 9, "batch2: no block leaked for missing file");
 
         // ── 批次 3:兩顆不同 key、byte-identical 的 corrupt 內容 → 共享同一 block ──
-        const char *pathC1 = "/tmp/chia_corpus_share1.bin";
-        const char *pathC2 = "/tmp/chia_corpus_share2.bin";
+        const char *pathC1 = TestTempFilePath("chia_corpus_share1.bin");
+        const char *pathC2 = TestTempFilePath("chia_corpus_share2.bin");
         DynamicArray<unsigned char> sharedBytes(16);
         for (size_t i = 0; i < 16; i++)
             sharedBytes[i] = 0xAB; // 任何「內容相同」都行 — 這裡用固定壞位元組
@@ -307,8 +307,9 @@ class AssetRoundtripTest : public Test
         for (size_t k = 0; k < sizeof(kSizes) / sizeof(kSizes[0]); k++)
         {
             const size_t size = kSizes[k];
-            char path[64];
-            std::snprintf(path, sizeof(path), "/tmp/chia_roundtrip_%zu.bin", size);
+            char fileName[64];
+            std::snprintf(fileName, sizeof(fileName), "chia_roundtrip_%zu.bin", size);
+            const char *path = TestTempFilePath(fileName);
 
             DynamicArray<unsigned char> original(size);
             for (size_t i = 0; i < size; i++)
@@ -422,12 +423,12 @@ class TextureViewHookTest : public Test
         TEST_MESSAGE("TextureViewHookTest: renderer hook fires with correct bytes on valid load; "
                      "safe on malformed / empty / missing assets");
 
-        const char *pathValid = "/tmp/chia_view_valid.bin";
-        const char *pathBad = "/tmp/chia_view_bad.bin";
-        const char *pathEmpty = "/tmp/chia_view_empty.bin";
-        const char *pathMissing = "/tmp/chia_view_missing.bin";
-        const char *pathDetach = "/tmp/chia_view_detach.bin";
-        const char *pathReattach = "/tmp/chia_view_reattach.bin";
+        const char *pathValid = TestTempFilePath("chia_view_valid.bin");
+        const char *pathBad = TestTempFilePath("chia_view_bad.bin");
+        const char *pathEmpty = TestTempFilePath("chia_view_empty.bin");
+        const char *pathMissing = TestTempFilePath("chia_view_missing.bin");
+        const char *pathDetach = TestTempFilePath("chia_view_detach.bin");
+        const char *pathReattach = TestTempFilePath("chia_view_reattach.bin");
 
         const char *validContent = "TEX-VALID-1234"; // 14 bytes,含 magic-ish 檔頭
         const size_t validLen = std::strlen(validContent);
@@ -456,7 +457,11 @@ class TextureViewHookTest : public Test
         Check(manager.DispatchCompletedEvents() == 1, "S1 valid: 1 completion event");
         Check(recorder.calls == 1, "S1 valid: hook fired once");
         Check(recorder.lastBytes.Length() == validLen, "S1 valid: hook bytes length matches");
-        Check(std::memcmp(&recorder.lastBytes[0], validContent, validLen) == 0, "S1 valid: hook bytes content matches file");
+        // 先確認長度足夠再 memcmp:上面的 Check 是非致命的(不會 early return),如果 hook
+        // 沒收到 bytes,這一行會對空陣列取 &[0] → 越界。長度不足就讓它照樣「失敗」,不要 crash。
+        Check(recorder.lastBytes.Length() >= validLen &&
+                  std::memcmp(&recorder.lastBytes[0], validContent, validLen) == 0,
+              "S1 valid: hook bytes content matches file");
         Check(recorder.lastHash == ExpectedHash(reinterpret_cast<const unsigned char *>(validContent), validLen),
               "S1 valid: hook content hash matches FNV1A64(bytes)");
 

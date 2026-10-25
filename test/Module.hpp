@@ -45,7 +45,10 @@ class Module
         bool allSuccessful = true;
         for (auto &test : tests)
         {
-            allSuccessful = allSuccessful && test->Run();
+            // Run every test even after a failure: with `allSuccessful && test->Run()`
+            // the first failure would silently skip the rest of the module, hiding
+            // further breakage behind it (#110). test->Run() must therefore come first.
+            allSuccessful = test->Run() && allSuccessful;
         }
         return allSuccessful;
     }

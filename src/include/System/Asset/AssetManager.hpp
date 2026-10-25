@@ -48,9 +48,11 @@ struct Asset
     }
 
     // 方便存取(載入成功後才有意義;pBlock 由 LoadWorker 在完成前填好)。
+    // 載入失敗(pBlock 空)時回傳空陣列 —— 與 ContentHash() 的防呆一致,不對 null 解參考。
     const DynamicArray<unsigned char> &Bytes() const
     {
-        return pBlock->bytes;
+        static const DynamicArray<unsigned char> kEmpty;
+        return pBlock ? pBlock->bytes : kEmpty;
     }
 
     uint64_t ContentHash() const
