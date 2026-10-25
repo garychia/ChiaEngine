@@ -100,7 +100,7 @@ class AudioSystemTest : public Test
         // 用私有方法不可達;改走 LoadSound 需檔案。這裡改測 decode 契約:
         // 間接驗證 — 造一個 temp 檔給 LoadSound(裝置無關,LoadSound 不開裝置)。
         // 檔案寫入臨時路徑,測完刪除。
-        const char *tmpPath = "/tmp/chia_audio_test_silent.wav";
+        const char *tmpPath = TestTempFilePath("chia_audio_test_silent.wav"); // #130:平台臨時目錄(Windows 沒有 /tmp)
         {
             std::FILE *f = std::fopen(tmpPath, "wb");
             if (!f)
@@ -145,7 +145,7 @@ class AudioPlaybackTest : public Test
             SUCCESS_MESSAGE("AudioSystem playback skipped: no audio device (headless) — documented per #59");
             return true;
         }
-        const char *tmpPath = "/tmp/chia_audio_test_silent.wav";
+        const char *tmpPath = TestTempFilePath("chia_audio_test_silent.wav"); // #130:平台臨時目錄(Windows 沒有 /tmp)
         {
             DynamicArray<unsigned char> wav = MakeSilentWav(44100, 2, 44100);
             std::FILE *f = std::fopen(tmpPath, "wb");
