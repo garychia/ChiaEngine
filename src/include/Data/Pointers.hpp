@@ -130,6 +130,21 @@ template <class T> class Ptr
 //   * 控制塊(PtrInfo)由 weakCount 決定存亡。weakCount 初始 = 1(phantom,
 //     代表「strong 擁有群」的存在);strong 歸零時釋放 phantom,控制塊最後由
 //     「把 weakCount 減到 0 的那一位」刪除 → 恰好一次、無 UAF(boost/std 同款手法)。
+//
+// #122:clang-analyzer 的 cplusplus.NewDelete 會在「透過 pInfo 呼叫」的幾個位置
+// (實測:CleanUp 的 DecrementSharedCounter、SharedPtr::IsValid、WeakPtr::Lock)
+// 報 use-after-free。**這是誤報**,成因是分析器無法追蹤 atomic 計數的實際值,於是會
+// 走進「weakCount 減到 0 → delete this」這條在當下不可能成立的分支:只要還有任何
+// WeakPtr 存活、或 strong 還沒歸零,weakCount 必然 ≥ 2(每個 WeakPtr 各佔 1,phantom
+// 那 1 直到 strong 歸零才釋放)。分析器在該分支把控制塊 delete 掉,回頭又使用它 →
+// 才被標成 UAF。控制塊不可能在還有持有者時被釋放,是本設計的核心不變式。
+// 佐證(2026-10):OwnershipTest 的 "WeakPtr Lock After Free" 與
+// "WeakPtr Lock Release Race"(8 執行緒以 Lock 與最後一次釋放交錯)覆蓋了這些轉換
+// 並在 CI 通過;另以 clang-tidy 18.1.8(與 CI 同版)在本機重現同一組警告,並把
+// 相同路徑的 harness 以 ASan+UBSan(開 leak detection)跑過 → 乾淨、無 UAF。
+// 因此這裡刻意不加逐行 NOLINT:被標記的行隨 TU/路徑而異(CI 報 :244/:314,本機報
+// :244/:499),逐行抑制會變成追逐移動目標。若日後真的找到可達的 UAF 路徑,以本段為
+// 起點推翻它 —— 那就該修設計,而不是加抑制。
 class PtrInfo
 {
   private:
@@ -258,7 +273,13 @@ template <class T> class SharedPtr
     template <class SubclassType, class... Args> static SharedPtr<T> Construct(Args... args)
     {
         SharedPtr<T> ptr;
-        ptr.pInfo = new PtrInfo(static_cast<void *>(static_cast<T *>(new SubclassType(args...))),
+        // #122:存 new 回傳的 SubclassType*,不要先轉成 T*。deleter 是
+        // PtrInfoDeleteTyped<SubclassType>(會把指標還原成 SubclassType* 再 delete),
+        // 若中間先做 static_cast<T *>,在 base subobject 不位於 offset 0 的繼承下,
+        // 還原後拿到的就不再是 new 回傳的那個位址 → delete 錯的位置。目前單一繼承鏈
+        // 的 offset 恰為 0 才沒出事;這裡讓「存什麼型別、就用什麼型別刪」保持一致,
+        // 直接把這個潛在陷阱移除(GetPtr<T>() 走的是正常的 upcast,不受影響)。
+        ptr.pInfo = new PtrInfo(static_cast<void *>(new SubclassType(args...)),
                                 &PtrInfoDeleteTyped<SubclassType>);
         return ptr;
     }
