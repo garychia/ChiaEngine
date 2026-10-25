@@ -108,8 +108,15 @@ class AudioSystemTest : public Test
                 SUCCESS_MESSAGE("AudioSystem decode test skipped (cannot write temp file)");
                 return true;
             }
-            std::fwrite(&wav[0], 1, wav.Length(), f);
+            const size_t written = std::fwrite(&wav[0], 1, wav.Length(), f);
             std::fclose(f);
+            // #135:fopen 成功不代表寫得進去(臨時目錄滿了/寫入短少 → 檔案會是 0 位元組)。
+            // 少了這個檢查,空檔案會被當成「解碼失敗」回報,訊息完全指錯方向。
+            if (written != wav.Length())
+            {
+                SUCCESS_MESSAGE("AudioSystem decode test skipped (temp file write failed)");
+                return true;
+            }
         }
         const uint32_t buf = sys.LoadSound(tmpPath);
         EXPECT_TRUE(buf != 0, "LoadSound decodes valid WAV to a buffer", true);
@@ -155,8 +162,15 @@ class AudioPlaybackTest : public Test
                 SUCCESS_MESSAGE("AudioSystem playback skipped (cannot write temp file)");
                 return true;
             }
-            std::fwrite(&wav[0], 1, wav.Length(), f);
+            const size_t written = std::fwrite(&wav[0], 1, wav.Length(), f);
             std::fclose(f);
+            // #135:同 decode 段 —— fopen 成功但寫入短少時,後面會誤報成載入/播放失敗。
+            if (written != wav.Length())
+            {
+                sys.Shutdown();
+                SUCCESS_MESSAGE("AudioSystem playback skipped (temp file write failed)");
+                return true;
+            }
         }
         const uint32_t buf = sys.LoadSound(tmpPath);
         EXPECT_TRUE(buf != 0, "loaded buffer", true);
