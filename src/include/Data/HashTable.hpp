@@ -131,6 +131,23 @@ template <class Key, class Value> class HashTable
         delete[] oldDeleteMarks;
     }
 
+    // Store a key/value into a bucket only: no nElements bookkeeping, no resize.
+    // Shared by Insert() and by the Expand()/Shrink() rebuild loops - a rebuild
+    // that went through Insert() re-counted every entry (measured: 512 inserts
+    // reported Length() == 1155, #127) and could trigger a nested resize.
+    // Returns true when it overwrote an existing live entry (#137); the caller
+    // needs that to know whether the element count actually grew.
+    template <class KeyType, class ValueType> bool Place(KeyType &&key, ValueType &&value)
+    {
+        const auto idx = FindPosition(key, false);
+        const bool existed = insertMarks[idx] && !deleteMarks[idx] && pairs[idx].Key() == key;
+        insertMarks[idx] = true;
+        deleteMarks[idx] = false;
+        pairs[idx].Key() = Types::Forward<decltype(key)>(key);
+        pairs[idx].Value() = Types::Forward<decltype(value)>(value);
+        return existed;
+    }
+
     size_t FindPosition(const Key &key, bool search) const
     {
         const auto hashValue = KeyHash<Key>::Generate(key);
@@ -320,23 +337,14 @@ template <class Key, class Value> class HashTable
         ReleaseMemory();
     }
 
-    // 只把鍵值放進桶裡:不碰 nElements、不觸發自動擴縮。
-    // Insert()(單筆寫入)與 Expand()/Shrink()(重建)共用它 —— 重建若走 Insert(),
-    // 一來 nElements 會被再累加一次(實測 512 筆變 1155,#127),二來每次重插都會
-    // 再喊一次 DynamicallyResize(),在重建途中引發巢狀擴縮。
-    template <class KeyType, class ValueType> void Place(KeyType &&key, ValueType &&value)
-    {
-        const auto idx = FindPosition(key, false);
-        insertMarks[idx] = true;
-        deleteMarks[idx] = false;
-        pairs[idx].Key() = Types::Forward<decltype(key)>(key);
-        pairs[idx].Value() = Types::Forward<decltype(value)>(value);
-    }
-
+    // Place() reports whether it overwrote a live entry. A key that is already
+    // present must update its value without growing the count (#137) - otherwise
+    // nElements drifts above the number of live elements and the load factor
+    // DynamicallyResize() computes from it is wrong.
     template <class KeyType, class ValueType> void Insert(KeyType &&key, ValueType &&value)
     {
-        Place(Types::Forward<decltype(key)>(key), Types::Forward<decltype(value)>(value));
-        nElements++;
+        if (!Place(Types::Forward<decltype(key)>(key), Types::Forward<decltype(value)>(value)))
+            nElements++;
         DynamicallyResize();
     }
 
