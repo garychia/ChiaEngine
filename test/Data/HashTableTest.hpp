@@ -1,5 +1,6 @@
 #include "Test.hpp"
 #include "Data/HashTable.hpp"
+#include <cstdint>
 #include <iostream>
 
 class HashTableTest : public Test
@@ -84,9 +85,11 @@ class HashTableTest : public Test
 
         TEST_MESSAGE("HashTable length across resize (regression #127)");
         {
-            // 前面的案例都只放 1~3 個鍵,永遠碰不到 Expand/Shrink。這裡刻意塞超過
-            // 初始桶數,逼出重建路徑:重建若走會累加計數的 Insert(),Length() 就會
-            // 變成「實際元素數 + 重建時重插的數量」,而且是 2 倍負載率 → 提早擴張。
+            // The earlier cases insert 1-3 keys and never reach Expand/Shrink. This
+            // one deliberately exceeds the initial bucket count to force the rebuild
+            // path: a rebuild that went through the counting Insert() made Length()
+            // "live elements + entries re-inserted during the rebuild", which also
+            // doubled the load factor and so expanded early.
             HashTable<int, int> htBig;
             const int n = 512;
             for (int i = 0; i < n; i++)
@@ -106,13 +109,45 @@ class HashTableTest : public Test
             }
             EXPECT_TRUE(allFound, "Every key and value must survive the rebuild.", true);
 
-            // 移除一半 → 負載率掉到 0.3 以下 → 觸發 Shrink 重建,計數同樣不得重複累加
+            // Removing half drops the load factor below 0.3 and triggers a Shrink
+            // rebuild; the count must not be re-added there either.
             for (int i = 0; i < n / 2; i++)
                 htBig.Remove(i);
             EXPECT_TRUE(htBig.Length() == static_cast<size_t>(n / 2),
                         "Length must track removals across rebuilds (Shrink path).", true);
         }
         SUCCESS_MESSAGE("HashTable length across resize (regression #127)");
+
+        TEST_MESSAGE("HashTable insert over an existing key (regression #137)");
+        {
+            // Insert() on a key that is already present must overwrite the value
+            // without growing the count. ComponentPool and EntityRegistry hit this
+            // on every swap-remove that moves the last element into its own slot, so
+            // the drift used to compound silently: Length() stayed one too high and
+            // DynamicallyResize() computed its load factor from the wrong number.
+            HashTable<int, int> htDup;
+            htDup.Insert(7, 70);
+            htDup.Insert(7, 71);
+
+            EXPECT_TRUE(htDup.Length() == 1,
+                        "Overwriting an existing key must not increase Length.", true);
+            EXPECT_TRUE(htDup[7] == 71, "Overwrite must replace the value.", true);
+            EXPECT_TRUE(htDup.Contains(7), "The key must still be present.", true);
+
+            // The compounding symptom: remove the only entry, table must be empty.
+            htDup.Remove(7);
+            EXPECT_TRUE(htDup.IsEmpty(),
+                        "After removing the only entry the table must be empty.", true);
+
+            // The real call-site shape: re-insert a key that is still live.
+            HashTable<uint32_t, uint32_t> htSwap;
+            htSwap.Insert(1u, 10u);
+            htSwap.Insert(2u, 20u);
+            htSwap.Insert(2u, 20u);
+            EXPECT_TRUE(htSwap.Length() == 2,
+                        "A redundant re-insert must not inflate Length.", true);
+        }
+        SUCCESS_MESSAGE("HashTable insert over an existing key (regression #137)");
 
         return true;
     }
