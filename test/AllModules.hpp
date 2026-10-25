@@ -20,8 +20,10 @@ class AllModules
     bool Run()
     {
         bool allSuccessful = true;
+        // Every module runs even after one fails, so a broken module cannot hide the
+        // results of the modules after it (#110).
         for (auto &module : modules)
-            allSuccessful = allSuccessful && module.Run();
+            allSuccessful = module.Run() && allSuccessful;
         return allSuccessful;
     }
 };
