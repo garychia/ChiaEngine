@@ -17,7 +17,7 @@ class IComponentPool
     virtual uint32_t GetTypeId() const = 0;
 
     // 池內容的確定性雜湊(FNV-1a 64):replay 驗證用。
-    // 前提:元件是 trivially copyable,且儲存時 padding 已歸零(見 Add)。
+    // 前提:元件是 trivially copyable,且型別沒有隱含 padding(見 Add 與 #129)。
     virtual uint64_t Hash() const = 0;
 
     // Entity 銷毀時清掉它的元件
@@ -64,11 +64,17 @@ template <class T> class ComponentPool : public IComponentPool
         if (Contains(entityIndex))
             return Get(entityIndex); // 已存在,回傳現有(冪等)
         lookup.Insert(entityIndex, static_cast<uint32_t>(data.GetNElements()));
-        // 存進去之後把 padding 歸零:Append 的 copy 只寫 members,陣列容量
-        // 的未初始化記憶體會漏進 padding 位元組(空 struct 實測會留垃圾),
-        // 導致 Hash() 讀到未定義位元組 → 兩局同輸入不同 hash。
-        // 解法:先 Append,再 memset 整塊儲存,最後成員指派(assignment 只寫
-        // members、不動 padding)→ padding 永遠為零,Hash 逐 bit 確定。
+        // Hash() 逐 bit 讀 sizeof(T),所以這裡要讓「每個成員」都被寫成確定值:
+        // 先 Append 佔位,再 memset 整塊儲存,最後指派 —— 成員一定被寫過,陣列
+        // 容量的未初始化記憶體不會漏進成員位元組(空 struct 實測會留垃圾),
+        // 「同值 → 同 hash」因此成立。
+        // #129:但這「不能」保證隱含 padding 為零。trivially copyable 的指派允許
+        // 被實作成整塊複製(padding 的值是 unspecified、對 conforming program
+        // 無從觀察,as-if 規則放行),來源暫時物件的 padding 會蓋掉剛清零的位元組
+        // —— gcc 與 clang 就此不同,甚至同一份 build 的兩次執行都可能不同。
+        // 契約:元件型別請保持無隱含 padding(需要填充就宣告明確的成員,沒被指名
+        // 的陣列成員由聚合初始化值初始化為 0,是標準保證的),否則改用 per-type
+        // hasher。詳見 #129。
         data.Append(value);
         std::memset(&data.GetLast(), 0, sizeof(T));
         data.GetLast() = value;

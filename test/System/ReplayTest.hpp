@@ -56,11 +56,16 @@ class InputMoveSystem : public IModule
     }
 };
 
-// 含 padding 的元件:驗證 Add 的零初始化讓 Hash() 不受未定義 padding 影響
+// 元件 hash 的決定性:Add 會把整塊儲存清零再指派,所以每個成員都是確定值。
+// 注意:隱含 padding 的位元組在 C++ 是 unspecified —— 指派可能被實作成整塊複製,
+// 把來源暫時物的 padding 一起帶進來,gcc 與 clang 的行為就不同(#129)。所以這裡
+// 宣告「明確」的填充成員:聚合初始化會把沒被指名的成員值初始化(0),這是標準
+// 保證的。測試因此驗證引擎真正保證的東西:同值 → 同 hash。
 struct PaddedComponent
 {
     float value;
-    uint8_t tag; // sizeof 含 3 個 padding byte
+    uint8_t tag;
+    uint8_t explicitPadding[3]; // 明確填充,取代 compiler 的隱含 padding
 };
 
 // ---------------- 測試主體 ----------------
