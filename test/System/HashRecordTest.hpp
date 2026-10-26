@@ -68,6 +68,17 @@ class HashRecordTest : public Test
             EXPECT_TRUE(secondName.find("Beta") != std::string::npos, "Pool 1 is Beta.", true);
             EXPECT_TRUE(thirdName.find("Tag") != std::string::npos, "Pool 2 is Tag.", true);
             EXPECT_TRUE(record.pools[2].elementCount == 1, "Element counts are recorded.", true);
+
+            // 「解析成功」比「字串裡有 Alpha」嚴格:萃取失敗時回傳的是整串
+            // __PRETTY_FUNCTION__/__FUNCSIG__,那當然也含 Alpha。所以再要求它不含空白
+            // 與巨集名 —— 這樣 MSVC 那條分岔(沒有 __PRETTY_FUNCTION__,只有
+            // __FUNCSIG__)如果解析壞了,測試會紅,而不是靜默留一坨原文。
+            for (size_t i = 0; i < record.pools.GetNElements(); i++)
+            {
+                const std::string name(record.pools[i].typeName);
+                EXPECT_TRUE(name.find(' ') == std::string::npos && name.find("TypeNameRaw") == std::string::npos,
+                            "Type name is parsed, not a raw compiler signature.", true);
+            }
         }
 
         TEST_MESSAGE("the text form is self-describing and reproducible");
