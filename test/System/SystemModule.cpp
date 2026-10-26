@@ -11,6 +11,7 @@
 #include "IO/IOTest.hpp"
 #include "InputSystemTest.hpp"
 #include "ModuleTest.hpp"
+#include "PaddingAuditTest.hpp" // #142:元件無隱含 padding 的編譯期/執行期稽核
 #include "PhysicsOverlapTest.hpp"
 #include "PhysicsSystemTest.hpp"
 #include "SceneSystemTest.hpp"
@@ -41,6 +42,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();
+    AddTest<paddingaudittest::PaddingAuditTest>(); // #142:無隱含 padding 稽核
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();
     AddTest<inputtest::KeyboardHandlerTest>();
