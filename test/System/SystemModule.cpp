@@ -2,6 +2,7 @@
 #include "AssetFormatValidationTest.hpp"
 #include "AssetTest.hpp"
 #include "CameraControllerTest.hpp"
+#include "EntityIdentityTest.hpp" // #149:world hash 涵蓋 entity 世代與 dense 走訪順序
 #include "FrameCounterTest.hpp"
 #include "GUITest.hpp"
 #include "InspectorTest.hpp"
@@ -35,6 +36,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<operationtest::SystemOperationTest>();
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
+    AddTest<entityidentitytest::EntityIdentityTest>(); // #149:entity 身分進 hash
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<guitest::GUITest>();
     AddTest<guitest::HierarchyRowTest>();
