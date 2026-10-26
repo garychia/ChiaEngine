@@ -226,27 +226,14 @@ jobs:
           echo "hash sequences found: ${#files[@]}"
           printf '  %s\n' "${files[@]}"
 
-          cmp_files=()
-          info_files=()
-          for f in "${files[@]}"; do
-            case "$f" in
-              *msvc*)
-                # MSVC's FP/ABI policy is its own question (#143): list it, do not
-                # compare it yet.
-                info_files+=("$f")
-                ;;
-              *)
-                cmp_files+=("$f")
-                ;;
-            esac
-          done
-          if [ "${#info_files[@]}" -gt 0 ]; then
-            for f in "${info_files[@]}"; do echo "(informational, not compared: $f)"; done
-          fi
+          # All four legs are compared. MSVC was measured to agree value-for-value
+          # with gcc (only its text-mode line endings differ, hence
+          # --strip-trailing-cr), so excluding it would weaken the claim for nothing.
+          cmp_files=("${files[@]}")
 
           # A missing leg must fail the job, never look like agreement.
-          if [ "${#cmp_files[@]}" -lt 3 ]; then
-            echo "::error::expected gcc + clang + appleclang hash sequences, found ${#cmp_files[@]}"
+          if [ "${#cmp_files[@]}" -lt 4 ]; then
+            echo "::error::expected gcc + clang + appleclang + msvc hash sequences, found ${#cmp_files[@]}"
             exit 1
           fi
 
@@ -254,7 +241,7 @@ jobs:
           echo "reference sequence: $ref"
           status=0
           for f in "${cmp_files[@]}"; do
-            if diff -u "$ref" "$f"; then
+            if diff -u --strip-trailing-cr "$ref" "$f"; then
               echo "OK: $f matches the reference"
             else
               echo "::error file=$f::replay hash sequence differs from $ref - the cross-compiler determinism claim does not hold"
