@@ -4,8 +4,10 @@
 #include "Data/DynamicArray.hpp"
 #include "Data/Hash.hpp"
 #include "Data/HashTable.hpp"
+#include "Data/TypeName.hpp"
 #include "System/Module/TypeId.hpp"
 
+#include <string_view> // 稽核用的型別名(#150)
 #include <type_traits>
 
 // 元件池的型別消除介面:World 用同一份陣列管理所有型別的池。
@@ -16,10 +18,18 @@ class IComponentPool
 
     virtual uint32_t GetTypeId() const = 0;
 
+    // 稽核用名字(#150):只出現在 World::WriteHashRecord(),不進 Hash()。
+    // 為什麼不進:名字格式隨 compiler 而異(見 Data/TypeName.hpp),餵進 digest 就等於
+    // 把 compiler 依賴塞回 hash —— 那正是 #147 拿掉的東西。
+    virtual std::string_view GetTypeName() const = 0;
+
+    // 池內元素數量(記錄用;Hash() 自己走訪,不需要這個)
+    virtual uint32_t GetElementCount() const = 0;
+
     // 池內容的確定性雜湊(FNV-1a 64):replay 驗證用。
     // 前提:元件型別沒有隱含 padding(用 CHIA_PADDING_FREE 在型別定義處把關,
-    // 見 Data/Padding.hpp 與 #129 / #142)。有 padding 的型別請改用明確的填充成員,
-    // 或提供 HashComponent<T> 專案化。
+    // 見 Data/Padding.hpp 與 #129 / #142)。有 padding 的型別請補上明確的填充成員;
+    // 無法變 dense 的型別不該放進會被雜湊的池。
     virtual uint64_t Hash() const = 0;
 
     // Entity 銷毀時清掉它的元件
@@ -44,6 +54,16 @@ template <class T> class ComponentPool : public IComponentPool
     uint32_t GetTypeId() const override
     {
         return TypeId<T>();
+    }
+
+    std::string_view GetTypeName() const override
+    {
+        return TypeName<T>();
+    }
+
+    uint32_t GetElementCount() const override
+    {
+        return GetNElements();
     }
 
     void RemoveEntity(uint32_t entityIndex) override

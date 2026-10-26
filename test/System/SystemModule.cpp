@@ -5,6 +5,7 @@
 #include "EntityIdentityTest.hpp" // #149:world hash 涵蓋 entity 世代與 dense 走訪順序
 #include "FrameCounterTest.hpp"
 #include "GUITest.hpp"
+#include "HashRecordTest.hpp" // #150:世界指紋的自我描述(hash + 配方 + 型別清單)
 #include "InspectorTest.hpp"
 #include "EditorSessionTest.hpp"
 #include "PanelRegionsTest.hpp"
@@ -36,6 +37,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<operationtest::SystemOperationTest>();
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
+    AddTest<hashrecordtest::HashRecordTest>(); // #150:hash 記錄/配方版本/型別清單
     AddTest<entityidentitytest::EntityIdentityTest>(); // #149:entity 身分進 hash
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<guitest::GUITest>();
