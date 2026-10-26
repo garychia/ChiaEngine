@@ -9,11 +9,17 @@
 // 用途:稽核 —— replay 記錄裡「註冊了哪些元件型別、依什麼順序」(#150)。
 //
 // 它不是 hash 輸入,也不該變成 hash 輸入:各家 compiler 的名字格式不同
-// (GCC "[with T = X]"、Clang "[T = X]"、MSVC "TypeNameRaw<struct X>(void)"),
-// 拿它算 hash 等於把 compiler 依賴重新塞回 World::Hash() —— 那正是 #147 拿掉的東西。
+// (GCC/Clang 用 __PRETTY_FUNCTION__: "[with T = X]" / "[T = X]";MSVC 沒有
+// __PRETTY_FUNCTION__,要用 __FUNCSIG__: "TypeNameRaw<struct X>(void)")。拿它算 hash
+// 等於把 compiler 依賴重新塞回 World::Hash() —— 那正是 #147 拿掉的東西。
 template <class T> constexpr const char *TypeNameRaw() noexcept
 {
+#if defined(_MSC_VER)
+    // 實測 MSVC 會直接 error C2065 說 __PRETTY_FUNCTION__ 未宣告,所以這裡分岔。
+    return __FUNCSIG__;
+#else
     return __PRETTY_FUNCTION__;
+#endif
 }
 
 constexpr bool StartsWith(std::string_view text, std::string_view prefix) noexcept
