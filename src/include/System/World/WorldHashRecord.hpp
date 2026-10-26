@@ -11,12 +11,13 @@
 // 否則舊的 replay 記錄會靜默失去意義:同一個 64-bit 值不再代表同一件事。
 // 「hash 是 source of truth」的前提,是記錄裡寫清楚它是用哪一版算出來的(#150)。
 //
-// v1 (main, 2026-10):entity 數 + 每個元件池的 (TypeId<T>() + data bytes + owners),
-//                     池依註冊順序。
-// v2 (隨 #147 / #149 落地):registry 身分(dense raw handle:世代 + index)+ 每個池的
-//                     (data + owners) + 池的註冊序號;不再含 TypeId。
-//                     ⚠ 這兩支 PR 本人要負責把這個常數改成 2 並更新本註解。
-inline constexpr uint32_t CHIA_WORLD_HASH_RECIPE_VERSION = 1;
+// v1 (已淘汰):entity 數 + 每個元件池的 (TypeId<T>() + data bytes + owners),池依註冊順序。
+//              這個配方不可靠:TypeId 是執行期「第一次請求」的計數器,值隨服務註冊順序
+//              變動、每份 binary 各一組,於是同一份邏輯狀態在不同 build 會得到不同 hash
+//              (#141)。指紋編號從 6eb9a3a05706dd54 變成 115770ae32637597 的那次就是它。
+// v2 (現行 main,#147 + #149):registry 身分(dense 走訪序 + 每筆完整 raw handle:
+//              世代 | index)+ 每個元件池的 (位置 + data bytes + owners);不含 TypeId。
+inline constexpr uint32_t CHIA_WORLD_HASH_RECIPE_VERSION = 2;
 
 // 記錄裡的一個元件池;註冊順序由它在陣列中的位置表示。
 struct HashRecordPool
