@@ -73,8 +73,8 @@ template <class T, class... Member> constexpr bool NoPadding(Member T::*...pMemb
     static_assert(::NoPadding<TYPE>(__VA_ARGS__),                                                                 \
                   #TYPE " is not proven padding-free: World::Hash() reads sizeof(T) bytes, so implicit padding " \
                         "- or an unmarked nested member type - makes the hash compiler-dependent (#129 / "       \
-                        "#142 / #148). List every leaf member, mark nested types with CHIA_PADDING_FREE as "    \
-                        "well, or specialize HashComponent<T>.");                                             \
+                        "#142 / #148). List every leaf member and mark nested types with CHIA_PADDING_FREE too; " \
+                        "a type that cannot be made dense does not belong in a hashed component pool.");        \
     constexpr bool ChiaPaddingFreeMarker(TYPE * /*pUnused*/) noexcept                                             \
     {                                                                                                             \
         return true;                                                                                              \
