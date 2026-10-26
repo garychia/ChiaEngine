@@ -127,6 +127,11 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Run unit tests
+        env:
+          # Each leg dumps its replay hash sequence here; determinism-compare diffs
+          # them. "Replay hash identical across compilers" has to be a checked
+          # fact, not a sentence in a document (#144).
+          CHIA_REPLAY_HASH_DUMP: replay-hashes-${{ matrix.compiler }}.txt
         run: |
           test_bin=./build/bin/TestMain
           if [ "${{ runner.os }}" = "Windows" ]; then test_bin="${test_bin}.exe"; fi
@@ -136,6 +141,17 @@ jobs:
           else
             "${test_bin}"
           fi
+
+      - name: Upload replay hash sequence
+        # Uploaded even when the tests fail: the sequence is the diagnostic, and the
+        # compare job fails loudly on a missing leg rather than assuming agreement.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-hashes-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          path: replay-hashes-${{ matrix.compiler }}.txt
+          if-no-files-found: warn
+          retention-days: 30
 
       # Diagnostic for #108: capture the macOS SIGTRAP (exit 133) backtrace.
       # continue-on-error + `|| true` guarantee this can never fail the job.
@@ -186,6 +202,66 @@ jobs:
             Testing/*/Test*.log
             build/Testing/*/Test*.log
           retention-days: 30
+
+  # "Replay hash identical across compilers" is a sentence in the determinism
+  # document; this job turns it into a checked fact (#144). Every leg runs the same
+  # scripted input through its own compiler and dumps its hash sequence; the
+  # sequences have to agree bit for bit.
+  determinism-compare:
+    name: Determinism (cross-compiler replay hashes)
+    runs-on: ubuntu-24.04
+    needs: [build-and-test]
+    if: always() && github.event_name != 'schedule'
+    steps:
+      - name: Download per-leg hash sequences
+        uses: actions/download-artifact@v4
+        with:
+          pattern: replay-hashes-*-${{ github.sha }}
+          path: hashes
+
+      - name: Compare sequences
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find hashes -name 'replay-hashes-*.txt' | sort)
+          echo "hash sequences found: ${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+
+          cmp_files=()
+          info_files=()
+          for f in "${files[@]}"; do
+            case "$f" in
+              *msvc*)
+                # MSVC's FP/ABI policy is its own question (#143): list it, do not
+                # compare it yet.
+                info_files+=("$f")
+                ;;
+              *)
+                cmp_files+=("$f")
+                ;;
+            esac
+          done
+          if [ "${#info_files[@]}" -gt 0 ]; then
+            for f in "${info_files[@]}"; do echo "(informational, not compared: $f)"; done
+          fi
+
+          # A missing leg must fail the job, never look like agreement.
+          if [ "${#cmp_files[@]}" -lt 3 ]; then
+            echo "::error::expected gcc + clang + appleclang hash sequences, found ${#cmp_files[@]}"
+            exit 1
+          fi
+
+          ref="${cmp_files[0]}"
+          echo "reference sequence: $ref"
+          status=0
+          for f in "${cmp_files[@]}"; do
+            if diff -u "$ref" "$f"; then
+              echo "OK: $f matches the reference"
+            else
+              echo "::error file=$f::replay hash sequence differs from $ref - the cross-compiler determinism claim does not hold"
+              status=1
+            fi
+          done
+          exit "$status"
 
   # Code quality checks
   code-quality:

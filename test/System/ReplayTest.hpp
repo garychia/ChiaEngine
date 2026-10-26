@@ -9,6 +9,25 @@
 #include "System/World/World.hpp"
 
 #include <cmath>
+#include <cstdlib>
+#include <fstream>
+
+// CI 用(#144):把 per-tick hash 序列寫成檔案,讓每個 compiler leg 產出一份可直接互相
+// 比對的紀錄 —— 「replay hash identical across compilers」要是被檢查的事實,不是宣稱。
+// 沒設 CHIA_REPLAY_HASH_DUMP 時完全不作用,測試行為本身不受影響。
+inline void DumpReplayHashSequence(const DynamicArray<uint64_t> &hashes, uint64_t finalHash)
+{
+    const char *pPath = std::getenv("CHIA_REPLAY_HASH_DUMP");
+    if (pPath == nullptr || *pPath == '\0')
+        return;
+    std::ofstream out(pPath);
+    if (!out.is_open())
+        return;
+    out << std::hex;
+    for (size_t i = 0; i < hashes.GetNElements(); i++)
+        out << "tick " << i << " " << hashes[i] << "\n";
+    out << "final " << finalHash << "\n";
+}
 
 // WorldTest.hpp 已在同一 TU 定義全域 struct Position — 整個測試收進
 // namespace replaytest 隔離,避免與 SystemModule.cpp 的合併編譯衝突。
@@ -109,6 +128,7 @@ class ReplayTest : public Test
                 liveHashes.Append(sim.world.Hash());
             }
             const uint64_t liveFinal = sim.world.Hash();
+            DumpReplayHashSequence(liveHashes, liveFinal); // CI 跨 leg 比對用(#144)
 
             EXPECT_TRUE(recorder.GetInputCount() == static_cast<size_t>(N), "錄到 N 筆輸入.", true);
             EXPECT_TRUE(liveFinal != 0, "hash 非零(狀態有內容).", true);
