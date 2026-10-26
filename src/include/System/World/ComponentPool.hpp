@@ -106,10 +106,14 @@ template <class T> class ComponentPool : public IComponentPool
     uint64_t Hash() const override
     {
         uint64_t h = FNV1A64_OFFSET;
-        h = FNV1A64(h, GetTypeId());
+        // 刻意不雜湊 GetTypeId():它是執行期「第一次請求」的計數器,會隨服務註冊順序
+        // 變動、每份 binary 各一組 → 餵進 hash 會讓跨 build 的比較失去意義(#141)。
+        // 型別之間的區分由 World::Hash() 摺入的池位置承擔;型別清單另存於 hash 記錄
+        // (World::WriteHashRecord(),#150)。
+        //
         // 空型別(tag 元件)沒有成員:那 1 byte 的儲存值 unspecified,讀它會讓「同值」
         // 的兩個 world 產生不同 hash(建構路徑不同 → 殘值不同)。所以刻意不讀它 ——
-        // 空型別池的內容完全由 TypeId 與 owners 決定。
+        // 空型別池的內容完全由 owners 與池位置決定。
         if constexpr (!std::is_empty_v<T>)
         {
             for (size_t i = 0; i < data.GetNElements(); i++)
