@@ -9,6 +9,9 @@
 #include "EntityRegistry.hpp"
 #include "System/Module/TypeId.hpp"
 #include "View.hpp"
+#include "WorldHashRecord.hpp"
+
+#include <ostream>
 
 // 世界的門面:Entity 生命週期 + 元件 CRUD + View 走訪。
 // 元件池以 TypeId<T>() 為 key 註冊,與 EngineContext 共用型別 ID 計數器。
@@ -153,6 +156,35 @@ class World
             h = FNV1A64(h, pools[i]->Hash());
         }
         return h;
+    }
+
+    // ---- 自我描述的指紋(#150)----
+    // hash 值 + 配方版本 + 註冊型別清單(依註冊順序)+ 元素數量。
+    // 為什麼需要:hash 本身看不出「這一組型別」。#147 之後型別身分不在 digest 裡,
+    // 所以「兩個 hash 相同」回答不了「是不是同一個配方、同一組型別」—— 那份回答要靠
+    // 這份記錄,而不是靠 64-bit 值反推。刻意用 in-place 建構(不靠容器的複製/搬移)。
+    void BuildHashRecord(WorldHashRecord &record) const
+    {
+        record.recipeVersion = CHIA_WORLD_HASH_RECIPE_VERSION;
+        record.hash = Hash();
+        record.entityCount = GetEntityCount();
+        record.poolCount = static_cast<uint32_t>(pools.GetNElements());
+        for (size_t i = 0; i < pools.GetNElements(); i++)
+        {
+            HashRecordPool entry;
+            entry.typeId = pools[i]->GetTypeId();
+            entry.typeName = pools[i]->GetTypeName();
+            entry.elementCount = pools[i]->GetElementCount();
+            record.pools.Append(entry);
+        }
+    }
+
+    // 方便版:直接把上面那份記錄以文字形式寫出去(replay 檔 / CI artifact 可直接 diff)。
+    void WriteHashRecord(std::ostream &out) const
+    {
+        WorldHashRecord record;
+        BuildHashRecord(record);
+        WriteWorldHashRecord(out, record);
     }
 };
 
