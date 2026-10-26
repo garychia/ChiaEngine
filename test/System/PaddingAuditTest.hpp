@@ -41,6 +41,40 @@ static_assert(!::NoPadding<PaddedProbe>(&PaddedProbe::a, &PaddedProbe::b),
               "PaddedProbe must be caught as padded: the guard has to have teeth.");
 static_assert(::NoPadding<EmptyProbe>(), "An empty type has no padding bytes.");
 
+// #148:尺寸守恆對「成員型別內部的 padding」是盲的 —— sizeof(成員) 已經含了那份
+// padding,等號兩邊一起變大。所以成員型別必須自己帶 CHIA_PADDING_FREE 的標記。
+struct NestedDenseProbe
+{
+    DenseProbe inner; // 已標記 + 尺寸守恆 → 可以證明
+};
+
+struct UnmarkedProbe
+{
+    float a; // 沒有標記:就算它自己沒 padding,也沒人證明過
+};
+
+struct HoldsUnmarkedProbe
+{
+    UnmarkedProbe inner;
+};
+
+union MismatchedPayload
+{
+    float f;
+    double d;
+};
+
+struct HoldsUnionProbe
+{
+    MismatchedPayload payload; // 寫了 float 之後 double 的那 4 byte 是 unspecified
+};
+
+CHIA_PADDING_FREE(NestedDenseProbe, &NestedDenseProbe::inner);
+static_assert(!::NoPadding<HoldsUnmarkedProbe>(&HoldsUnmarkedProbe::inner),
+              "An unmarked nested member type must not pass (#148).");
+static_assert(!::NoPadding<HoldsUnionProbe>(&HoldsUnionProbe::payload),
+              "A size-mismatched union member must not pass (#148).");
+
 // ---------------- 工具:造出「成員有值、但儲存空間先被垃圾填過」的元件 ----------------
 
 // 這正是 #129 的失敗場景:trivially copyable 的複製/指派允許整塊複製,來源物件的
@@ -70,6 +104,12 @@ class PaddingAuditTest : public Test
         EXPECT_TRUE(::NoPadding<DenseProbe>(&DenseProbe::a, &DenseProbe::b), "DenseProbe is padding-free.", true);
         EXPECT_TRUE(!::NoPadding<PaddedProbe>(&PaddedProbe::a, &PaddedProbe::b), "PaddedProbe is detected.", true);
         EXPECT_TRUE(::NoPadding<EmptyProbe>(), "EmptyProbe has no padding bytes.", true);
+        EXPECT_TRUE(::NoPadding<NestedDenseProbe>(&NestedDenseProbe::inner),
+                    "A marked, size-conserving nested member type passes (#148).", true);
+        EXPECT_TRUE(!::NoPadding<HoldsUnmarkedProbe>(&HoldsUnmarkedProbe::inner),
+                    "An unmarked nested member type is rejected: sizeof() would hide its padding (#148).", true);
+        EXPECT_TRUE(!::NoPadding<HoldsUnionProbe>(&HoldsUnionProbe::payload),
+                    "A size-mismatched union member is rejected (#148).", true);
 
         TEST_MESSAGE("every sim component is padding-free");
         EXPECT_TRUE(::NoPadding<Point3D>(&Point3D::x, &Point3D::y, &Point3D::z), "Point3D: 3 members = sizeof.",

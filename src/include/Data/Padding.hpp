@@ -30,20 +30,54 @@
 // 「任何含 float 的 struct」都回 false —— 包含完全無 padding 的 struct{float,float,float}
 // (±0.0 與 NaN payload 讓標準意義下的「同值」不保證同位元組),所以那條 trait 不能
 // 拿來當這個 guard。
+// 全域 fallback:沒有被 CHIA_PADDING_FREE 標記的型別一律視為「未證明」。
+constexpr bool ChiaPaddingFreeMarker(...) noexcept
+{
+    return false;
+}
+
+namespace chia_padding_detail
+{
+// 成員型別檢查:算術 / enum / 空型別放行(陣列先去掉維度),其餘交給 ADL 標記。
+template <class T> constexpr bool MemberIsChecked() noexcept
+{
+    using U = std::remove_all_extents_t<T>;
+    if constexpr (std::is_arithmetic_v<U> || std::is_enum_v<U> || std::is_empty_v<U>)
+        return true;
+    else
+        return ChiaPaddingFreeMarker(static_cast<U *>(nullptr));
+}
+
+template <class T, class... Member> constexpr bool MembersAreChecked(Member T::*...pMember) noexcept
+{
+    return (MemberIsChecked<Member>() && ...);
+}
+} // namespace chia_padding_detail
+
 template <class T, class... Member> constexpr bool NoPadding(Member T::*...pMember) noexcept
 {
     if constexpr (std::is_empty_v<T>)
         return true; // 沒有成員 → 沒有隱含 padding
     else
-        return sizeof(T) == (sizeof(((T *)nullptr)->*pMember) + ... + 0);
+        return sizeof(T) == (sizeof(((T *)nullptr)->*pMember) + ... + 0) &&
+               chia_padding_detail::MembersAreChecked<T>(pMember...);
 }
 
 // 用法(緊接在型別定義之後):
 //   CHIA_PADDING_FREE(Position, &Position::x, &Position::y, &Position::z);
+// 巢狀型別要各別標記(#148):sizeof(成員) 會把成員型別「自己」的 padding 一起算進去,
+// 所以只比尺寸會讓「內部有 padding 的子結構」靜默通過 —— 實測 struct Inner{float;uint8_t;}
+// 自己的檢查回 false,但 struct Outer{Inner in;} 回 true。標記 = 在型別所屬 namespace
+// 發出 ChiaPaddingFreeMarker(TYPE *) 多載,靠 ADL 找到;沒有標記就編譯失敗。
 #define CHIA_PADDING_FREE(TYPE, ...)                                                                              \
     static_assert(::NoPadding<TYPE>(__VA_ARGS__),                                                                 \
-                  #TYPE " has implicit padding: World::Hash() reads sizeof(T) bytes, so a padded type hashes "   \
-                        "differently per compiler (#129 / #142). Declare explicit filler members that are "       \
-                        "always initialized, or specialize HashComponent<T>.")
+                  #TYPE " is not proven padding-free: World::Hash() reads sizeof(T) bytes, so implicit padding " \
+                        "- or an unmarked nested member type - makes the hash compiler-dependent (#129 / "       \
+                        "#142 / #148). List every leaf member, mark nested types with CHIA_PADDING_FREE as "    \
+                        "well, or specialize HashComponent<T>.");                                             \
+    constexpr bool ChiaPaddingFreeMarker(TYPE * /*pUnused*/) noexcept                                             \
+    {                                                                                                             \
+        return true;                                                                                              \
+    }
 
 #endif // PADDING_HPP
