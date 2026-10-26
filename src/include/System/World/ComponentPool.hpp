@@ -6,7 +6,7 @@
 #include "Data/HashTable.hpp"
 #include "System/Module/TypeId.hpp"
 
-#include <cstring> // std::memset
+#include <type_traits>
 
 // 元件池的型別消除介面:World 用同一份陣列管理所有型別的池。
 class IComponentPool
@@ -17,7 +17,9 @@ class IComponentPool
     virtual uint32_t GetTypeId() const = 0;
 
     // 池內容的確定性雜湊(FNV-1a 64):replay 驗證用。
-    // 前提:元件是 trivially copyable,且型別沒有隱含 padding(見 Add 與 #129)。
+    // 前提:元件型別沒有隱含 padding(用 CHIA_PADDING_FREE 在型別定義處把關,
+    // 見 Data/Padding.hpp 與 #129 / #142)。有 padding 的型別請改用明確的填充成員,
+    // 或提供 HashComponent<T> 專案化。
     virtual uint64_t Hash() const = 0;
 
     // Entity 銷毀時清掉它的元件
@@ -64,19 +66,15 @@ template <class T> class ComponentPool : public IComponentPool
         if (Contains(entityIndex))
             return Get(entityIndex); // 已存在,回傳現有(冪等)
         lookup.Insert(entityIndex, static_cast<uint32_t>(data.GetNElements()));
-        // Hash() 逐 bit 讀 sizeof(T),所以這裡要讓「每個成員」都被寫成確定值:
-        // 先 Append 佔位,再 memset 整塊儲存,最後指派 —— 成員一定被寫過,陣列
-        // 容量的未初始化記憶體不會漏進成員位元組(空 struct 實測會留垃圾),
-        // 「同值 → 同 hash」因此成立。
-        // #129:但這「不能」保證隱含 padding 為零。trivially copyable 的指派允許
-        // 被實作成整塊複製(padding 的值是 unspecified、對 conforming program
-        // 無從觀察,as-if 規則放行),來源暫時物件的 padding 會蓋掉剛清零的位元組
-        // —— gcc 與 clang 就此不同,甚至同一份 build 的兩次執行都可能不同。
-        // 契約:元件型別請保持無隱含 padding(需要填充就宣告明確的成員,沒被指名
-        // 的陣列成員由聚合初始化值初始化為 0,是標準保證的),否則改用 per-type
-        // hasher。詳見 #129。
+        // Hash() 逐位元組讀 sizeof(T) → 池中每個元素的所有 byte 都必須有確定的值。
+        // 型別沒有隱含 padding(CHIA_PADDING_FREE 保證)時,複製建構/指派會寫到
+        // 每一個 byte,所以直接指派就够了。
+        //
+        // 舊版寫法 `data.Append(value); memset(&GetLast(), 0, sizeof(T)); GetLast() = value;`
+        // 是無效的:memset 緊接著被整塊指派覆蓋掉(死碼),padding 的值其實來自來源
+        // 物件的 padding。clang -O2 保留那些垃圾 byte、gcc -O2 恰好清零 —— 「靠 memset
+        // 保證確定性」會讓 hash 依編譯器而異,這正是 #129 / #142 要消滅的東西。
         data.Append(value);
-        std::memset(&data.GetLast(), 0, sizeof(T));
         data.GetLast() = value;
         owners.Append(entityIndex);
         return &data.GetLast();
@@ -109,8 +107,14 @@ template <class T> class ComponentPool : public IComponentPool
     {
         uint64_t h = FNV1A64_OFFSET;
         h = FNV1A64(h, GetTypeId());
-        for (size_t i = 0; i < data.GetNElements(); i++)
-            h = FNV1A64(h, &data[i], sizeof(T));
+        // 空型別(tag 元件)沒有成員:那 1 byte 的儲存值 unspecified,讀它會讓「同值」
+        // 的兩個 world 產生不同 hash(建構路徑不同 → 殘值不同)。所以刻意不讀它 ——
+        // 空型別池的內容完全由 TypeId 與 owners 決定。
+        if constexpr (!std::is_empty_v<T>)
+        {
+            for (size_t i = 0; i < data.GetNElements(); i++)
+                h = FNV1A64(h, &data[i], sizeof(T));
+        }
         for (size_t i = 0; i < owners.GetNElements(); i++)
             h = FNV1A64(h, owners[i]);
         return h;
