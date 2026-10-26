@@ -127,15 +127,25 @@ class World
         return static_cast<ComponentPool<T> *>(itr->Value());
     }
 
-    // 整個世界狀態的確定性雜湊:entity 數 + 每個元件池(data + owners,依註冊順序)。
+    // 整個世界狀態的確定性雜湊:entity 數 + 每個元件池(位置 + data + owners,依註冊順序)。
     // 兩個相同輸入的執行必須逐 bit 相同;任何狀態分歧都會反映在 hash 上。
     // 註:池註冊順序 = 首次 AddComponent<T> 的順序,對確定性 Sim 來說是確定的。
+    //
+    // 摺入的是「池的位置」而不是 TypeId<T>():TypeId 是執行期第一次請求的計數器,
+    // 會隨服務註冊順序變動(EngineContext 與 World 共用同一個計數器),餵進 hash 就等於
+    // 讓 hash 依賴與世界狀態無關的執行順序 → 跨 build 比較失去意義(#141)。
+    // 位置的來源是 Sim 程式碼本身(首次 AddComponent<T> 的順序),因此是確定性的。
+    // 代價:型別身分不再進 hash(位置 + 位元組 + owners 就是完整輸入)。若要稽核
+    // 「哪些型別」,replay 記錄應另外帶一份註冊型別名清單,而不是靠 64-bit hash 反推。
     uint64_t Hash() const
     {
         uint64_t h = FNV1A64_OFFSET;
         h = FNV1A64(h, GetEntityCount());
         for (size_t i = 0; i < pools.GetNElements(); i++)
+        {
+            h = FNV1A64(h, static_cast<uint32_t>(i)); // 池的位置:序列歧義不靠型別 id
             h = FNV1A64(h, pools[i]->Hash());
+        }
         return h;
     }
 };

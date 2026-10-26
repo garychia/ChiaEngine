@@ -19,6 +19,7 @@
 #include "RendererContractTest.hpp"
 #include "FrameInterpreterTest.hpp" // #84:真實 seam(純解譯器)契約測試
 #include "TextureAssetViewTest.hpp"
+#include "TypeIdentityTest.hpp" // #141:hash 不依賴執行期 TypeId 計數器
 #include "WorldTest.hpp"
 #include "AudioSystemTest.hpp"
 #include "PongTest.hpp" // #89: Pong demo 無頭測試(Sim 層隔離,無 GPU)
@@ -43,6 +44,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();
     AddTest<paddingaudittest::PaddingAuditTest>(); // #142:無隱含 padding 稽核
+    AddTest<typeidentitytest::TypeIdentityTest>(); // #141:hash 不依賴 TypeId 計數器
     AddTest<CameraControllerTest>();
     AddTest<inputtest::KeyCombinationTest>();
     AddTest<inputtest::KeyboardHandlerTest>();
