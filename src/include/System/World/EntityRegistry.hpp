@@ -2,6 +2,7 @@
 #define ENTITY_REGISTRY_HPP
 
 #include "Data/DynamicArray.hpp"
+#include "Data/Hash.hpp" // FNV1A64:狀態雜湊(#149)
 #include "Data/HashTable.hpp"
 #include "Entity.hpp"
 
@@ -82,6 +83,23 @@ class EntityRegistry
     uint32_t GetNElements() const
     {
         return static_cast<uint32_t>(dense.GetNElements());
+    }
+
+    // 狀態雜湊:每個存活 entity 的完整 raw handle(generation | index),照 dense 的順序。
+    //
+    // 為什麼需要(#149):World::Hash() 以前只摺入 entity「數量」,所以
+    // 「slot 0 從未被回收」與「slot 0 建了又刪再建(世代 1 → 2)」—— 元件位元組完全相同
+    // —— 會產生同一個 hash。只差 handle 回收歷史的 desync 因此看不到,而 stale handle
+    // 的 Alive() 結果在兩個 state 之間是不一樣的。
+    // dense 的順序同時是 View 走訪順序,所以順序本身也進 hash(它是可觀察的)。
+    // freeIndices 不摺入:它只影響「下一個 entity 拿到哪個 slot」,那個結果會由之後的
+    // Create 反映在 dense/generations 上;若哪天 sim 直接觀察 free-list 順序,再補。
+    uint64_t Hash() const
+    {
+        uint64_t h = FNV1A64_OFFSET;
+        for (size_t i = 0; i < dense.GetNElements(); i++)
+            h = FNV1A64(h, dense[i]);
+        return h;
     }
 
     // dense 位置 -> 完整 handle(供走訪)
