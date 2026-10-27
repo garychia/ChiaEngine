@@ -342,8 +342,13 @@ class InputHandlerTest : public Test
         EXPECT_TRUE(handler.HandleMouseInput(mouseEvent), "layerA 滑鼠回 true → 處理成功.", false);
         EXPECT_TRUE(probeA.mouseCalls == 2 && probeB.mouseCalls == 0, "layerA 處理成功 → layerB 不被呼叫.", false);
 
-        // 註:pLayerA / pLayerB 刻意不 delete(InputHandler 無移除 layer 的 API,
-        // singleton 會繼續持有指標直到程序結束 — 測試二進位生命週期短,可接受)。
+        // pLayerA / pLayerB 以 new 配置,InputHandler 沒有移除 layer 的 API。
+        // 測試二維在這裡即將結束,且 InputHandler 無解構子也不會在程序結束
+        // 時解引用這些指標,所以在此 delete 是安全的(不會懸空存取)——同時也
+        // 讓新加入的 ASan/UBSan CI 腿通過(否則這兩個 layer 與它們的
+        // Callback 包裝物會被 LeakSanitizer 通報)。
+        delete pLayerA;
+        delete pLayerB;
         SUCCESS_MESSAGE("InputInputHandler");
         return true;
     }
