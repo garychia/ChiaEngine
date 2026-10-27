@@ -1,0 +1,27 @@
+---
+# clang-tidy configuration (#123).
+#
+# The code-quality job runs clang-tidy over the tree (see .github/workflows/ci.yml).
+# Before this file existed it ran with clang-tidy's defaults, and because that step
+# reports rather than fails, findings were visible but never remembered. This file
+# fixes *what* is looked for; it does not make the step fail - that is a separate
+# decision (the determinism document lists it as kept-by-review for exactly that
+# reason).
+#
+# The check list is deliberately small: whole categories are enabled, the noisy
+# members of those categories are disabled by name. There is no naming or style
+# policy here on purpose - inventing one in a config file would be a review rule
+# pretending to be a check. Use clang-format (already enforced) for formatting.
+Checks: >
+  clang-diagnostic-*,
+  clang-analyzer-*,
+  bugprone-*,
+  performance-*,
+  portability-*,
+  -clang-analyzer-alpha.*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -performance-inefficient-string-concatenation
+WarningsAsErrors: ''
+HeaderFilterRegex: '.*'
+FormatStyle: none
