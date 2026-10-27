@@ -316,6 +316,10 @@ template <class Key, class Value> class HashTable
 
     HashTable &operator=(HashTable &&other) noexcept
     {
+        // 竊取 other 的指標前,必須先釋放 *this 已持有的資源 — 否則 *this
+        // 原本的 buckets/標示陣列永遠失去參照(HashTable::Clear() 透過
+        // *this = HashTable() 走此路徑,見 ASan/UBSan CI 腿發現的 leak)。
+        ReleaseMemory();
         size = other.size;
         sizeIndex = other.sizeIndex;
         nElements = other.nElements;
