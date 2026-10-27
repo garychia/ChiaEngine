@@ -121,7 +121,15 @@ template <class T> class Str
 
     Str<T> &operator=(const Str<T> &s) noexcept
     {
-        CopyPtr(&s[0], s.length);
+        if (this != &s)
+        {
+            // Copy-assignment used to leak the old buffer: CopyPtr allocates a new
+            // one and overwrites ptr without freeing what was there. Move-assignment
+            // (below) deletes first; copy must match. Self-assignment guard required:
+            // deleting ptr before CopyPtr would read freed memory otherwise.
+            delete[] ptr;
+            CopyPtr(&s[0], s.length);
+        }
         return *this;
     }
 

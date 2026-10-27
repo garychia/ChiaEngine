@@ -113,6 +113,9 @@ template <class T> class DynamicArray : public Array<T>
     {
         // Issue #85: KEEP capacity — callers do not free, they reset. Frame::Clear()
         // runs every frame; dropping the buffer here means a cold realloc every frame.
+        // nElements = 0 is correct: ~Array() -> ReleaseData() -> delete[] destroys the
+        // live elements when the array dies, and Append overwrites dropped slots in the
+        // meantime (String::operator= now frees the buffer it replaces, see Str.hpp).
         nElements = 0;
     }
 
