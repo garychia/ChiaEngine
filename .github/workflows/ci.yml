@@ -132,6 +132,11 @@ jobs:
           # them. "Replay hash identical across compilers" has to be a checked
           # fact, not a sentence in a document (#144).
           CHIA_REPLAY_HASH_DUMP: replay-hashes-${{ matrix.compiler }}.txt
+          # Self-describing fingerprint of the same run: recipe version + registered
+          # component type list (#150). Deliberately a separate file: the type-name
+          # column is compiler-specific, so it must never be diffed the way the
+          # value-only hash sequence above is.
+          CHIA_HASH_RECORD_DUMP: hash-record-${{ matrix.compiler }}.txt
         run: |
           test_bin=./build/bin/TestMain
           if [ "${{ runner.os }}" = "Windows" ]; then test_bin="${test_bin}.exe"; fi
@@ -150,6 +155,19 @@ jobs:
         with:
           name: replay-hashes-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
           path: replay-hashes-${{ matrix.compiler }}.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload world hash record
+        # Audit trail, not a comparison: the record carries the recipe version and the
+        # registered component type list. Its name column is compiler-specific by
+        # design (see Data/TypeName.hpp), so determinism-compare checks only that the
+        # recipe version agrees across legs and prints the records for the log.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hash-records-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          path: hash-record-${{ matrix.compiler }}.txt
           if-no-files-found: warn
           retention-days: 30
 
@@ -219,6 +237,12 @@ jobs:
           pattern: replay-hashes-*-${{ github.sha }}
           path: hashes
 
+      - name: Download per-leg world hash records
+        uses: actions/download-artifact@v4
+        with:
+          pattern: hash-records-*-${{ github.sha }}
+          path: records
+
       - name: Compare sequences
         run: |
           set -euo pipefail
@@ -245,6 +269,40 @@ jobs:
               echo "OK: $f matches the reference"
             else
               echo "::error file=$f::replay hash sequence differs from $ref - the cross-compiler determinism claim does not hold"
+              status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Check the recorded recipe agrees across legs
+        run: |
+          set -euo pipefail
+          mapfile -t records < <(find records -name 'hash-record-*.txt' | sort)
+          echo "hash records found: ${#records[@]}"
+          printf '  %s\n' "${records[@]}"
+
+          # The records are deliberately NOT compared value-for-value: the name
+          # column comes from __PRETTY_FUNCTION__ / __FUNCSIG__ and therefore
+          # differs per compiler by design (see Data/TypeName.hpp). What must agree
+          # is the recipe - if two legs hashed different inputs, the sequence
+          # comparison above was meaningless even when it passed (#150). The records
+          # are printed so the artifact trail is readable straight from the log.
+          if [ "${#records[@]}" -lt 4 ]; then
+            echo "::error::expected gcc + clang + appleclang + msvc hash records, found ${#records[@]}"
+            exit 1
+          fi
+
+          ref_recipe=""
+          status=0
+          for f in "${records[@]}"; do
+            recipe=$(head -n 1 "$f" | tr -d '\r')
+            echo "--- $f"
+            sed 's/\r$//' "$f"
+            if [ -z "$ref_recipe" ]; then
+              ref_recipe="$recipe"
+              echo "reference recipe: $recipe"
+            elif [ "$recipe" != "$ref_recipe" ]; then
+              echo "::error file=$f::recipe '$recipe' differs from '$ref_recipe' - the legs did not hash the same inputs"
               status=1
             fi
           done
