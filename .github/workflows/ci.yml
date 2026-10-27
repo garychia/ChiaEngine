@@ -221,6 +221,62 @@ jobs:
             build/Testing/*/Test*.log
           retention-days: 30
 
+  # ASan/UBSan runtime sanitizer leg (#125). The determinism document used to assert
+  # "ASan/UBSan clean on main" with no job behind it; this is the job. Debug build with
+  # halt_on_error=1 on both sanitizers, so a leak or UB fails the run instead of
+  # annotating it - the leg exists to be able to disagree with us.
+  sanitizers:
+    name: ASan/UBSan
+    runs-on: ubuntu-24.04
+    if: github.event_name != 'schedule'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            cmake g++ git libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxi-dev pkg-config libvulkan-dev ccache \
+            ninja-build xvfb
+
+      - name: Setup ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/ccache
+            ~/.ccache
+          key: ccache-sanitizers-${{ hashFiles('CMakeLists.txt', 'src/CMakeLists.txt') }}
+          restore-keys: |
+            ccache-sanitizers-
+
+      - name: Configure CMake with ASan/UBSan
+        run: |
+          cmake -B build-asan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DGLFW_BUILD_TESTS=OFF \
+            -DGLFW_BUILD_EXAMPLES=OFF \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -GNinja
+
+      - name: Build with sanitizers
+        run: cmake --build build-asan --parallel
+
+      - name: Run tests with ASan/UBSan
+        # xvfb: the windowing tests need a display, same as the build legs.
+        run: xvfb-run -a ./build/bin/TestMain
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+
   # "Replay hash identical across compilers" is a sentence in the determinism
   # document; this job turns it into a checked fact (#144). Every leg runs the same
   # scripted input through its own compiler and dumps its hash sequence; the

@@ -71,6 +71,7 @@ A violation turns a check red.
 | Replay hash sequence identical across compiler legs | `test/System/ReplayTest.hpp` + `.github/workflows/ci.yml` | `determinism-compare` job (gcc, clang, appleclang, msvc) |
 | FP configuration pinned | `CMakeLists.txt` | configure-time `FATAL_ERROR` |
 | Gating CI jobs run even when a dependency failed | `.github/workflows/ci.yml` | `always()` present in the workflow |
+| ASan/UBSan clean | `.github/workflows/ci.yml` | `ASan/UBSan` job: Debug + `-fsanitize=address,undefined` + `halt_on_error=1` |
 
 ## Non-negotiables: kept by review, not yet automated
 
@@ -81,8 +82,7 @@ Do not read these as checks.
 | Late attachment of `SimRecorder` | needs a service-table freeze in `EngineContext` |
 | `dt` fixed per build configuration | `Engine::Tick(double)` still accepts any value |
 | Recipe version bumped when hash inputs change | review rule; the record makes the drift visible (a value with a stale version is wrong, not merely old) |
-| ASan/UBSan clean on main | the sanitizer leg exists on the `pr95` branch, not on `main` — issue #125 is closed but its deliverable never landed |
-| clang-tidy clean | `.clang-tidy` exists on `pr95`, not on `main`; `main` runs clang-tidy with defaults and the step swallows its own exit status |
+| clang-tidy clean | `.clang-tidy` defines the check set, but the code-quality step reports findings and never fails — turning it into a gate is its own decision, not a config edit |
 | `clang-format` clean | advisory by design: the step reports, it never fails |
 
 ## Violations
