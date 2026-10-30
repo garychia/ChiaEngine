@@ -6,6 +6,7 @@
 #include "FrameCounterTest.hpp"
 #include "GUITest.hpp"
 #include "HashRecordTest.hpp" // #150:世界指紋的自我描述(hash + 配方 + 型別清單)
+#include "ReplayFileTest.hpp" // #159:Replay File Format v1 的讀寫與錯誤對應
 #include "InspectorTest.hpp"
 #include "EditorSessionTest.hpp"
 #include "PanelRegionsTest.hpp"
@@ -38,6 +39,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<ModuleTest>();
     AddTest<WorldTest>();
     AddTest<hashrecordtest::HashRecordTest>(); // #150:hash 記錄/配方版本/型別清單
+    AddTest<replayfiletest::ReplayFileTest>(); // #159:Replay File Format v1
     AddTest<entityidentitytest::EntityIdentityTest>(); // #149:entity 身分進 hash
     AddTest<framecountertest::FrameCounterTest>();
     AddTest<guitest::GUITest>();

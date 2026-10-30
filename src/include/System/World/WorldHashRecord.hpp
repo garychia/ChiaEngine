@@ -3,8 +3,11 @@
 
 #include "Data/DynamicArray.hpp"
 
+#include <charconv>
 #include <cstdint>
+#include <istream>
 #include <ostream>
+#include <string>
 #include <string_view>
 
 // World::Hash() 的「配方」版本。任何改變 hash 輸入的改動都要升這個號 ——
@@ -23,7 +26,7 @@ inline constexpr uint32_t CHIA_WORLD_HASH_RECIPE_VERSION = 2;
 struct HashRecordPool
 {
     uint32_t typeId = 0;       // 執行期 key:只在同一個 process 內有意義
-    std::string_view typeName; // 稽核用;不進 hash(見 Data/TypeName.hpp)
+    std::string typeName;      // 稽核用;不進 hash(見 Data/TypeName.hpp)
     uint32_t elementCount = 0;
 };
 
@@ -52,8 +55,176 @@ inline void WriteWorldHashRecord(std::ostream &out, const WorldHashRecord &recor
     {
         const HashRecordPool &entry = record.pools[i];
         out << "pool " << i << " typeid " << entry.typeId << " elements " << entry.elementCount << " name "
-            << (entry.typeName.empty() ? std::string_view("<unknown>") : entry.typeName) << "\n";
+            << (entry.typeName.empty() ? std::string("<unknown>") : entry.typeName) << "\n";
     }
+}
+
+// 讀回 WriteWorldHashRecord 寫出的區塊(逐行、嚴格)。不驗證 recipe version ——
+// 那是 ReadReplayFile 的責任,這裡只回報解析到的值。line 為 1-based:進入時等於
+// chia-world-hash 那一行,每成功消耗一行就 +1,失敗時停在出錯的那一行。
+enum class HashRecordReadResult : uint8_t
+{
+    Ok,
+    Malformed,
+    Truncated
+};
+
+namespace worldhashrecord_detail
+{
+inline bool ReadLine(std::istream &in, std::string &line) noexcept
+{
+    if (!std::getline(in, line))
+        return false;
+    if (!line.empty() && line.back() == '\r')
+        line.pop_back();
+    return true;
+}
+
+// 取出下一個以單一 ASCII 空格分隔的 token;開頭/結尾/連續空格與 tab 都算錯。
+inline bool NextToken(std::string_view line, size_t &pos, std::string_view &token) noexcept
+{
+    if (pos >= line.size() || line[pos] == ' ')
+        return false;
+    const size_t separator = line.find(' ', pos);
+    const size_t end = (separator == std::string_view::npos) ? line.size() : separator;
+    token = line.substr(pos, end - pos);
+    for (char c : token)
+    {
+        if (c == '\t' || c == '\r')
+            return false;
+    }
+    if (end == line.size())
+    {
+        pos = line.size();
+        return true;
+    }
+    if (end + 1 >= line.size() || line[end + 1] == ' ')
+        return false;
+    pos = end + 1;
+    return true;
+}
+
+inline bool SplitLine(std::string_view line, std::string_view *tokens, size_t capacity, size_t &count) noexcept
+{
+    count = 0;
+    size_t pos = 0;
+    while (pos < line.size())
+    {
+        if (count >= capacity)
+            return false;
+        if (!NextToken(line, pos, tokens[count]))
+            return false;
+        ++count;
+    }
+    return true;
+}
+
+inline bool ParseUInt32(std::string_view token, uint32_t &out) noexcept
+{
+    if (token.empty())
+        return false;
+    uint32_t value = 0;
+    const std::from_chars_result result = std::from_chars(token.data(), token.data() + token.size(), value);
+    if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+        return false;
+    out = value;
+    return true;
+}
+
+inline bool IsLowerHex(char c) noexcept
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+}
+
+inline bool ParseHexUInt64(std::string_view token, uint64_t &out) noexcept
+{
+    if (token.empty() || token.size() > 16)
+        return false;
+    for (char c : token)
+    {
+        if (!IsLowerHex(c))
+            return false;
+    }
+    uint64_t value = 0;
+    const std::from_chars_result result = std::from_chars(token.data(), token.data() + token.size(), value, 16);
+    if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+        return false;
+    out = value;
+    return true;
+}
+} // namespace worldhashrecord_detail
+
+inline HashRecordReadResult ReadWorldHashRecord(std::istream &in, WorldHashRecord &outRecord,
+                                                uint32_t &inOutLineNumber)
+{
+    using namespace worldhashrecord_detail;
+
+    std::string line;
+    std::string_view tokens[4];
+    size_t count = 0;
+    WorldHashRecord parsed;
+
+    if (!ReadLine(in, line))
+        return HashRecordReadResult::Truncated;
+    if (!SplitLine(line, tokens, 4, count) || count != 2 || tokens[0] != "chia-world-hash")
+        return HashRecordReadResult::Malformed;
+    if (tokens[1].size() < 2 || tokens[1][0] != 'v' || !ParseUInt32(tokens[1].substr(1), parsed.recipeVersion))
+        return HashRecordReadResult::Malformed;
+    ++inOutLineNumber;
+
+    if (!ReadLine(in, line))
+        return HashRecordReadResult::Truncated;
+    if (!SplitLine(line, tokens, 3, count) || count != 2 || tokens[0] != "hash" || !ParseHexUInt64(tokens[1], parsed.hash))
+        return HashRecordReadResult::Malformed;
+    ++inOutLineNumber;
+
+    if (!ReadLine(in, line))
+        return HashRecordReadResult::Truncated;
+    if (!SplitLine(line, tokens, 3, count) || count != 2 || tokens[0] != "entities" ||
+        !ParseUInt32(tokens[1], parsed.entityCount))
+        return HashRecordReadResult::Malformed;
+    ++inOutLineNumber;
+
+    if (!ReadLine(in, line))
+        return HashRecordReadResult::Truncated;
+    if (!SplitLine(line, tokens, 3, count) || count != 2 || tokens[0] != "pools" ||
+        !ParseUInt32(tokens[1], parsed.poolCount))
+        return HashRecordReadResult::Malformed;
+    ++inOutLineNumber;
+
+    for (uint32_t i = 0; i < parsed.poolCount; ++i)
+    {
+        if (!ReadLine(in, line))
+            return HashRecordReadResult::Truncated;
+
+        size_t pos = 0;
+        std::string_view token;
+        uint32_t ordinal = 0;
+        HashRecordPool entry;
+        if (!NextToken(line, pos, token) || token != "pool")
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || !ParseUInt32(token, ordinal) || ordinal != i)
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || token != "typeid")
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || !ParseUInt32(token, entry.typeId))
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || token != "elements")
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || !ParseUInt32(token, entry.elementCount))
+            return HashRecordReadResult::Malformed;
+        if (!NextToken(line, pos, token) || token != "name" || pos >= line.size())
+            return HashRecordReadResult::Malformed;
+
+        const std::string_view name = std::string_view(line).substr(pos);
+        if (name != "<unknown>")
+            entry.typeName.assign(name.data(), name.size());
+        parsed.pools.Append(entry);
+        ++inOutLineNumber;
+    }
+
+    outRecord = parsed;
+    return HashRecordReadResult::Ok;
 }
 
 #endif // WORLD_HASH_RECORD_HPP
