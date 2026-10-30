@@ -137,6 +137,9 @@ jobs:
           # column is compiler-specific, so it must never be diffed the way the
           # value-only hash sequence above is.
           CHIA_HASH_RECORD_DUMP: hash-record-${{ matrix.compiler }}.txt
+          # The same scripted replay as a complete Replay File Format v1 artifact
+          # (#159). determinism-compare diffs its diffable projection below.
+          CHIA_REPLAY_FILE_DUMP: replay-file-${{ matrix.compiler }}.txt
         run: |
           test_bin=./build/bin/TestMain
           if [ "${{ runner.os }}" = "Windows" ]; then test_bin="${test_bin}.exe"; fi
@@ -168,6 +171,17 @@ jobs:
         with:
           name: hash-records-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
           path: hash-record-${{ matrix.compiler }}.txt
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload replay file
+        # The complete file, not just the hash sequence. determinism-compare diffs its
+        # diffable projection, masking the compiler-specific name/typeid/build columns.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: replay-files-${{ matrix.os }}-${{ matrix.compiler }}-${{ github.sha }}
+          path: replay-file-${{ matrix.compiler }}.txt
           if-no-files-found: warn
           retention-days: 30
 
@@ -299,6 +313,12 @@ jobs:
           pattern: hash-records-*-${{ github.sha }}
           path: records
 
+      - name: Download per-leg replay files
+        uses: actions/download-artifact@v4
+        with:
+          pattern: replay-files-*-${{ github.sha }}
+          path: replayfiles
+
       - name: Compare sequences
         run: |
           set -euo pipefail
@@ -359,6 +379,36 @@ jobs:
               echo "reference recipe: $recipe"
             elif [ "$recipe" != "$ref_recipe" ]; then
               echo "::error file=$f::recipe '$recipe' differs from '$ref_recipe' - the legs did not hash the same inputs"
+              status=1
+            fi
+          done
+          exit "$status"
+
+      - name: Compare replay files
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find replayfiles -name 'replay-file-*.txt' | sort)
+          echo "replay files found: ${#files[@]}"
+          printf '  %s\n' "${files[@]}"
+
+          # The whole file is compared after masking the three compiler-specific
+          # columns by design: pool name, pool typeid and the build identity. The
+          # container, recipe, hash, counts, every tick payload and the terminator
+          # must be byte-identical across legs (#159).
+          if [ "${#files[@]}" -lt 4 ]; then
+            echo "::error::expected gcc + clang + appleclang + msvc replay files, found ${#files[@]}"
+            exit 1
+          fi
+
+          ref="${files[0]}"
+          echo "reference replay file: $ref"
+          status=0
+          for f in "${files[@]}"; do
+            if diff -u --strip-trailing-cr <(sed -E 's/^pool ([0-9]+) typeid [0-9]+ elements ([0-9]+) name .*$/pool \1 elements \2/; s/^build .*$/build <build-identity>/' "$ref") \
+                                      <(sed -E 's/^pool ([0-9]+) typeid [0-9]+ elements ([0-9]+) name .*$/pool \1 elements \2/; s/^build .*$/build <build-identity>/' "$f"); then
+              echo "OK: $f matches the reference"
+            else
+              echo "::error file=$f::replay file projection differs from $ref - the replay file bytes are not stable across compilers"
               status=1
             fi
           done

@@ -46,6 +46,8 @@ Unreal and Unity treat determinism as a concession: rollback netcode, frame-perf
 
 **Rule:** Replay tests run on every CI leg with the same scripted input, and the hash sequences are compared *across* legs, not just within each one: each leg writes its per-tick sequence and the `determinism-compare` job diffs them, failing outright if a leg is missing rather than treating absence as agreement. Measured on the current scripted replay: gcc, clang, appleclang and msvc produce identical sequences.
 
+**Rule:** The on-disk form is Replay File Format v1 (`docs/designs/replay-file-format.md`). It carries the hash record in the form principle 3 defines, plus the build identity (compiler, version, FP policy) that makes a hash comparable. Loading a file whose recipe differs from `CHIA_WORLD_HASH_RECIPE_VERSION` is an error, not a warning; a truncated file is an error, not a shorter replay.
+
 ### 5. No hidden state, no implicit magic
 
 If a subsystem caches, buffers, or defers work, that state must be serializable into the replay stream or explicitly excluded from the deterministic core.
@@ -69,6 +71,7 @@ A violation turns a check red.
 | `SimInput` byte-copyable and padding-free | `src/include/System/Module/SimInput.hpp` | `static_assert` in every build |
 | Component types padding-free, nested types marked | each component header + `src/include/Data/Padding.hpp` | compile error (`CHIA_PADDING_FREE`) |
 | Replay hash sequence identical across compiler legs | `test/System/ReplayTest.hpp` + `.github/workflows/ci.yml` | `determinism-compare` job (gcc, clang, appleclang, msvc) |
+| Replay file bytes stable across compiler legs (diffable projection) | `test/System/ReplayTest.hpp` + `.github/workflows/ci.yml` | `determinism-compare` job (gcc, clang, appleclang, msvc) |
 | FP configuration pinned | `CMakeLists.txt` | configure-time `FATAL_ERROR` |
 | Gating CI jobs run even when a dependency failed | `.github/workflows/ci.yml` | `always()` present in the workflow |
 | ASan/UBSan clean | `.github/workflows/ci.yml` | `ASan/UBSan` job: Debug + `-fsanitize=address,undefined` + `halt_on_error=1` |

@@ -4,6 +4,7 @@
 #include "Test.hpp"
 #include "System/Module/Engine.hpp"
 #include "System/Module/IModule.hpp"
+#include "System/Module/ReplayFile.hpp"
 #include "System/Module/SimInput.hpp"
 #include "System/Module/SimRecorder.hpp"
 #include "System/World/World.hpp"
@@ -27,6 +28,21 @@ inline void DumpReplayHashSequence(const DynamicArray<uint64_t> &hashes, uint64_
     for (size_t i = 0; i < hashes.GetNElements(); i++)
         out << "tick " << i << " " << hashes[i] << "\n";
     out << "final " << finalHash << "\n";
+}
+
+// CI 用(#159):把同一段 scripted replay 的完整 replay 檔寫出來,讓 determinism-compare
+// 比對跨 leg 的 diffable projection。沒設 CHIA_REPLAY_FILE_DUMP 時完全不作用。
+inline void DumpReplayFile(const World &world, const DynamicArray<SimInput> &log)
+{
+    const char *pPath = std::getenv("CHIA_REPLAY_FILE_DUMP");
+    if (pPath == nullptr || *pPath == '\0')
+        return;
+    WorldHashRecord record;
+    world.BuildHashRecord(record);
+    std::ofstream out(pPath);
+    if (!out.is_open())
+        return;
+    WriteReplayFile(out, record, log);
 }
 
 // WorldTest.hpp 已在同一 TU 定義全域 struct Position — 整個測試收進
@@ -129,6 +145,7 @@ class ReplayTest : public Test
             }
             const uint64_t liveFinal = sim.world.Hash();
             DumpReplayHashSequence(liveHashes, liveFinal); // CI 跨 leg 比對用(#144)
+            DumpReplayFile(sim.world, recorder.GetLog());    // CI 跨 leg 比對 replay 檔(#159)
 
             EXPECT_TRUE(recorder.GetInputCount() == static_cast<size_t>(N), "錄到 N 筆輸入.", true);
             EXPECT_TRUE(liveFinal != 0, "hash 非零(狀態有內容).", true);

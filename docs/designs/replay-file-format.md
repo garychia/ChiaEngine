@@ -250,6 +250,13 @@ unprefixed, lowercase and variable length — a hash of 255 prints as `ff`. The
 example shows 16 digits because the value is large, not because the field is
 padded. Parsing accepts 1 to 16 digits.
 
+`name` is the one field that overrides the global "a line's final token must be
+followed by the line ending, nothing else" rule: the field-specific rule wins.
+Everything after the literal `name ` up to the line end *is* the name, so spaces
+inside it — trailing ones included — are preserved rather than rejected, and it
+must be at least one character long. The separator and the tokens before `name`
+still obey the single-space rule.
+
 ### The record block is the writer's bytes, and its shape is a contract
 
 Lines 2-5 plus the pool lines are exactly what `WriteWorldHashRecord` emits,
@@ -323,13 +330,14 @@ string views so writer and reader cannot disagree:
     configuration pinned" row of the automated table). A build that loosens it
     fails at configure time, so the reader may treat the literal as fixed.
 
-It is **audit-only**, treated exactly like `name` and `typeid`: written, parsed
-into the result, never diffed across legs (it differs per leg by construction),
-never used to fail a load. A caller that wants "this file came from a different
-build than me" can compare the parsed tokens itself; the format does not decide
-for it whether that is an error. One consequence: build identity lives in the
-container, not in the record block, because the block is frozen for compatibility
-with the artifact `ci.yml:161` already publishes.
+It is **audit-only**, treated exactly like `name` and `typeid`: written, parsed into
+the result, never diffed across legs (it differs per leg by construction), never
+used to fail a load. The three tokens are returned in `ReplayBuildIdentity
+outBuild`, filled on `Ok` exactly as the record and the log are — so a caller can
+see that a file came from a different build than itself and decide whether that
+is an error; the format does not decide for it. One consequence: build identity
+lives in the container, not in the record block, because the block is frozen for
+compatibility with the artifact `ci.yml:161` already publishes.
 
 ### Diffable projection
 
@@ -388,6 +396,12 @@ The mapping is total and exclusive — every deviation lands on exactly one code
 | `pool` ordinal ≠ its position, or a tick line with a wrong token count | `Malformed` |
 | `end` missing at the point it is expected | `Truncated` |
 | anything after `end`, including text on the `end` line | `Malformed` |
+| a stream that fails for a reason other than EOF where the file is otherwise complete | `Truncated` |
+
+The final line ending is not significant: a complete `end` with no trailing
+newline is `Ok`, because EOF immediately after it is not a failure. Every other
+line is read by `std::getline`, so a missing newline before `end` is likewise
+just the line ending.
 
 Every integer is parsed with `std::from_chars` and must consume the **entire**
 token; `from_chars` reports overflow as an error, so an out-of-range count is
@@ -407,12 +421,15 @@ only after the `end` line is seen.
     `Truncated` map to the file-level results unchanged. This function does **not**
     validate the recipe version; it reports the parsed value in
     `outRecord.recipeVersion`.
-3.  Line 6 + N: `build …`. Three non-empty tokens, no validation of their values.
+3.  Line 6 + N: `build …`. Three non-empty tokens, no validation of their
+    values; they are copied into `outBuild`.
 4.  Next: `ticks N`, then exactly N `tick` lines in order.
-5.  `end`. Absent → `Truncated`. Content after it → `Malformed`.
+5.  `end`. Absent → `Truncated`. Content after it → `Malformed`. EOF immediately
+    after a complete `end` (no trailing newline) is `Ok`; a stream failure that
+    is not EOF is `Truncated`.
 6.  Only now: compare `outRecord.recipeVersion` against
     `CHIA_WORLD_HASH_RECIPE_VERSION`; differ → `RecipeMismatch`, filling
-    `fileRecipe` and `binaryRecipe`, and leaving both output parameters
+    `fileRecipe` and `binaryRecipe`, and leaving all three output parameters
     untouched.
 
 ### Decisions taken in this revision
@@ -649,11 +666,19 @@ counter, and the `<unknown>` mapping.
         uint32_t line = 1;             // 1-based line the load failed on
     };
 
+    struct ReplayBuildIdentity
+    {
+        std::string compiler;
+        std::string version;
+        std::string fpPolicy;
+    };
+
     bool WriteReplayFile(std::ostream &out, const WorldHashRecord &record,
                          const DynamicArray<SimInput> &log);
 
     ReplayFileError ReadReplayFile(std::istream &in, WorldHashRecord &outRecord,
-                                   DynamicArray<SimInput> &outLog);
+                                   DynamicArray<SimInput> &outLog,
+                                   ReplayBuildIdentity &outBuild);
     ```
 
     `WriteReplayFile` emits the container line, delegates the record block to
@@ -661,7 +686,8 @@ counter, and the `<unknown>` mapping.
     per entry (each field `memcpy`'d into a `uint32_t` and printed as 8 hex
     digits), then `end`. It returns `false` only on a stream failure and does not
     validate the record. `ReadReplayFile` implements the algorithm above, owns the
-    line counter, and writes both output parameters only on `Ok`.
+    line counter, and writes all three output parameters — the record, the log and
+    the parsed build identity — only on `Ok`.
 *   **Rationale**: Keeps serialization out of `SimRecorder`, needs no `<fstream>`
     anywhere, and puts the format in one place a test can drive with in-memory
     streams.
@@ -682,8 +708,8 @@ counter, and the `<unknown>` mapping.
         comparison is written explicitly.
     *   **(b) Recipe mismatch — G3.** A hand-written header naming a different
         recipe: assert `RecipeMismatch`, that `fileRecipe` and `binaryRecipe`
-        carry both numbers, that `line` names the recipe line, and that both output
-        parameters are untouched.
+        carry both numbers, that `line` names the recipe line, and that all three
+        output parameters are untouched.
     *   **(c) Truncation — G6.** No `end` line; fewer tick lines than declared; a
         stream cut inside the record block. Assert `Truncated`, the reported line,
         and untouched outputs.
@@ -694,11 +720,14 @@ counter, and the `<unknown>` mapping.
     *   **(e) Record round trip — G2.** Write a record, read it back with
         `ReadWorldHashRecord`, and assert recipe version, hash, counts and pool
         fields match; assert the `<unknown>` fallback round-trips to an empty
-        name; assert the line counter advances by `3 + pools`.
-    *   **(f) Build line — G2.** Round-trip a file and assert the parsed build
-        tokens equal the writer's constants, that the line is not validated (a
-        file claiming `msvc 19.0 unknown` still loads), and that the projection
-        sed masks it.
+        name; assert the line counter has advanced `4 + pools` lines in total (the
+        `chia-world-hash` line, the 3 header lines, one line per pool).
+    *   **(f) Build line — G2.** Read a written file back through `ReadReplayFile`
+        and assert `outBuild`'s three tokens equal the `CHIA_REPLAY_BUILD_*`
+        constants — the assertion that catches a reader which parses the line and
+        discards it; then assert the line is not validated (a file claiming
+        `msvc 19.0 unknown` still loads, with those tokens returned unchanged),
+        and that the projection sed masks it.
 *   **Rationale**: (a) is the only case that catches an encoding mistake, and its
     comparison method has to be exact; (b) and (c) are the two failure modes the
     format exists to prevent; (d) pins the error mapping that v2 left ambiguous.
