@@ -2,6 +2,7 @@
 #define SCENE_SYSTEM_HPP
 
 #include "Data/DynamicArray.hpp"
+#include "Data/Padding.hpp"
 #include "Scene/ParentComponent.hpp"
 #include "Scene/TransformComponent.hpp"
 #include "Scene/TransformMath.hpp"
@@ -11,6 +12,116 @@
 #include "System/Operation/Event.hpp"
 #include "System/World/Entity.hpp"
 #include "System/World/World.hpp"
+#include "System/World/WorldHashRecord.hpp" // ReadLine/NextToken/ParseUInt32(嚴格單空格 token)
+
+#include <charconv>
+#include <cstdint>
+#include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <string>
+#include <string_view>
+
+namespace scenesystem_detail
+{
+constexpr size_t NODE_NAME_CAPACITY = 64;
+
+// 節點名稱跟著 entity 存進 World 的元件池,SaveScene/LoadScene 才能原樣帶回。
+// 固定長度 char 陣列 → 無 padding、trivially copyable,可安全進 World::Hash()。
+struct NodeName
+{
+    char text[NODE_NAME_CAPACITY] = {};
+};
+CHIA_PADDING_FREE(NodeName, &NodeName::text);
+
+inline void SetNodeName(NodeName &name, std::string_view text) noexcept
+{
+    size_t length = text.size();
+    if (length >= NODE_NAME_CAPACITY)
+        length = NODE_NAME_CAPACITY - 1; // shortcut: 名稱上限 63 byte,超過就截斷
+    std::memcpy(name.text, text.data(), length);
+    name.text[length] = '\0';
+}
+
+inline bool ParseFloat(std::string_view token, float &out) noexcept
+{
+    if (token.empty())
+        return false;
+    float value = 0;
+    const std::from_chars_result result = std::from_chars(token.data(), token.data() + token.size(), value);
+    if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+        return false;
+    out = value;
+    return true;
+}
+
+// parentIndex 是 uint32,但 -1 代表 root;用 int64 同時容納兩者。
+inline bool ParseParent(std::string_view token, int64_t &out) noexcept
+{
+    if (token.empty())
+        return false;
+    int64_t value = 0;
+    const std::from_chars_result result = std::from_chars(token.data(), token.data() + token.size(), value);
+    if (result.ec != std::errc() || result.ptr != token.data() + token.size() || value < -1)
+        return false;
+    out = value;
+    return true;
+}
+
+struct SceneNode
+{
+    uint32_t index = 0;
+    int64_t parent = -1;
+    std::string name;
+    TransformComponent transform;
+};
+
+// node <index> <parent> <name> <px> <py> <pz> <rx> <ry> <rz> <sx> <sy> <sz>
+// name 可以含空格 → 最後 9 個 token 固定是 TRS,之前整段都算 name。
+inline bool ParseNodeLine(std::string_view line, SceneNode &out)
+{
+    using namespace worldhashrecord_detail;
+
+    size_t pos = 0;
+    std::string_view token;
+    if (!NextToken(line, pos, token) || token != "node")
+        return false;
+    if (!NextToken(line, pos, token) || !ParseUInt32(token, out.index))
+        return false;
+    if (!NextToken(line, pos, token) || !ParseParent(token, out.parent))
+        return false;
+
+    const std::string_view rest = line.substr(pos);
+    size_t cursor = rest.size();
+    for (int i = 0; i < 9; ++i)
+    {
+        if (cursor == 0)
+            return false;
+        const size_t space = rest.rfind(' ', cursor - 1);
+        if (space == std::string_view::npos)
+            return false;
+        cursor = space;
+    }
+    if (cursor == 0)
+        return false; // 空 name
+    out.name.assign(rest.data(), cursor);
+
+    float values[9];
+    size_t valuePos = cursor + 1;
+    for (int i = 0; i < 9; ++i)
+    {
+        if (!NextToken(rest, valuePos, token) || !ParseFloat(token, values[i]))
+            return false;
+    }
+    if (valuePos != rest.size())
+        return false;
+
+    out.transform.position = Point3D(values[0], values[1], values[2]);
+    out.transform.rotation = Point3D(values[3], values[4], values[5]);
+    out.transform.scale = Point3D(values[6], values[7], values[8]);
+    return true;
+}
+} // namespace scenesystem_detail
 
 // 場景圖模組(Sim 層,確定性,無 GPU,可無頭測試)。
 //
@@ -62,6 +173,9 @@ class SceneSystem : public IModule
         ParentComponent p;
         p.parent = parent;
         world.AddComponent<ParentComponent>(e, p);
+        scenesystem_detail::NodeName name;
+        scenesystem_detail::SetNodeName(name, "Node");
+        world.AddComponent<scenesystem_detail::NodeName>(e, name);
         return e;
     }
 
@@ -122,6 +236,135 @@ class SceneSystem : public IModule
         Entity childA = CreateNode(root);
         CreateNode(root);
         CreateNode(childA);
+    }
+
+    // ---- 場景檔 Save/Load(#164)----
+    // 格式:ASCII、一行一節點,見 SceneNode 格式;失敗回 false,不清動現有場景。
+    bool SaveScene(const char *path) const
+    {
+        if (path == nullptr)
+            return false;
+        std::ofstream out(path, std::ios::out | std::ios::trunc);
+        if (!out.is_open())
+            return false;
+
+        out << "scene v1\n";
+        out << std::dec << std::setprecision(17);
+
+        // World::GetComponent 尚無 const 多載(見 #81 seam 註解),讀取需暫時去掉 const。
+        World &mutableWorld = const_cast<World &>(world);
+        DynamicArray<Entity> nodes;
+        DynamicArray<uint32_t> depths;
+        GetHierarchy(nodes, depths);
+        for (size_t i = 0; i < nodes.GetNElements(); ++i)
+        {
+            const Entity e = nodes[i];
+            const TransformComponent *pTransform = mutableWorld.GetComponent<TransformComponent>(e);
+            if (!pTransform)
+                return false;
+
+            const ParentComponent *pParent = mutableWorld.GetComponent<ParentComponent>(e);
+            int64_t parentIndex = -1;
+            if (pParent && pParent->parent.GetRaw() != 0 && mutableWorld.Alive(pParent->parent))
+                parentIndex = static_cast<int64_t>(pParent->parent.GetIndex());
+
+            const scenesystem_detail::NodeName *pName = mutableWorld.GetComponent<scenesystem_detail::NodeName>(e);
+            const char *nodeName = (pName && pName->text[0] != '\0') ? pName->text : "Node";
+
+            out << "node " << e.GetIndex() << " " << parentIndex << " " << nodeName << " ";
+            out << pTransform->position.x << " " << pTransform->position.y << " " << pTransform->position.z << " ";
+            out << pTransform->rotation.x << " " << pTransform->rotation.y << " " << pTransform->rotation.z << " ";
+            out << pTransform->scale.x << " " << pTransform->scale.y << " " << pTransform->scale.z << "\n";
+        }
+
+        out << "end\n";
+        return out.good();
+    }
+
+    bool LoadScene(const char *path)
+    {
+        if (path == nullptr)
+            return false;
+        std::ifstream in(path, std::ios::in);
+        if (!in.is_open())
+            return false;
+
+        using namespace worldhashrecord_detail;
+
+        std::string line;
+        if (!ReadLine(in, line) || line != "scene v1")
+            return false;
+
+        // 先完整解析到區域容器;任何錯誤都在動世界之前返回。
+        DynamicArray<scenesystem_detail::SceneNode> parsed;
+        DynamicArray<uint32_t> indices;
+        bool sawEnd = false;
+        while (ReadLine(in, line))
+        {
+            if (line == "end")
+            {
+                sawEnd = true;
+                break;
+            }
+
+            scenesystem_detail::SceneNode node;
+            if (!scenesystem_detail::ParseNodeLine(line, node))
+                return false;
+
+            // index 不得重複;parent 必須是更早出現的 index 或 -1。
+            bool duplicate = false;
+            for (size_t i = 0; i < indices.GetNElements(); ++i)
+                if (indices[i] == node.index)
+                    duplicate = true;
+            if (duplicate)
+                return false;
+            if (node.parent >= 0)
+            {
+                bool found = false;
+                for (size_t i = 0; i < indices.GetNElements(); ++i)
+                    if (static_cast<uint32_t>(node.parent) == indices[i])
+                        found = true;
+                if (!found)
+                    return false;
+            }
+
+            indices.Append(node.index);
+            parsed.Append(node);
+        }
+        if (!sawEnd)
+            return false;
+        if (ReadLine(in, line) || !in.eof())
+            return false;
+
+        // 解析全成功才清空現有場景,再依檔案順序重建。
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); ++i)
+            DestroyNode(roots[i]);
+
+        DynamicArray<Entity> created;
+        for (size_t i = 0; i < parsed.GetNElements(); ++i)
+        {
+            Entity parent;
+            if (parsed[i].parent >= 0)
+            {
+                for (size_t j = 0; j < indices.GetNElements(); ++j)
+                {
+                    if (indices[j] == static_cast<uint32_t>(parsed[i].parent))
+                    {
+                        parent = created[j];
+                        break;
+                    }
+                }
+            }
+
+            const Entity e = CreateNode(parent);
+            *world.GetComponent<TransformComponent>(e) = parsed[i].transform;
+            scenesystem_detail::NodeName *pName = world.GetComponent<scenesystem_detail::NodeName>(e);
+            if (pName)
+                scenesystem_detail::SetNodeName(*pName, parsed[i].name);
+            created.Append(e);
+        }
+        return true;
     }
 
     // children 依 entity index 升序(掃描 pool,parent == e)。

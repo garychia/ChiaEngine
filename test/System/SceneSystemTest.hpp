@@ -13,6 +13,8 @@
 #include "Test.hpp"
 
 #include <cstdint>
+#include <cstring>
+#include <fstream>
 
 // 場景圖整合測試:AC1(父子跟隨)/AC2(建/重設 parent/destroy)/ AC3(遍歷確定)。
 // 全 standalone headless,不碰 GPU。
@@ -184,6 +186,113 @@ class SceneSystemTest : public Test
             EXPECT_TRUE(nodes.GetNElements() == 4, "demo 階層共 4 節點.", true);
             EXPECT_TRUE(depths[0] == 0 && depths[1] == 1, "root 深度 0,childA 深度 1.", true);
             EXPECT_TRUE(depths[2] == 2 && depths[3] == 1, "grand 深度 2,childB 深度 1.", true);
+        }
+
+        // ---- AC6:場景檔 v1 SaveScene/LoadScene round-trip(#164)----
+        {
+            SceneSystem source;
+            Entity root = source.CreateNode();
+            Entity childA = source.CreateNode(root);
+            Entity childB = source.CreateNode(root);
+            Entity grand = source.CreateNode(childA);
+
+            *source.GetLocalTransform(root) = TransformComponent(Point3D(1.5f, -2.25f, 3.75f),
+                                                                 Point3D(10.f, -20.f, 30.f),
+                                                                 Point3D(1.f, 2.f, 3.f));
+            *source.GetLocalTransform(childA) = TransformComponent(Point3D(0.1f, -0.0f, 1e-7f),
+                                                                   Point3D(45.f, 0.f, 0.f),
+                                                                   Point3D(0.5f, 0.25f, 2.f));
+            *source.GetLocalTransform(childB) = TransformComponent(Point3D(0.f, 0.f, 5.f),
+                                                                   Point3D(0.f, 90.f, 0.f),
+                                                                   Point3D(2.f, 2.f, 2.f));
+            *source.GetLocalTransform(grand) = TransformComponent(Point3D(-7.5f, 8.125f, -9.f),
+                                                                  Point3D(0.f, 0.f, -180.f),
+                                                                  Point3D(0.1f, 0.1f, 0.1f));
+
+            const char *path = TestTempFilePath("chia_scene_v1.scene");
+            EXPECT_TRUE(source.SaveScene(path), "SaveScene 寫出場景檔.", false);
+
+            SceneSystem loaded;
+            loaded.CreateNode(); // LoadScene 成功後應清掉舊場景
+            EXPECT_TRUE(loaded.LoadScene(path), "LoadScene 讀回場景檔.", false);
+
+            DynamicArray<Entity> nodes;
+            DynamicArray<uint32_t> depths;
+            loaded.GetHierarchy(nodes, depths);
+            EXPECT_TRUE(nodes.GetNElements() == 4 && depths.GetNElements() == 4, "round-trip 後 4 節點.", false);
+            if (nodes.GetNElements() == 4)
+            {
+                // pre-order:root → childA → grandchild → childB
+                EXPECT_TRUE(std::memcmp(loaded.GetLocalTransform(nodes[0]), source.GetLocalTransform(root),
+                                        sizeof(TransformComponent)) == 0,
+                            "root TRS bit-exact.", false);
+                EXPECT_TRUE(std::memcmp(loaded.GetLocalTransform(nodes[1]), source.GetLocalTransform(childA),
+                                        sizeof(TransformComponent)) == 0,
+                            "childA TRS bit-exact(含 0.1 / -0.0 / 1e-7).", false);
+                EXPECT_TRUE(std::memcmp(loaded.GetLocalTransform(nodes[2]), source.GetLocalTransform(grand),
+                                        sizeof(TransformComponent)) == 0,
+                            "grandchild TRS bit-exact.", false);
+                EXPECT_TRUE(std::memcmp(loaded.GetLocalTransform(nodes[3]), source.GetLocalTransform(childB),
+                                        sizeof(TransformComponent)) == 0,
+                            "childB TRS bit-exact.", false);
+                EXPECT_TRUE(depths[0] == 0 && depths[1] == 1 && depths[2] == 2 && depths[3] == 1,
+                            "階層深度與原場景相同.", false);
+
+                DynamicArray<Entity> rootChildren = loaded.GetChildren(nodes[0]);
+                EXPECT_TRUE(rootChildren.GetNElements() == 2 && rootChildren[0] == nodes[1] &&
+                                rootChildren[1] == nodes[3],
+                            "root 的兩個 child 保留.", false);
+                DynamicArray<Entity> aChildren = loaded.GetChildren(nodes[1]);
+                EXPECT_TRUE(aChildren.GetNElements() == 1 && aChildren[0] == nodes[2],
+                            "grandchild 掛回 childA.", false);
+            }
+        }
+
+        // ---- AC7:name 可含空格;malformed 檔回 false 且場景不變 ----
+        {
+            auto writeScene = [](const char *filePath, const char *text) {
+                std::ofstream out(filePath, std::ios::out | std::ios::trunc);
+                out << text;
+            };
+
+            const char *namePath = TestTempFilePath("chia_scene_name.scene");
+            writeScene(namePath, "scene v1\nnode 0 -1 Root Node 1.5 2 -3 0 0 0 1 1 1\nend\n");
+            SceneSystem named;
+            EXPECT_TRUE(named.LoadScene(namePath), "含空格的 name 可解析.", false);
+            DynamicArray<Entity> namedNodes;
+            DynamicArray<uint32_t> namedDepths;
+            named.GetHierarchy(namedNodes, namedDepths);
+            EXPECT_TRUE(namedNodes.GetNElements() == 1, "name 含空格仍是一個節點.", false);
+            if (namedNodes.GetNElements() == 1)
+            {
+                TransformComponent got;
+                EXPECT_TRUE(named.GetTransform(namedNodes[0].GetIndex(), got), "命名節點的 transform 可讀.", false);
+                EXPECT_TRUE(got.position.x == 1.5f && got.position.y == 2.f && got.position.z == -3.f,
+                            "name 後的 TRS 從正確位置開始解析.", false);
+            }
+
+            SceneSystem system;
+            Entity keep = system.CreateNode();
+            const TransformComponent expected(Point3D(7.f, 8.f, 9.f));
+            *system.GetLocalTransform(keep) = expected;
+
+            const char *badPath = TestTempFilePath("chia_scene_bad.scene");
+            auto expectRejected = [&](const char *text, const char *message) {
+                writeScene(badPath, text);
+                EXPECT_TRUE(!system.LoadScene(badPath), message, false);
+                DynamicArray<Entity> nodes;
+                DynamicArray<uint32_t> depths;
+                system.GetHierarchy(nodes, depths);
+                EXPECT_TRUE(nodes.GetNElements() == 1 && nodes[0] == keep, "失敗的 LoadScene 保留原場景.", false);
+                EXPECT_TRUE(std::memcmp(system.GetLocalTransform(keep), &expected, sizeof(TransformComponent)) == 0,
+                            "失敗的 LoadScene 不改 transform.", false);
+                return true;
+            };
+
+            expectRejected("scene v1\nnode 0 0 Root 0 0 0 0 0 0 1 1 1\nend\n",
+                           "parent 指向尚未出現的 index → false.");
+            expectRejected("scene v1\nnode 0 -1 Root 0 0 0 0 0 0 1 1 1\n", "缺少 end → false.");
+            expectRejected("scene v1\nnode 0 -1 Root 0 0 0 0 0 0 1 1 nope\nend\n", "壞 float → false.");
         }
 
         // ---- 驗證:SceneSystem 透過 EngineContext RegisterService 可被 Resolve ----
