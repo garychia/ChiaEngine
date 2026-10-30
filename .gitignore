@@ -57,3 +57,9 @@ test/AllTests
 # CMake-generated headers (configure_file from *.in templates)
 src/include/Paths.hpp
 test/TestInfo.h
+
+# AI agent harness files (local tooling; not part of the build)
+.claude/
+CLAUDE.md
+.mcp.json
+.openrig/
