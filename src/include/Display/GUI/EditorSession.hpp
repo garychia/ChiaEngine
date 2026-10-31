@@ -3,9 +3,14 @@
 
 #include "Data/DynamicArray.hpp"
 #include "Data/String.hpp"
+#include "Data/HashTable.hpp"
+#include "Data/Hash.hpp"
 #include "Display/GUI/PanelPane.hpp"
 #include "Display/GUI/Selection.hpp"
+#include "Display/Asset/TextureAssetView.hpp"
+#include "Display/IRendererAssetRegistrar.hpp"
 #include "Scene/SceneSystem.hpp"
+#include "System/Asset/AssetManager.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
 
@@ -109,13 +114,37 @@ class EditorSession
     // ADR-0001 D4:注入 pointer set(不擁有 — Panel/App 長時間持有)。
     // 全部可為 nullptr(測試 / 未接線無妨)。
     EditorSession(SceneSystem *pSceneSystem = nullptr, CameraController *pCameraController = nullptr,
-                  SimRecorder *pSimRecorder = nullptr);
+                  SimRecorder *pSimRecorder = nullptr, AssetManager *pAssetManager = nullptr,
+                  IRendererAssetRegistrar *pRegistrar = nullptr);
     ~EditorSession();
 
     // ---- D4 pointer set ----
     SceneSystem *GetSceneSystem() const { return mpSceneSystem; }
     CameraController *GetCameraController() const { return mpCameraController; }
     SimRecorder *GetSimRecorder() const { return mpSimRecorder; }
+    AssetManager *GetAssetManager() const { return mpAssetManager; }
+    IRendererAssetRegistrar *GetAssetRegistrar() const { return mpRegistrar; }
+
+    // 綁定 AssetManager:TextureAssetView 訂閱其 LoadedEvent,EditorSession 也自行訂閱
+    // 以記錄 path → contentHash 映射(供 GetMaterialId 查詢)。
+    void SetAssetManager(AssetManager *pAssetManager);
+    // 綁定 renderer 資產註冊器:TextureAssetView 的解碼完成 hook 會把 RGBA pixels
+    // 透過此 registrar 呼叫 RegisterMaterial(contentHash, {pRawRGBA, w, h}) 上傳 GPU。
+    void SetAssetRegistrar(IRendererAssetRegistrar *pRegistrar);
+
+    // 發起貼圖非同步載入(依 key 去重,不重複讀檔)。回傳 pathHash 作為追蹤 ID;
+    // 實際 materialId(= contentHash)需在 DispatchAssetEvents 後透過 GetMaterialId 查詢。
+    uint64_t LoadTexture(const String &path);
+
+    // 主線程:派發 AssetManager 完成事件 → TextureAssetView 解碼 → hook → RegisterMaterial。
+    // 需在每個 Update 幀或載入後呼叫。
+    void DispatchAssetEvents();
+
+    // 查詢某路徑貼圖已註冊的 materialId(= contentHash); 未完成回 0。
+    uint64_t GetMaterialId(const String &path) const;
+
+    // 查詢某路徑貼圖是否已載入完成(解碼並註冊成功)。
+    bool IsTextureLoaded(const String &path) const;
 
     // ---- Selection (ADR-0001 D2:single truth source) ----
     Selection &GetSelection() { return mSelection; }
@@ -145,9 +174,23 @@ class EditorSession
     SceneSystem *mpSceneSystem;
     CameraController *mpCameraController;
     SimRecorder *mpSimRecorder;
+    AssetManager *mpAssetManager;
+    IRendererAssetRegistrar *mpRegistrar;
+    TextureAssetView mTextureView;      // Value:訂閱 AssetManager,解碼 → 轉交 hook
+    HashTable<uint64_t, uint64_t> mTextureToContentHash;  // pathHash → contentHash(materialId)
     Selection mSelection;
     UndoStack mUndoStack;
     DynamicArray<SharedPtr<PanelPane>> mPanes;
+
+    // AssetManager::LoadedEvent 回編:記錄 path → contentHash 映射。
+    void OnAssetLoaded(SharedPtr<Asset> asset);
+
+    // TextureAssetView hook 靜態進入點:rgba 解碼後經註冊器上傳 GPU。
+    static void OnTextureReadyStatic(const unsigned char *rgbaPixels, int width, int height,
+                                     size_t contentHash, void *pUserData);
+
+    // 簡易 FNV-1a 字串雜湊(僅用於 EditorSession 內部 path→contentHash 索引)。
+    static uint64_t HashPath(const String &path);
 
     EditorSession(const EditorSession &) = delete;
     EditorSession &operator=(const EditorSession &) = delete;

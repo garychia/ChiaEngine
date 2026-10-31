@@ -1,7 +1,7 @@
 #include "Display/Asset/TextureAssetView.hpp"
 
-// stb_image:僅此一個 TU 負責實作 implementation,避免多重定義。
-#define STB_IMAGE_IMPLEMENTATION
+// stb_image 實作由 VulkanRenderer.cpp(已 #define STB_IMAGE_IMPLEMENTATION) 提供,
+// 此處僅宣告,避免多重定義。
 #include "3rdparty/stb_image.h"
 
 #include <cstring>
