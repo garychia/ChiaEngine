@@ -53,10 +53,10 @@ class TextureAssetViewTest : public Test
     {
         TEST_MESSAGE("TextureAssetView: typed LoadedEvent -> stb_image decode -> renderer upload hook");
 
-        const char *pathA = TestTempFilePath("chia_view_a.tga");
-        const char *pathB = TestTempFilePath("chia_view_b.tga");
-        WriteTestTga(pathA, 1, 1, 10, 20, 30, 255); // RGBA(10,20,30,255)
-        WriteTestTga(pathB, 2, 1, 0, 20, 40, 255);  // RGBA(0,20,40,255)
+        const char *pathA = TestTempFilePath("chia_view_a.ppm");
+        const char *pathB = TestTempFilePath("chia_view_b.ppm");
+        WriteTestPpm(pathA, 1, 1, 10, 20, 30, 255); // RGBA(10,20,30,255)
+        WriteTestPpm(pathB, 2, 1, 0, 20, 40, 255);  // RGBA(0,20,40,255)
 
         JobSystem jobs(2);
         AssetManager manager(jobs);
@@ -114,35 +114,18 @@ class TextureAssetViewTest : public Test
         file.write(content, static_cast<std::streamsize>(std::strlen(content)));
     }
 
-    // 手工組裝最小 uncompressed TGA(image type 2, 32-bit, 無 RLE, 無顏色表)。
-    // 像素以 BGRA 順序儲存(stb_image 讀取 req_comp=4 時會統一成 RGBA)。
-    static void WriteTestTga(const char *path, int w, int h,
+    // 手工組裝最小 PPM P6(二進位 RGB,無壓縮,無跨平台差異)。
+    // stb_image(req_comp=4)會輸出 RGBA(R,G,B,255)。
+    static void WriteTestPpm(const char *path, int w, int h,
                              unsigned char r, unsigned char g, unsigned char b,
-                             unsigned char a)
+                             unsigned char /*a*/)
     {
-        std::vector<unsigned char> tga;
-        // 18-byte header
-        tga.push_back(0x00);          // idlength
-        tga.push_back(0x00);          // colormaptype
-        tga.push_back(0x02);          // datatype = uncompressed true-color
-        tga.push_back(0x00); tga.push_back(0x00); tga.push_back(0x00); tga.push_back(0x00); tga.push_back(0x00); // colormap spec (5 bytes)
-        tga.push_back(0x00); tga.push_back(0x00);          // x_origin
-        tga.push_back(0x00); tga.push_back(0x00);          // y_origin
-        tga.push_back(static_cast<unsigned char>(w & 0xFF));
-        tga.push_back(static_cast<unsigned char>((w >> 8) & 0xFF));
-        tga.push_back(static_cast<unsigned char>(h & 0xFF));
-        tga.push_back(static_cast<unsigned char>((h >> 8) & 0xFF));
-        tga.push_back(0x20);          // pixel depth = 32
-        tga.push_back(0x00);          // image descriptor
-        // pixel data (BGRA), 重複 w*h 次
+        std::ofstream file(path, std::ios::binary);
+        file << "P6\n" << w << " " << h << "\n255\n";
         for (int i = 0; i < w * h; ++i)
         {
-            tga.push_back(b); tga.push_back(g); tga.push_back(r); tga.push_back(a);
+            file.put(r); file.put(g); file.put(b);
         }
-
-        std::ofstream file(path, std::ios::binary);
-        file.write(reinterpret_cast<const char *>(tga.data()),
-                   static_cast<std::streamsize>(tga.size()));
     }
 };
 
