@@ -108,6 +108,14 @@ template <class T> class ComponentPool : public IComponentPool
         return &data[itr->Value()];
     }
 
+    const T *Get(uint32_t entityIndex) const
+    {
+        HashTable<uint32_t, uint32_t>::Iterator itr = lookup.Find(entityIndex);
+        if (itr == lookup.Last())
+            return nullptr;
+        return &data[itr->Value()];
+    }
+
     bool Contains(uint32_t entityIndex) const
     {
         return lookup.Contains(entityIndex);
