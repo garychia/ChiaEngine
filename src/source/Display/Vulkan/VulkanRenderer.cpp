@@ -15,8 +15,7 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
-#include "3rdparty/stb_image.h"
+#include "3rdparty/stb_image.h" // 宣告;實作在 source/Display/Asset/stb_image_impl.cpp
 
 #include <algorithm>
 #include <cmath>

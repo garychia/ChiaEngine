@@ -30,6 +30,7 @@ set(DISPLAY_SOURCE_FILES
     source/Display/Scene.cpp
     include/Display/Asset/TextureAssetView.hpp
     source/Display/Asset/TextureAssetView.cpp
+    source/Display/Asset/stb_image_impl.cpp
     include/Display/Shader.hpp
     source/Display/Shader.cpp
     include/Display/Texture.hpp

@@ -10,6 +10,29 @@
 namespace editorsessiontest
 {
 
+// Mock renderer asset registrar:記錄 RegisterMaterial 呼叫,供 EditorSession texture 集成測試驗證。
+class MockRegistrar : public IRendererAssetRegistrar
+{
+  public:
+    bool registerCalled = false;
+    uint64_t lastMaterialId = 0;
+    int lastWidth = 0;
+    int lastHeight = 0;
+    bool lastHadRawRGBA = false;
+
+    bool RegisterMeshGeometry(uint64_t meshId, const RenderInfo &info) override { return false; }
+
+    bool RegisterMaterial(uint64_t materialId, const MaterialSource &source) override
+    {
+        registerCalled = true;
+        lastMaterialId = materialId;
+        lastWidth = source.width;
+        lastHeight = source.height;
+        lastHadRawRGBA = (source.pRawRGBA != nullptr);
+        return true;
+    }
+};
+
 // Test-local command: 對一個 float 做 set(記錄舊值)。
 class FloatSetCommand : public EditorCommand
 {
@@ -155,8 +178,53 @@ class EditorSessionTest : public Test
             EXPECT_TRUE(!pConsole->IsCollapsed(), "SetPaneCollapsed(false) 回復.", true);
         }
 
-        SUCCESS_MESSAGE("EditorSession: selection / undo-redo / pointer set / shortcuts / pane registry 全部通過.");
+        // ---- AC8:EditorSession + TextureAssetView 集成(load → decode → RegisterMaterial)----
+        {
+            JobSystem jobs(2);
+            AssetManager manager(jobs);
+            MockRegistrar mockReg;
+            EditorSession session(nullptr, nullptr, nullptr, &manager, &mockReg);
+
+            const char *path = TestTempFilePath("chia_editor_tex.ppm");
+            WriteTestPpm(path, 2, 1, 10, 20, 30); // RGB(10,20,30) × 2 pixels
+
+            uint64_t pathHash = session.LoadTexture(path);
+            EXPECT_TRUE(pathHash != 0, "LoadTexture 回傳非零 pathHash", true);
+
+            jobs.WaitForIdle();
+            session.DispatchAssetEvents();
+
+            EXPECT_TRUE(mockReg.registerCalled, "RegisterMaterial 被呼叫", true);
+            EXPECT_TRUE(mockReg.lastHadRawRGBA, "RegisterMaterial 收到 pRawRGBA", true);
+            EXPECT_TRUE(mockReg.lastWidth == 2 && mockReg.lastHeight == 1, "解碼尺寸 2x1", true);
+
+            uint64_t materialId = session.GetMaterialId(path);
+            EXPECT_TRUE(materialId != 0, "GetMaterialId 回傳非零", true);
+            EXPECT_TRUE(materialId == mockReg.lastMaterialId, "GetMaterialId == RegisterMaterial 的 materialId", true);
+            EXPECT_TRUE(session.IsTextureLoaded(path), "IsTextureLoaded 回傳 true", true);
+
+            // 重複 LoadTexture(同一 path) → 依 key 去重,回傳相同 pathHash
+            uint64_t pathHash2 = session.LoadTexture(path);
+            EXPECT_TRUE(pathHash2 == pathHash, "重複 LoadTexture 回傳相同 pathHash", true);
+
+            std::remove(path);
+        }
+
+        SUCCESS_MESSAGE("EditorSession: selection / undo-redo / pointer set / shortcuts / pane registry / texture integration 全部通過.");
         return true;
+    }
+
+  private:
+    // 手工組裝最小 PPM P6(二進位 RGB,無壓縮,無跨平台差異)。
+    static void WriteTestPpm(const char *path, int w, int h,
+                             unsigned char r, unsigned char g, unsigned char b)
+    {
+        std::ofstream file(path, std::ios::binary);
+        file << "P6\n" << w << " " << h << "\n255\n";
+        for (int i = 0; i < w * h; ++i)
+        {
+            file.put(r); file.put(g); file.put(b);
+        }
     }
 };
 
