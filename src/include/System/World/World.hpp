@@ -91,6 +91,11 @@ class World
         return GetComponentByIndex<T>(entity.GetIndex());
     }
 
+    template <class T> const T *GetComponent(Entity entity) const
+    {
+        return GetComponentByIndex<T>(entity.GetIndex());
+    }
+
     template <class T> bool HasComponent(Entity entity) const
     {
         return HasComponentByIndex<T>(entity.GetIndex());
@@ -111,6 +116,12 @@ class World
 
     // ---- 內部(View 用,吃 entity index)----
     template <class T> T *GetComponentByIndex(uint32_t entityIndex)
+    {
+        ComponentPool<T> *pPool = GetPool<T>();
+        return pPool ? pPool->Get(entityIndex) : nullptr;
+    }
+
+    template <class T> const T *GetComponentByIndex(uint32_t entityIndex) const
     {
         ComponentPool<T> *pPool = GetPool<T>();
         return pPool ? pPool->Get(entityIndex) : nullptr;

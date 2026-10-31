@@ -251,24 +251,25 @@ class SceneSystem : public IModule
         out << "scene v1\n";
         out << std::dec << std::setprecision(17);
 
-        // World::GetComponent 尚無 const 多載(見 #81 seam 註解),讀取需暫時去掉 const。
-        World &mutableWorld = const_cast<World &>(world);
+        // setprecision(17) 對 float 足以唯一識別每個位元組合(24-bit 尾數需約 7 位小數，
+        // 17 位綽綽有餘);-0.0f 會輸出為 -0 並由 from_chars 解回 -0.0f,因此逐 bit
+        // 圓行對所有 float 值都成立(see test AC6)。
         DynamicArray<Entity> nodes;
         DynamicArray<uint32_t> depths;
         GetHierarchy(nodes, depths);
         for (size_t i = 0; i < nodes.GetNElements(); ++i)
         {
             const Entity e = nodes[i];
-            const TransformComponent *pTransform = mutableWorld.GetComponent<TransformComponent>(e);
+            const TransformComponent *pTransform = world.GetComponent<TransformComponent>(e);
             if (!pTransform)
                 return false;
 
-            const ParentComponent *pParent = mutableWorld.GetComponent<ParentComponent>(e);
+            const ParentComponent *pParent = world.GetComponent<ParentComponent>(e);
             int64_t parentIndex = -1;
-            if (pParent && pParent->parent.GetRaw() != 0 && mutableWorld.Alive(pParent->parent))
+            if (pParent && pParent->parent.GetRaw() != 0 && world.Alive(pParent->parent))
                 parentIndex = static_cast<int64_t>(pParent->parent.GetIndex());
 
-            const scenesystem_detail::NodeName *pName = mutableWorld.GetComponent<scenesystem_detail::NodeName>(e);
+            const scenesystem_detail::NodeName *pName = world.GetComponent<scenesystem_detail::NodeName>(e);
             const char *nodeName = (pName && pName->text[0] != '\0') ? pName->text : "Node";
 
             out << "node " << e.GetIndex() << " " << parentIndex << " " << nodeName << " ";

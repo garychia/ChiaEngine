@@ -304,6 +304,64 @@ class SceneSystemTest : public Test
             EXPECT_TRUE(pResolved == &system, "OnAttach 自註冊 SceneSystem 服務,Resolve 指向 system.", true);
         }
 
+        // ---- AC8:更多異常邊界與空場景(#164)----
+        {
+            auto writeScene = [](const char *filePath, const char *text) {
+                std::ofstream out(filePath, std::ios::out | std::ios::trunc);
+                out << text;
+            };
+            SceneSystem system;
+            Entity keep = system.CreateNode();
+            const TransformComponent expected(Point3D(7.f, 8.f, 9.f));
+            *system.GetLocalTransform(keep) = expected;
+            const char *badPath = TestTempFilePath("chia_scene_bad2.scene");
+            auto expectRejected = [&](const char *text, const char *message) {
+                writeScene(badPath, text);
+                EXPECT_TRUE(!system.LoadScene(badPath), message, false);
+                DynamicArray<Entity> nodes;
+                DynamicArray<uint32_t> depths;
+                system.GetHierarchy(nodes, depths);
+                EXPECT_TRUE(nodes.GetNElements() == 1 && nodes[0] == keep, "失敗的 LoadScene 保留原場景.", false);
+                EXPECT_TRUE(std::memcmp(system.GetLocalTransform(keep), &expected, sizeof(TransformComponent)) == 0, "失敗的 LoadScene 不改 transform.", false);
+                return true;
+            };
+
+            // 空場景:只有 container 與 end
+            const char *emptyPath = TestTempFilePath("chia_scene_empty.scene");
+            writeScene(emptyPath, "scene v1\nend\n");
+            SceneSystem emptySys;
+            EXPECT_TRUE(emptySys.LoadScene(emptyPath), "空場景檔可載入.", false);
+            DynamicArray<Entity> emptyNodes;
+            DynamicArray<uint32_t> emptyDepths;
+            emptySys.GetHierarchy(emptyNodes, emptyDepths);
+            EXPECT_TRUE(emptyNodes.GetNElements() == 0, "空場景無節點.", false);
+
+            // 重複 index → false
+            expectRejected("scene v1\nnode 0 -1 A 0 0 0 0 0 0 1 1 1\nnode 0 -1 B 0 0 0 0 0 0 1 1 1\nend\n", "重複 index → false.");
+
+            // 父=自身(self-parent) → false
+            expectRejected("scene v1\nnode 0 0 Self 0 0 0 0 0 0 1 1 1\nend\n", "父等於自身 → false.");
+
+            // end 後有尾隨資料 → false
+            expectRejected("scene v1\nnode 0 -1 Root 0 0 0 0 0 0 1 1 1\nend\textra\n", "end 後有尾隨資料 → false.");
+
+            // 名稱超過 63 字元 → 載入成功但截斷(第一個 63 字元)
+            char longName[200];
+            for (int i = 0; i < 199; ++i) longName[i] = 'a';
+            longName[199] = 0;
+            std::string longNameScene = "scene v1\nnode 0 -1 ";
+            longNameScene += longName;
+            longNameScene += " 0 0 0 0 0 0 0 1 1 1\nend\n";
+            const char *longPath = TestTempFilePath("chia_scene_longname.scene");
+            writeScene(longPath, longNameScene.c_str());
+            SceneSystem longSys;
+            EXPECT_TRUE(longSys.LoadScene(longPath), "超長名稱可載入(會截斷).", false);
+            DynamicArray<Entity> longNodes;
+            DynamicArray<uint32_t> longDepths;
+            longSys.GetHierarchy(longNodes, longDepths);
+            EXPECT_TRUE(longNodes.GetNElements() == 1, "超長名稱場景有一個節點.", false);
+        }
+
         SUCCESS_MESSAGE("SceneSystem");
         return true;
     }
