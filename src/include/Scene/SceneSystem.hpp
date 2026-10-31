@@ -3,6 +3,7 @@
 
 #include "Data/DynamicArray.hpp"
 #include "Data/Padding.hpp"
+#include "Data/String.hpp"
 #include "Scene/ParentComponent.hpp"
 #include "Scene/TransformComponent.hpp"
 #include "Scene/TransformMath.hpp"
@@ -216,6 +217,23 @@ class SceneSystem : public IModule
         if (!pT)
             return false;
         out = *pT;
+        return true;
+    }
+
+    // 讀取節點名稱(index + 存活檢查);無名稱回 "Node"。
+    bool GetNodeName(uint32_t entityIndex, String &outName) const
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        const scenesystem_detail::NodeName *pName =
+            world.GetComponent<scenesystem_detail::NodeName>(e);
+        if (!pName || pName->text[0] == '\0')
+        {
+            outName = String(u"Node");
+            return true;
+        }
+        outName = String(pName->text);
         return true;
     }
 

@@ -1,4 +1,6 @@
 #include "Display/GUI/EditorSession.hpp"
+#include "Geometry/2D/Point2D.hpp"
+#include "Display/GUI/Border.hpp"
 
 EditorSession::EditorSession(SceneSystem *pSceneSystem, CameraController *pCameraController,
                              SimRecorder *pSimRecorder, AssetManager *pAssetManager,
@@ -96,6 +98,28 @@ uint64_t EditorSession::HashPath(const String &path)
 {
     const Str<char> utf8 = path.ToUTF8();
     return FNV1A64(FNV1A64_OFFSET, utf8.CStr(), utf8.Length());
+}
+
+void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
+{
+    const Border leftBorder(0.f, 0.f, 240.f, windowSize.y);
+    const Border rightBorder(0.f, 0.f, 320.f, windowSize.y);
+
+    // Inspector(RightDock):TransformComponent + / - 編輯,Undoable。
+    auto pInspector = SharedPtr<InspectorLayer>::Construct(
+        String(u"Inspector"), windowSize, rightBorder, PanelDock::RightDock, mpSceneSystem,
+        &mUndoStack);
+    RegisterPane(pInspector);
+
+    // Hierarchy(LeftDock):節點樹,點擊 → Select() → Inspector 刷新。
+    auto pHierarchy = SharedPtr<HierarchyPanel>::Construct(
+        String(u"Hierarchy"), windowSize, leftBorder, PanelDock::LeftDock, mpSceneSystem, this,
+        pInspector.GetRaw());
+    RegisterPane(pHierarchy);
+
+    // Inspector 先同步目前選取(預設無選取)。
+    if (mpSceneSystem)
+        pInspector->SetSelection(&mSelection);
 }
 
 void EditorSession::Select(uint32_t entityIndex)

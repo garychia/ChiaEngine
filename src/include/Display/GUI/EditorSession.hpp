@@ -7,6 +7,8 @@
 #include "Data/Hash.hpp"
 #include "Display/GUI/PanelPane.hpp"
 #include "Display/GUI/Selection.hpp"
+#include "Display/GUI/HierarchyPanel.hpp"
+#include "Display/GUI/InspectorLayer.hpp"
 #include "Display/Asset/TextureAssetView.hpp"
 #include "Display/IRendererAssetRegistrar.hpp"
 #include "Scene/SceneSystem.hpp"
@@ -166,6 +168,11 @@ class EditorSession
     PanelPane *GetPane(const String &title);
     const DynamicArray<SharedPtr<PanelPane>> &GetPanes() const { return mPanes; }
     void SetPaneCollapsed(const String &title, bool collapsed); // 收合 → dock 高度歸零
+
+    // 建立預設 pane(Hierarchy LeftDock + Inspector RightDock)並串接:
+    // Hierarchy 列點擊 → EditorSession::Select() → InspectorLayer::SetSelection()。
+    // windowSize 由 App 提供(EditorSession 本身 window-agnostic)。
+    void CreateDefaultPanes(const Point2D &windowSize);
 
     // Reset all state
     void Reset();

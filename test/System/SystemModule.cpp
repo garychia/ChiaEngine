@@ -9,6 +9,7 @@
 #include "ReplayFileTest.hpp" // #159:Replay File Format v1 的讀寫與錯誤對應
 #include "InspectorTest.hpp"
 #include "EditorSessionTest.hpp"
+#include "HierarchyPanelTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
 #include "IO/IOTest.hpp"
@@ -46,6 +47,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<guitest::HierarchyRowTest>();
     AddTest<inspectortest::InspectorTest>();
     AddTest<editorsessiontest::EditorSessionTest>();
+    AddTest<hierarchypanel_test::HierarchyPanelTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();
