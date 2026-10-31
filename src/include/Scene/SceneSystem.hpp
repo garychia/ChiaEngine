@@ -15,6 +15,7 @@
 #include "System/World/WorldHashRecord.hpp" // ReadLine/NextToken/ParseUInt32(嚴格單空格 token)
 
 #include <charconv>
+#include <cstdlib>   // std::strtof (from_chars for float 在 libc++/Apple Clang 上未實作)
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -47,9 +48,14 @@ inline bool ParseFloat(std::string_view token, float &out) noexcept
 {
     if (token.empty())
         return false;
-    float value = 0;
-    const std::from_chars_result result = std::from_chars(token.data(), token.data() + token.size(), value);
-    if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+    // std::from_chars for float 在 libc++(Apple Clang) 上未實作(標記 deleted)。
+    // 場景檔由我們自己寫入(setprecision(17), C locale 格式),strtof 在預設
+    // "C" locale 下是確定性的;endptr 檢查確保整個 token 被消耗(嚴格解析,
+    // 不允許尾隨垃圾字元)。
+    std::string buf(token);
+    char *end = nullptr;
+    const float value = std::strtof(buf.c_str(), &end);
+    if (end == buf.c_str() || *end != '\0')
         return false;
     out = value;
     return true;
