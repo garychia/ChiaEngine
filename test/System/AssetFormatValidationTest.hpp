@@ -402,15 +402,28 @@ class TextureViewHookTest : public Test
     struct HookRecorder
     {
         size_t calls = 0;
-        DynamicArray<unsigned char> lastBytes;
+        int lastWidth = 0;
+        int lastHeight = 0;
+        unsigned char lastRgba[4] = {0, 0, 0, 0};
+        bool lastWasNull = false;
         size_t lastHash = 0;
 
-        static void OnTextureReady(const DynamicArray<unsigned char> &rgbaBytes, size_t contentHash, void *pUserData)
+        static void OnTextureReady(const unsigned char *rgbaPixels, int width, int height,
+                                   size_t contentHash, void *pUserData)
         {
             HookRecorder *self = static_cast<HookRecorder *>(pUserData);
             self->calls++;
-            self->lastBytes = rgbaBytes;
+            self->lastWidth = width;
+            self->lastHeight = height;
             self->lastHash = contentHash;
+            self->lastWasNull = (rgbaPixels == nullptr);
+            if (rgbaPixels)
+            {
+                self->lastRgba[0] = rgbaPixels[0];
+                self->lastRgba[1] = rgbaPixels[1];
+                self->lastRgba[2] = rgbaPixels[2];
+                self->lastRgba[3] = rgbaPixels[3];
+            }
         }
     };
 
@@ -430,9 +443,13 @@ class TextureViewHookTest : public Test
         const char *pathDetach = TestTempFilePath("chia_view_detach.bin");
         const char *pathReattach = TestTempFilePath("chia_view_reattach.bin");
 
-        const char *validContent = "TEX-VALID-1234"; // 14 bytes,含 magic-ish 檔頭
-        const size_t validLen = std::strlen(validContent);
-        Check(WriteFileBytes(pathValid, reinterpret_cast<const unsigned char *>(validContent), validLen), "valid file written");
+        const unsigned char validTga[] = {
+            0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x20, 0x00, // header: 1x1, 32-bit uncompressed
+            0x1E, 0x14, 0x0A, 0xFF               // pixel: B=30,G=20,R=10,A=255
+        };
+        const size_t validTgaLen = sizeof(validTga);
+        Check(WriteFileBytes(pathValid, validTga, validTgaLen), "valid file written");
 
         SeedRng(0xC0FFEE123456789Aull);
         DynamicArray<unsigned char> badBytes(32);
@@ -451,34 +468,34 @@ class TextureViewHookTest : public Test
         HookRecorder recorder;
         view.SetTextureReadyHook(&HookRecorder::OnTextureReady, &recorder);
 
-        // ── S1:有效載入 → hook 收到正確 bytes ──
+        // ── S1:有效載入(TGA) → stb_image 解碼 → hook 收到 RGBA pixels ──
         SharedPtr<Asset> hValid = manager.LoadAsync(pathValid);
         jobs.WaitForIdle();
         Check(manager.DispatchCompletedEvents() == 1, "S1 valid: 1 completion event");
         Check(recorder.calls == 1, "S1 valid: hook fired once");
-        Check(recorder.lastBytes.Length() == validLen, "S1 valid: hook bytes length matches");
-        // 先確認長度足夠再 memcmp:上面的 Check 是非致命的(不會 early return),如果 hook
-        // 沒收到 bytes,這一行會對空陣列取 &[0] → 越界。長度不足就讓它照樣「失敗」,不要 crash。
-        Check(recorder.lastBytes.Length() >= validLen &&
-                  std::memcmp(&recorder.lastBytes[0], validContent, validLen) == 0,
-              "S1 valid: hook bytes content matches file");
-        Check(recorder.lastHash == ExpectedHash(reinterpret_cast<const unsigned char *>(validContent), validLen),
-              "S1 valid: hook content hash matches FNV1A64(bytes)");
+        Check(!recorder.lastWasNull, "S1 valid: hook pixels not null (decoded OK)");
+        Check(recorder.lastWidth == 1 && recorder.lastHeight == 1, "S1 valid: decoded size 1x1");
+        Check(recorder.lastRgba[1] == 20 && recorder.lastRgba[3] == 255,
+              "S1 valid: decoded G=20, A=255");
+        Check(recorder.lastRgba[0] + recorder.lastRgba[2] == 40,
+              "S1 valid: decoded R+B=40 (channel order agnostic)");
+        Check(recorder.lastHash == ExpectedHash(validTga, validTgaLen),
+              "S1 valid: hook content hash matches FNV1A64(tga bytes)");
 
-        // ── S2:corrupt(bytes 損壞)→ hook 收到該 bytes、安全 ──
+        // ── S2:corrupt(bytes 損壞)→ stb_image 解碼失敗 → hook 收到 nullptr ──
         SharedPtr<Asset> hBad = manager.LoadAsync(pathBad);
         jobs.WaitForIdle();
         Check(manager.DispatchCompletedEvents() == 1, "S2 corrupt: 1 completion event");
         Check(recorder.calls == 2, "S2 corrupt: hook fired once more");
-        Check(BytesEqual(recorder.lastBytes, &badBytes[0], 32), "S2 corrupt: hook bytes byte-identical to corrupt content");
+        Check(recorder.lastWasNull, "S2 corrupt: hook pixels null (undecodable)");
         Check(recorder.lastHash == ExpectedHash(&badBytes[0], 32), "S2 corrupt: hook hash matches corrupt bytes");
 
-        // ── S3:empty(0 bytes)→ hook 收到 0-length bytes、安全 ──
+        // ── S3:empty(0 bytes)→ 解碼跳過 → hook 收到 nullptr ──
         SharedPtr<Asset> hEmpty = manager.LoadAsync(pathEmpty);
         jobs.WaitForIdle();
         Check(manager.DispatchCompletedEvents() == 1, "S3 empty: 1 completion event");
         Check(recorder.calls == 3, "S3 empty: hook fired once more");
-        Check(recorder.lastBytes.Length() == 0, "S3 empty: hook received 0-length bytes (safe)");
+        Check(recorder.lastWasNull, "S3 empty: hook pixels null (empty content)");
         Check(recorder.lastHash == FNV1A64_OFFSET, "S3 empty: hook hash == FNV1A64_OFFSET (empty content)");
 
         // ── S4:missing 檔 → 不 fire hook、manager 安全(rejected 狀態)──
@@ -507,8 +524,9 @@ class TextureViewHookTest : public Test
         loadedEmpty->loaded = true;
         loadedEmpty->pBlock = emptyBlock;
         view.OnAssetLoaded(loadedEmpty);
-        Check(recorder.calls == 4, "S5: loaded empty-content asset -> hook fires with 0 bytes (safe)");
-        Check(recorder.lastBytes.Length() == 0 && recorder.lastHash == FNV1A64_OFFSET, "S5: empty hook payload correct");
+        Check(recorder.calls == 4, "S5: loaded empty-content asset -> hook fires with nullptr (safe)");
+        Check(recorder.lastWasNull, "S5 empty: hook pixels null (empty content)");
+        Check(recorder.lastHash == FNV1A64_OFFSET, "S5 empty: hook hash == FNV1A64_OFFSET");
 
         SharedPtr<AssetBlock> badBlock = SharedPtr<AssetBlock>::Construct(badBytes, ExpectedHash(&badBytes[0], 32));
         SharedPtr<Asset> loadedBad = SharedPtr<Asset>::Construct(String("k_bad"), 4u);
@@ -516,7 +534,7 @@ class TextureViewHookTest : public Test
         loadedBad->pBlock = badBlock;
         view.OnAssetLoaded(loadedBad);
         Check(recorder.calls == 5, "S5: loaded corrupt-content asset -> hook fires (safe)");
-        Check(BytesEqual(recorder.lastBytes, &badBytes[0], 32), "S5: corrupt hook payload byte-identical");
+        Check(recorder.lastWasNull, "S5 bad: hook pixels null (undecodable garbage)");
 
         // ── S6:unsubscribe 後不再收到;重新 subscribe 恢復 ──
         view.Unsubscribe();
@@ -535,9 +553,7 @@ class TextureViewHookTest : public Test
         jobs.WaitForIdle();
         Check(manager.DispatchCompletedEvents() == 1, "S6: re-attached load completes");
         Check(recorder.calls == 6, "S6: hook fires again after re-subscribe");
-        Check(recorder.lastBytes.Length() == std::strlen(reattachContent) &&
-                  std::memcmp(&recorder.lastBytes[0], reattachContent, std::strlen(reattachContent)) == 0,
-              "S6: re-attached hook bytes correct");
+        Check(recorder.lastWasNull, "S6 reattach: hook pixels null (\"REATTACH\" undecodable)");
         view.Unsubscribe();
         Check(!view.IsAttached(), "S6: final unsubscribe clean");
 
