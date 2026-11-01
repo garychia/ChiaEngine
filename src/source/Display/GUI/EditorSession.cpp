@@ -2,6 +2,7 @@
 #include "Display/GUI/AssetBrowserPanel.hpp"
 #include "Display/GUI/HierarchyPanel.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
+#include "Display/GUI/SceneEditCommand.hpp"
 #include "Geometry/2D/Point2D.hpp"
 #include "Display/GUI/Border.hpp"
 
@@ -148,6 +149,38 @@ uint64_t EditorSession::GetSelectedEntityMaterialId() const
     uint64_t materialId = 0;
     mpSceneSystem->GetMaterial(mSelection.entityIndex, materialId);
     return materialId;
+}
+
+uint32_t EditorSession::CreateNode(Entity parent)
+{
+    if (!mpSceneSystem)
+        return 0;
+    // UndoStack::Push 會立即呼叫 cmd->Apply(),由 CreateNodeCommand 建立節點
+    // 並記錄 mEntityIndex;Push 後即可取得新節點 index。
+    auto *cmd = new CreateNodeCommand(mpSceneSystem, parent);
+    mUndoStack.Push(cmd);
+    return cmd->GetCreatedEntityIndex();
+}
+
+void EditorSession::DestroyNode(Entity entity)
+{
+    if (!mpSceneSystem)
+        return;
+    mUndoStack.Push(new DestroyNodeCommand(mpSceneSystem, entity));
+}
+
+void EditorSession::SetParent(Entity entity, Entity parent)
+{
+    if (!mpSceneSystem)
+        return;
+    mUndoStack.Push(new SetParentCommand(mpSceneSystem, entity, parent));
+}
+
+void EditorSession::SetSelectedEntityMaterial(uint64_t materialId)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    mUndoStack.Push(new SetMaterialCommand(mpSceneSystem, mSelection.entityIndex, materialId));
 }
 
 void EditorSession::CreateDefaultPanes(const Point2D &windowSize)

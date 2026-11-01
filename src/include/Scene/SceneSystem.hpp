@@ -197,6 +197,17 @@ class SceneSystem : public IModule
             p->parent = parent;
     }
 
+    // 讀取節點的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
+    Entity GetParent(Entity e) const
+    {
+        if (!world.Alive(e))
+            return Entity();
+        const ParentComponent *p = world.GetComponent<ParentComponent>(e);
+        if (!p)
+            return Entity();
+        return p->parent;
+    }
+
     void ClearParent(Entity e)
     {
         SetParent(e, Entity());
