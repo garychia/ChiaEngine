@@ -8,6 +8,7 @@
 #include "Scene/TransformComponent.hpp"
 #include "Scene/TransformMath.hpp"
 #include "Scene/WorldTransformComponent.hpp"
+#include "Scene/MaterialComponent.hpp"
 #include "System/Module/EngineContext.hpp"
 #include "System/Module/IModule.hpp"
 #include "System/Operation/Event.hpp"
@@ -183,6 +184,7 @@ class SceneSystem : public IModule
         scenesystem_detail::NodeName name;
         scenesystem_detail::SetNodeName(name, "Node");
         world.AddComponent<scenesystem_detail::NodeName>(e, name);
+        world.AddComponent<MaterialComponent>(e, MaterialComponent());
         return e;
     }
 
@@ -235,6 +237,31 @@ class SceneSystem : public IModule
         }
         outName = String(pName->text);
         return true;
+    }
+
+    // 讀取節點材質(index + 存活檢查);未綁定回 materialId = 0。
+    bool GetMaterial(uint32_t entityIndex, uint64_t &outMaterialId) const
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        const MaterialComponent *pM = world.GetComponent<MaterialComponent>(e);
+        if (!pM)
+            return false;
+        outMaterialId = pM->materialId;
+        return true;
+    }
+
+    // 編輯器增量編輯:設定節點材質(materialId = 0 表示解綁)。entity 不存在則 no-op。
+    void SetMaterial(uint32_t entityIndex, uint64_t materialId)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        MaterialComponent *pM = world.GetComponent<MaterialComponent>(e);
+        if (!pM)
+            return;
+        pM->materialId = materialId;
     }
 
     // 編輯器增量編輯:local TRS += delta(axis 對應的 delta 由 View 端組好,
