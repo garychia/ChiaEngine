@@ -63,6 +63,8 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/InspectorLayer.cpp
     include/Display/GUI/HierarchyPanel.hpp
     source/Display/GUI/HierarchyPanel.cpp
+    include/Display/GUI/AssetBrowserPanel.hpp
+    source/Display/GUI/AssetBrowserPanel.cpp
     include/Display/GUI/PanelPane.hpp
     include/Display/GUI/Selection.hpp
     include/Display/GUI/EditorSession.hpp

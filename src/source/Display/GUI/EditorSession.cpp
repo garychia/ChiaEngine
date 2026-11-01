@@ -1,4 +1,5 @@
 #include "Display/GUI/EditorSession.hpp"
+#include "Display/GUI/AssetBrowserPanel.hpp"
 #include "Display/GUI/HierarchyPanel.hpp"
 #include "Display/GUI/InspectorLayer.hpp"
 #include "Geometry/2D/Point2D.hpp"
@@ -165,6 +166,11 @@ void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
         String(u"Hierarchy"), windowSize, leftBorder, PanelDock::LeftDock, mpSceneSystem, this,
         pInspector.GetRaw());
     RegisterPane(pHierarchy);
+
+    // Asset Browser(LeftDock):已載入貼圖列表,點擊貼圖 → 綁定到選中節點。
+    auto pAssetBrowser = SharedPtr<AssetBrowserPanel>::Construct(
+        String(u"AssetBrowser"), windowSize, leftBorder, PanelDock::LeftDock, mpSceneSystem, this);
+    RegisterPane(pAssetBrowser);
 
     // Inspector 先同步目前選取(預設無選取)。
     if (mpSceneSystem)

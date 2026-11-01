@@ -11,6 +11,7 @@
 #include "EditorSessionTest.hpp"
 #include "HierarchyPanelTest.hpp"
 #include "MaterialBindingTest.hpp"
+#include "AssetBrowserTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
 #include "IO/IOTest.hpp"
@@ -50,6 +51,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<editorsessiontest::EditorSessionTest>();
     AddTest<hierarchypanel_test::HierarchyPanelTest>();
     AddTest<materialbinding_test::MaterialBindingTest>();
+    AddTest<assetbrowser_test::AssetBrowserTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();
