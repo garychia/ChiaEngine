@@ -13,6 +13,7 @@
 #include "MaterialBindingTest.hpp"
 #include "AssetBrowserTest.hpp"
 #include "SceneUndoTest.hpp"
+#include "PrefabTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
 #include "IO/IOTest.hpp"
@@ -54,6 +55,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<materialbinding_test::MaterialBindingTest>();
     AddTest<assetbrowser_test::AssetBrowserTest>();
     AddTest<sceneundo_test::SceneUndoTest>();
+    AddTest<prefab_test::PrefabTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
     AddTest<replaytest::ReplayTest>();

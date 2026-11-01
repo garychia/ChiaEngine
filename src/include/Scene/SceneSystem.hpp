@@ -129,6 +129,74 @@ inline bool ParseNodeLine(std::string_view line, SceneNode &out)
     out.transform.scale = Point3D(values[6], values[7], values[8]);
     return true;
 }
+
+// prefab 节点:localIndex + parentLocalIndex + materialId + name + 9 floats
+// localIndex 從 0 開始重新編號(Prefab 可實例化到不同場景位置)。
+struct PrefabNode
+{
+    uint32_t localIndex = 0;
+    int64_t parentLocalIndex = -1;
+    std::string name;
+    uint64_t materialId = 0;
+    TransformComponent transform;
+};
+
+// node <localIndex> <parentLocalIndex> <materialId> <name> <9 floats>
+// name 可含空格 → 最後 9 個 token 固定是 TRS,materialId 在 name 之前。
+inline bool ParsePrefabNodeLine(std::string_view line, PrefabNode &out)
+{
+    using namespace worldhashrecord_detail;
+
+    size_t pos = 0;
+    std::string_view token;
+    if (!NextToken(line, pos, token) || token != "node")
+        return false;
+    if (!NextToken(line, pos, token) || !ParseUInt32(token, out.localIndex))
+        return false;
+    if (!NextToken(line, pos, token) || !ParseParent(token, out.parentLocalIndex))
+        return false;
+    if (!NextToken(line, pos, token))
+        return false;
+    // materialId:uint64,無符號十進位
+    {
+        uint64_t value = 0;
+        const std::from_chars_result result =
+            std::from_chars(token.data(), token.data() + token.size(), value);
+        if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+            return false;
+        out.materialId = value;
+    }
+
+    const std::string_view rest = line.substr(pos);
+    size_t cursor = rest.size();
+    for (int i = 0; i < 9; ++i)
+    {
+        if (cursor == 0)
+            return false;
+        const size_t space = rest.rfind(' ', cursor - 1);
+        if (space == std::string_view::npos)
+            return false;
+        cursor = space;
+    }
+    if (cursor == 0)
+        return false; // 空 name
+    out.name.assign(rest.data(), cursor);
+
+    float values[9];
+    size_t valuePos = cursor + 1;
+    for (int i = 0; i < 9; ++i)
+    {
+        if (!NextToken(rest, valuePos, token) || !ParseFloat(token, values[i]))
+            return false;
+    }
+    if (valuePos != rest.size())
+        return false;
+
+    out.transform.position = Point3D(values[0], values[1], values[2]);
+    out.transform.rotation = Point3D(values[3], values[4], values[5]);
+    out.transform.scale = Point3D(values[6], values[7], values[8]);
+    return true;
+}
 } // namespace scenesystem_detail
 
 // 場景圖模組(Sim 層,確定性,無 GPU,可無頭測試)。
@@ -273,6 +341,20 @@ class SceneSystem : public IModule
         if (!pM)
             return;
         pM->materialId = materialId;
+    }
+
+    // 編輯器增量編輯:設定節點名稱。entity 不存在則 no-op。
+    void SetNodeName(uint32_t entityIndex, const String &name)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        scenesystem_detail::NodeName *pName =
+            world.GetComponent<scenesystem_detail::NodeName>(e);
+        if (!pName)
+            return;
+        const Str<char> utf8 = name.ToUTF8();
+        scenesystem_detail::SetNodeName(*pName, std::string_view(utf8.CStr(), utf8.Length()));
     }
 
     // 編輯器增量編輯:local TRS += delta(axis 對應的 delta 由 View 端組好,
@@ -428,6 +510,157 @@ class SceneSystem : public IModule
             created.Append(e);
         }
         return true;
+    }
+
+    // ---- Prefab 檔 Save/Load(#168 優先級 4)----
+    // 格式:ASCII、prefab v1,一行一節點,見 PrefabNode 格式。
+    // localIndex 從 0 開始重新編號,Prefab 可實例化到不同場景位置。
+    // 失敗回 false,不清動現有場景。
+    bool SavePrefab(Entity root, const char *path) const
+    {
+        if (path == nullptr || !world.Alive(root))
+            return false;
+        std::ofstream out(path, std::ios::out | std::ios::trunc);
+        if (!out.is_open())
+            return false;
+        out << "prefab v1\n";
+        out << std::dec << std::setprecision(17);
+
+        // DFS pre-order 收集子樹所有節點。
+        DynamicArray<Entity> nodes;
+        CollectSubtree(root, nodes);
+
+        // 建立 entity index -> local index 映射。
+        HashTable<uint32_t, uint32_t> indexMap;
+        for (size_t i = 0; i < nodes.GetNElements(); i++)
+            indexMap.Insert(nodes[i].GetIndex(), static_cast<uint32_t>(i));
+
+        for (size_t i = 0; i < nodes.GetNElements(); i++)
+        {
+            const Entity e = nodes[i];
+            const TransformComponent *pTransform = world.GetComponent<TransformComponent>(e);
+            if (!pTransform)
+                return false;
+
+            const ParentComponent *pParent = world.GetComponent<ParentComponent>(e);
+            int64_t parentLocalIndex = -1;
+            if (pParent && pParent->parent.GetRaw() != 0 && world.Alive(pParent->parent))
+            {
+                typename HashTable<uint32_t, uint32_t>::Iterator itr =
+                    indexMap.Find(pParent->parent.GetIndex());
+                if (itr != indexMap.Last())
+                    parentLocalIndex = static_cast<int64_t>(itr->Value());
+            }
+
+            const scenesystem_detail::NodeName *pName =
+                world.GetComponent<scenesystem_detail::NodeName>(e);
+            const char *nodeName =
+                (pName && pName->text[0] != '\0') ? pName->text : "Node";
+
+            uint64_t matId = 0;
+            const MaterialComponent *pMat = world.GetComponent<MaterialComponent>(e);
+            if (pMat)
+                matId = pMat->materialId;
+
+            out << "node " << i << " " << parentLocalIndex << " " << matId << " " << nodeName
+                << " ";
+            out << pTransform->position.x << " " << pTransform->position.y << " "
+                << pTransform->position.z << " ";
+            out << pTransform->rotation.x << " " << pTransform->rotation.y << " "
+                << pTransform->rotation.z << " ";
+            out << pTransform->scale.x << " " << pTransform->scale.y << " "
+                << pTransform->scale.z << "\n";
+        }
+        out << "end\n";
+        return out.good();
+    }
+
+    // 從 Prefab 檔載入子樹到指定 parent 下。回傳新建立的根節點 Entity。
+    Entity LoadPrefab(Entity parent, const char *path)
+    {
+        Entity nullEntity;
+        if (path == nullptr)
+            return nullEntity;
+        std::ifstream in(path, std::ios::in);
+        if (!in.is_open())
+            return nullEntity;
+
+        using namespace scenesystem_detail;
+        using namespace worldhashrecord_detail;
+
+        std::string line;
+        if (!ReadLine(in, line) || line != "prefab v1")
+            return nullEntity;
+
+        // 先完整解析到區域容器;任何錯誤都在動世界之前返回。
+        DynamicArray<PrefabNode> parsed;
+        DynamicArray<uint32_t> indices; // localIndex 順序
+        bool sawEnd = false;
+        while (ReadLine(in, line))
+        {
+            if (line == "end")
+            {
+                sawEnd = true;
+                break;
+            }
+            PrefabNode node;
+            if (!ParsePrefabNodeLine(line, node))
+                return nullEntity;
+            // localIndex 不得重複;parent 必須是更早出現的 localIndex 或 -1。
+            bool duplicate = false;
+            for (size_t i = 0; i < indices.GetNElements(); ++i)
+                if (indices[i] == node.localIndex)
+                    duplicate = true;
+            if (duplicate)
+                return nullEntity;
+            if (node.parentLocalIndex >= 0)
+            {
+                bool found = false;
+                for (size_t i = 0; i < indices.GetNElements(); ++i)
+                    if (static_cast<uint32_t>(node.parentLocalIndex) == indices[i])
+                    {
+                        found = true;
+                        break;
+                    }
+                if (!found)
+                    return nullEntity;
+            }
+            indices.Append(node.localIndex);
+            parsed.Append(node);
+        }
+        if (!sawEnd)
+            return nullEntity;
+        if (ReadLine(in, line) || !in.eof())
+            return nullEntity;
+
+        // 依檔案順序建立節點(CreateNode 會自動掛 Transform/Parent/NodeName/Material)。
+        DynamicArray<Entity> created;
+        for (size_t i = 0; i < parsed.GetNElements(); ++i)
+        {
+            Entity pEnt;
+            if (parsed[i].parentLocalIndex >= 0)
+            {
+                for (size_t j = 0; j < indices.GetNElements(); ++j)
+                {
+                    if (indices[j] == static_cast<uint32_t>(parsed[i].parentLocalIndex))
+                    {
+                        pEnt = created[j];
+                        break;
+                    }
+                }
+            }
+            const Entity e = CreateNode(pEnt);
+            *world.GetComponent<TransformComponent>(e) = parsed[i].transform;
+            scenesystem_detail::NodeName *pName =
+                world.GetComponent<scenesystem_detail::NodeName>(e);
+            if (pName)
+                scenesystem_detail::SetNodeName(*pName, parsed[i].name);
+            MaterialComponent *pMat = world.GetComponent<MaterialComponent>(e);
+            if (pMat)
+                pMat->materialId = parsed[i].materialId;
+            created.Append(e);
+        }
+        return created.IsEmpty() ? nullEntity : created[0];
     }
 
     // children 依 entity index 升序(掃描 pool,parent == e)。
