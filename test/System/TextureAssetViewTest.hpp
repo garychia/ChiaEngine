@@ -70,17 +70,23 @@ class TextureAssetViewTest : public Test
         view.SetTextureReadyHook(&TextureViewObserver::OnTextureReady, &obs);
 
         // 發起 N 個載入 → 全部收到 LoadedEvent → View stb_image 解碼 → 轉交 renderer hook。
+        // 分開串行加載(先 A 1×1，再 B 2×1)，避免並發完成序不確定導致 lastWidth/Height 取錯。
         SharedPtr<Asset> hA = manager.LoadAsync(pathA);
+        jobs.WaitForIdle();
+        manager.DispatchCompletedEvents();
+        EXPECT_TRUE(hA->loaded, "asset A loaded", true);
+        EXPECT_TRUE(obs.onReadyCount == 1, "first event for A", true);
+        EXPECT_TRUE(obs.lastWidth == 1 && obs.lastHeight == 1, "decoded size A = 1x1", true);
+
         SharedPtr<Asset> hB = manager.LoadAsync(pathB);
         jobs.WaitForIdle();
         const size_t nEvents = manager.DispatchCompletedEvents();
-
-        EXPECT_TRUE(nEvents == 2, "async loads both complete -> 2 LoadedEvents", true);
-        EXPECT_TRUE(hA->loaded && hB->loaded, "both asset bytes loaded", true);
-        EXPECT_TRUE(obs.onReadyCount == 2, "TextureAssetView relayed every completed asset to renderer hook", true);
+        EXPECT_TRUE(nEvents == 1, "second LoadedEvent for B", true);
+        EXPECT_TRUE(hB->loaded, "asset B loaded", true);
+        EXPECT_TRUE(obs.onReadyCount == 2, "TextureAssetView relayed both assets to renderer hook", true);
 
         // 最後一次事件 = B:寬 2、高 1、G=20、A=255、R+B=40(不依賴 stb_image 是否交換 R/B 通道)
-        EXPECT_TRUE(obs.lastWidth == 2 && obs.lastHeight == 1, "decoded size = 2x1", true);
+        EXPECT_TRUE(obs.lastWidth == 2 && obs.lastHeight == 1, "decoded size B = 2x1", true);
         EXPECT_TRUE(obs.lastRgba[1] == 20 && obs.lastRgba[3] == 255,
                     "decoded RGBA G=20, A=255", true);
         EXPECT_TRUE(obs.lastRgba[0] + obs.lastRgba[2] == 40,
