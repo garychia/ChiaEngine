@@ -167,6 +167,14 @@ class EditorSession
     void SetParent(Entity entity, Entity parent);
     void SetSelectedEntityMaterial(uint64_t materialId); // 對選中節點 push SetMaterialCommand
 
+    // ---- Prefab(ADR-0001 D5,Undo/Redo 友善) ----
+    // 將選中節點的子樹儲存為 Prefab 檔。回傳 true 成功。
+    bool SavePrefab(uint32_t entityIndex, const String &path);
+    // 從 Prefab 檔載入子樹到指定 parent 下(預設 root)。回傳新建根節點的 entity index,失敗回 0。
+    uint32_t LoadPrefab(const String &path, Entity parent = Entity());
+    // LoadPrefab 的別名(Instantiate)。
+    uint32_t InstantiatePrefab(const String &path, Entity parent = Entity());
+
     // ---- Selection (ADR-0001 D2:single truth source) ----
     Selection &GetSelection() { return mSelection; }
     const Selection &GetSelection() const { return mSelection; }

@@ -183,6 +183,31 @@ void EditorSession::SetSelectedEntityMaterial(uint64_t materialId)
     mUndoStack.Push(new SetMaterialCommand(mpSceneSystem, mSelection.entityIndex, materialId));
 }
 
+bool EditorSession::SavePrefab(uint32_t entityIndex, const String &path)
+{
+    if (!mpSceneSystem)
+        return false;
+    Entity e = mpSceneSystem->GetEntityByIndex(entityIndex);
+    if (!mpSceneSystem->Alive(e))
+        return false;
+    const Str<char> utf8 = path.ToUTF8();
+    return mpSceneSystem->SavePrefab(e, utf8.CStr());
+}
+
+uint32_t EditorSession::LoadPrefab(const String &path, Entity parent)
+{
+    if (!mpSceneSystem)
+        return 0;
+    const Str<char> utf8 = path.ToUTF8();
+    Entity e = mpSceneSystem->LoadPrefab(parent, utf8.CStr());
+    return e.GetIndex();
+}
+
+uint32_t EditorSession::InstantiatePrefab(const String &path, Entity parent)
+{
+    return LoadPrefab(path, parent);
+}
+
 void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
 {
     const Border leftBorder(0.f, 0.f, 240.f, windowSize.y);
