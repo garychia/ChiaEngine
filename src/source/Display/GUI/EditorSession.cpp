@@ -1,4 +1,6 @@
 #include "Display/GUI/EditorSession.hpp"
+#include "Display/GUI/HierarchyPanel.hpp"
+#include "Display/GUI/InspectorLayer.hpp"
 #include "Geometry/2D/Point2D.hpp"
 #include "Display/GUI/Border.hpp"
 

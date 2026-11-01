@@ -4,6 +4,8 @@
 #include "Data/DynamicArray.hpp"
 #include "Display/GUI/HierarchyRow.hpp"
 #include "Display/GUI/PanelPane.hpp"
+#include "Geometry/2D/Point2D.hpp"
+#include "Display/GUI/Border.hpp"
 #include "Scene/SceneSystem.hpp"
 
 // 前置宣告(避免循環 include):EditorSession 與 InspectorLayer 僅持指標。
