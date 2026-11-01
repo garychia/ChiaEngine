@@ -1,4 +1,5 @@
 #include "Display/GUI/InspectorLayer.hpp"
+#include "Display/GUI/EditorSession.hpp" // GetTextureCount/GetTexturePathAt/BindTextureToSelectedEntity
 #include "Display/GUI/InspectorButton.hpp"
 
 const float InspectorLayer::StepPosition = 0.5f;
@@ -25,9 +26,11 @@ const char16_t *InspectorLayer::AxisLabel(InspectorAxis axis)
     return u"?";
 }
 
-InspectorLayer::InspectorLayer(const String &title, const Point2D &windowSize, const Border &border, PanelDock dock,
-                               SceneSystem *pScene, UndoStack *pUndoStack)
-    : PanelPane(title, windowSize, border, dock), pScene(pScene), pUndoStack(pUndoStack), pSelection(nullptr)
+InspectorLayer::InspectorLayer(const String &title, const Point2D &windowSize, const Border &border,
+                               PanelDock dock, SceneSystem *pScene, UndoStack *pUndoStack,
+                               EditorSession *pSession)
+    : PanelPane(title, windowSize, border, dock), pScene(pScene), pUndoStack(pUndoStack),
+      pSelection(nullptr), mpSession(pSession), pMaterialRow(), pBindBtn(), pUnbindBtn()
 {
     SetColor(Color(0.10f, 0.10f, 0.12f));
     for (size_t i = 0; i < 9; i++)
@@ -44,8 +47,8 @@ InspectorLayer::InspectorLayer(const String &title, const Point2D &windowSize, c
 
         // - / + 鈕(初始 target = 0;SetSelection 會以 Selection.entityIndex 刷新)。
         auto pMinus = AddComponent<InspectorButton>(windowSize,
-                                                     Border(ColLabelWidth + 6.f, y, BtnWidth, RowHeight - 2.f), pScene,
-                                                     pUndoStack, 0, axis, -1.f);
+                                                     Border(ColLabelWidth + 6.f, y, BtnWidth, RowHeight - 2.f),
+                                                     pScene, pUndoStack, 0, axis, -1.f);
         pMinus->SetLabel(String(u"-"));
         pMinus->SetFontSize(12.f);
         auto pPlus = AddComponent<InspectorButton>(windowSize,
@@ -56,7 +59,35 @@ InspectorLayer::InspectorLayer(const String &title, const Point2D &windowSize, c
         pButtons[i * 2] = pMinus;
         pButtons[i * 2 + 1] = pPlus;
     }
+
+    // ---- 材質區(9 個 transform 行之後)----
+    const float matY = 9.f * RowHeight + 4.f;
+
+    // 材質標籤顯示行(只讀文字)。
+    auto pRow = AddComponent<Button>(windowSize, Border(4.f, matY, ColLabelWidth, RowHeight - 2.f));
+    pRow->SetColor(Color(0.10f, 0.10f, 0.12f));
+    pRow->SetFontSize(12.f);
+    pRow->SetTextColor(Color(0.9f, 0.9f, 0.92f));
+    pMaterialRow = pRow;
+
+    // Bind 鈕:綁定第一個已載入貼圖到選取節點。
+    auto pBind = AddComponent<Button>(windowSize,
+                                      Border(ColLabelWidth + 6.f, matY, BtnWidth, RowHeight - 2.f));
+    pBind->SetLabel(String(u"Bind"));
+    pBind->SetFontSize(10.f);
+    pBind->pressEvent.Subscribe(this, &InspectorLayer::OnBindClicked);
+    pBindBtn = pBind;
+
+    // Unbind 鈕:materialId = 0。
+    auto pUnbind = AddComponent<Button>(windowSize,
+                                        Border(ColLabelWidth + 6.f + BtnWidth, matY, BtnWidth, RowHeight - 2.f));
+    pUnbind->SetLabel(String(u"Unbind"));
+    pUnbind->SetFontSize(10.f);
+    pUnbind->pressEvent.Subscribe(this, &InspectorLayer::OnUnbindClicked);
+    pUnbindBtn = pUnbind;
+
     RebuildValueLabels();
+    RebuildMaterialLabel();
 }
 
 SharedPtr<Button> *InspectorLayer::GetFieldRows()
@@ -73,11 +104,13 @@ void InspectorLayer::SetSelection(const Selection *pNewSelection)
         pButtons[i * 2 + 1]->SetTarget(pSelection->entityIndex);
     }
     RebuildValueLabels(); // 選取變更立即刷新(非每幀 churn)
+    RebuildMaterialLabel();
 }
 
 void InspectorLayer::Update()
 {
     RebuildValueLabels();
+    RebuildMaterialLabel();
 }
 
 void InspectorLayer::ApplyEdit(uint32_t entityIndex, InspectorAxis axis, float sign)
@@ -108,4 +141,46 @@ void InspectorLayer::RebuildValueLabels()
         label = label + String(Str<char16_t>::FromFloat(vals[i], 2));
         pFieldRows[i]->SetLabel(label);
     }
+}
+
+void InspectorLayer::RebuildMaterialLabel()
+{
+    if (!pScene || !mpSession || !pSelection || !pSelection->hasSelection)
+    {
+        mMaterialLabel = String(u"Material: None");
+        pMaterialRow->SetLabel(mMaterialLabel);
+        pBindBtn->SetLabel(String(u"Bind"));
+        pUnbindBtn->SetLabel(String(u"Unbind"));
+        return;
+    }
+
+    const uint64_t matId = mpSession->GetSelectedEntityMaterialId();
+    if (matId == 0)
+        mMaterialLabel = String(u"Material: None");
+    else
+    {
+        String label = String(u"Material: ");
+        label = label + String(Str<char16_t>::FromInt(matId));
+        mMaterialLabel = label;
+    }
+    pMaterialRow->SetLabel(mMaterialLabel);
+}
+
+void InspectorLayer::OnBindClicked()
+{
+    if (!mpSession || !pSelection || !pSelection->hasSelection)
+        return;
+    if (mpSession->GetTextureCount() == 0)
+        return; // 尚無已載入貼圖可綁定
+    const String &firstPath = mpSession->GetTexturePathAt(0);
+    mpSession->BindTextureToSelectedEntity(firstPath);
+    RebuildMaterialLabel();
+}
+
+void InspectorLayer::OnUnbindClicked()
+{
+    if (!mpSession || !pSelection || !pSelection->hasSelection)
+        return;
+    mpSession->BindTextureToSelectedEntity(String());
+    RebuildMaterialLabel();
 }

@@ -10,6 +10,7 @@
 #include "Display/Asset/TextureAssetView.hpp"
 #include "Display/IRendererAssetRegistrar.hpp"
 #include "Geometry/2D/Point2D.hpp"
+#include "Scene/MaterialComponent.hpp"
 #include "Scene/SceneSystem.hpp"
 #include "System/Asset/AssetManager.hpp"
 #include "System/Module/CameraController.hpp"
@@ -147,6 +148,17 @@ class EditorSession
     // 查詢某路徑貼圖是否已載入完成(解碼並註冊成功)。
     bool IsTextureLoaded(const String &path) const;
 
+    // ---- 已載入貼圖列表(供 Inspector 材質選擇) ----
+    // 已載入貼圖數量(依 LoadTexture 成功順序)。
+    size_t GetTextureCount() const;
+    // 第 index 張已載入貼圖的路徑(調用者需保證 index < GetTextureCount())。
+    const String &GetTexturePathAt(size_t index) const;
+    // 將指定路徑貼圖的 materialId 綁定到目前選取的場景節點(= SetMaterial)。
+    // 路徑未載入完成或未選取節點則 no-op。
+    void BindTextureToSelectedEntity(const String &path);
+    // 查詢目前選取場景節點的 materialId(未選取/未綁定回 0)。
+    uint64_t GetSelectedEntityMaterialId() const;
+
     // ---- Selection (ADR-0001 D2:single truth source) ----
     Selection &GetSelection() { return mSelection; }
     const Selection &GetSelection() const { return mSelection; }
@@ -184,6 +196,8 @@ class EditorSession
     IRendererAssetRegistrar *mpRegistrar;
     TextureAssetView mTextureView;      // Value:訂閱 AssetManager,解碼 → 轉交 hook
     HashTable<uint64_t, uint64_t> mTextureToContentHash;  // pathHash → contentHash(materialId)
+    HashTable<uint64_t, String> mContentHashToPath;       // contentHash(materialId) → path
+    DynamicArray<String> mTexturePaths;                   // 已載入貼圖路徑(依加載順序)
     Selection mSelection;
     UndoStack mUndoStack;
     DynamicArray<SharedPtr<PanelPane>> mPanes;

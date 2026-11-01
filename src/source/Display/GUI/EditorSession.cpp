@@ -80,7 +80,21 @@ void EditorSession::OnAssetLoaded(SharedPtr<Asset> asset)
     if (!asset || !asset->loaded || !asset->pBlock)
         return;
     uint64_t pathHash = HashPath(asset->key);
-    mTextureToContentHash.Insert(pathHash, asset->ContentHash());
+    uint64_t contentHash = asset->ContentHash();
+    mTextureToContentHash.Insert(pathHash, contentHash);
+    mContentHashToPath.Insert(contentHash, asset->key);
+    // 記錄路徑順序(去重:同一 path 只會觸發一次 LoadedEvent)。
+    bool found = false;
+    for (size_t i = 0; i < mTexturePaths.GetNElements(); i++)
+    {
+        if (mTexturePaths[i] == asset->key)
+        {
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        mTexturePaths.Append(asset->key);
 }
 
 void EditorSession::OnTextureReadyStatic(const unsigned char *rgbaPixels, int width, int height,
@@ -102,6 +116,39 @@ uint64_t EditorSession::HashPath(const String &path)
     return FNV1A64(FNV1A64_OFFSET, utf8.CStr(), utf8.Length());
 }
 
+size_t EditorSession::GetTextureCount() const
+{
+    return mTexturePaths.GetNElements();
+}
+
+const String &EditorSession::GetTexturePathAt(size_t index) const
+{
+    // 調用者需保證 index < GetTextureCount();越界回空字串(不崩)。
+    if (index >= mTexturePaths.GetNElements())
+    {
+        static const String empty;
+        return empty;
+    }
+    return mTexturePaths[index];
+}
+
+void EditorSession::BindTextureToSelectedEntity(const String &path)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    uint64_t materialId = GetMaterialId(path);
+    mpSceneSystem->SetMaterial(mSelection.entityIndex, materialId);
+}
+
+uint64_t EditorSession::GetSelectedEntityMaterialId() const
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return 0;
+    uint64_t materialId = 0;
+    mpSceneSystem->GetMaterial(mSelection.entityIndex, materialId);
+    return materialId;
+}
+
 void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
 {
     const Border leftBorder(0.f, 0.f, 240.f, windowSize.y);
@@ -110,7 +157,7 @@ void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
     // Inspector(RightDock):TransformComponent + / - 編輯,Undoable。
     auto pInspector = SharedPtr<InspectorLayer>::Construct(
         String(u"Inspector"), windowSize, rightBorder, PanelDock::RightDock, mpSceneSystem,
-        &mUndoStack);
+        &mUndoStack, this);
     RegisterPane(pInspector);
 
     // Hierarchy(LeftDock):節點樹,點擊 → Select() → Inspector 刷新。
