@@ -159,6 +159,14 @@ class EditorSession
     // 查詢目前選取場景節點的 materialId(未選取/未綁定回 0)。
     uint64_t GetSelectedEntityMaterialId() const;
 
+    // ---- Scene Edit Commands (Undo/Redo, ADR-0001 D5) ----
+    // 將場景編輯操作以 EditorCommand 形式 push 到 UndoStack,支援 Ctrl+Z/Y。
+    // 回傳新建節點的 entity index(CreateNode)或 0(無效)。
+    uint32_t CreateNode(Entity parent = Entity());
+    void DestroyNode(Entity entity);
+    void SetParent(Entity entity, Entity parent);
+    void SetSelectedEntityMaterial(uint64_t materialId); // 對選中節點 push SetMaterialCommand
+
     // ---- Selection (ADR-0001 D2:single truth source) ----
     Selection &GetSelection() { return mSelection; }
     const Selection &GetSelection() const { return mSelection; }
