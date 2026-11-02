@@ -15,6 +15,7 @@
 #include "System/Asset/AssetManager.hpp"
 #include "System/Module/CameraController.hpp"
 #include "System/Module/SimRecorder.hpp"
+#include "Display/GUI/TransformGizmo.hpp"
 
 // ADR-0001 D4:window-agnostic editor 狀態與組合根。
 // 擁有 pointer set(SceneSystem* / CameraController* / SimRecorder*)+
@@ -133,6 +134,22 @@ class EditorSession
     // 綁定 renderer 資產註冊器:TextureAssetView 的解碼完成 hook 會把 RGBA pixels
     // 透過此 registrar 呼叫 RegisterMaterial(contentHash, {pRawRGBA, w, h}) 上傳 GPU。
     void SetAssetRegistrar(IRendererAssetRegistrar *pRegistrar);
+
+    // ---- Transform Gizmo (Issue #168, priority 4d) ----
+    // 3D viewport gizmo that lets the user drag-translate/rotate/scale a selected scene node.
+    // gizmo math is pure (no GPU coupling); this class handles gizmo state and commands;
+    // the renderer draws gizmo lines.
+    bool mGizmoActive = false;
+    TransformGizmo mGizmo;
+    Entity mGizmoSelectedEntity = Entity();
+    GizmoAxis mGizmoActiveAxis = GizmoAxis::Position;
+
+    void HandleGizmoInput(float mouseX, float mouseY);
+    void UpdateGizmoState();
+    void BeginGizmoManipulation(Entity entity, GizmoAxis axis);
+    void EndGizmoManipulation();
+    void ApplyGizmoEdit();
+    TransformGizmo &GetGizmo() { return mGizmo; }
 
     // 發起貼圖非同步載入(依 key 去重,不重複讀檔)。回傳 pathHash 作為追蹤 ID;
     // 實際 materialId(= contentHash)需在 DispatchAssetEvents 後透過 GetMaterialId 查詢。

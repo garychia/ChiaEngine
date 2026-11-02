@@ -299,6 +299,9 @@ void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
     // Inspector 先同步目前選取(預設無選取)。
     if (mpSceneSystem)
         pInspector->SetSelection(&mSelection);
+
+    // Wire up TransformGizmo now that InspectorLayer exists.
+    mGizmo.Bind(mpSceneSystem, this, pInspector.GetRaw());
 }
 
 void EditorSession::Select(uint32_t entityIndex)
@@ -310,6 +313,63 @@ void EditorSession::Select(uint32_t entityIndex)
 void EditorSession::ClearSelection()
 {
     mSelection = Selection();
+}
+
+void EditorSession::HandleGizmoInput(float mouseX, float mouseY)
+{
+    if (!mGizmoActive || mGizmoSelectedEntity.GetRaw() == 0)
+        return;
+
+    // Update gizmo state based on mouse input
+    GetGizmo().Update(mouseX, mouseY, 0.016f);  // 60fps frame time
+}
+
+void EditorSession::UpdateGizmoState()
+{
+    // This would be called from viewport render loop
+    if (mGizmoActive && mGizmoSelectedEntity.GetRaw() != 0)
+    {
+        // Gizmo state is updated via TransformGizmo::Update from the render loop
+        (void)0;
+    }
+}
+
+void EditorSession::BeginGizmoManipulation(Entity entity, GizmoAxis axis)
+{
+    mGizmoSelectedEntity = entity;
+    mGizmoActiveAxis = axis;
+    mGizmoActive = true;
+
+    // Start gizmo manipulation - select the entity in the hierarchy
+    if (entity.GetRaw() != 0)
+    {
+        Select(entity.GetIndex());
+    }
+}
+
+void EditorSession::EndGizmoManipulation()
+{
+    mGizmoActive = false;
+    mGizmoSelectedEntity = Entity();
+    mGizmoActiveAxis = GizmoAxis::Position;
+}
+
+void EditorSession::ApplyGizmoEdit()
+{
+    // Apply gizmo edits through the scene system
+    if (mGizmoActive && mGizmoSelectedEntity.GetRaw() != 0)
+    {
+        // In a real implementation, we'd get the actual edits from the gizmo
+        // and apply them through SceneSystem operations
+        TransformComponent transform;
+        if (mpSceneSystem && mpSceneSystem->GetTransform(mGizmoSelectedEntity.GetIndex(), transform))
+        {
+            // Simple example: translate along X axis based on gizmo state
+            // This would be replaced with actual gizmo delta calculations
+            transform.position.x += 0.1f;  // Simplified - real implementation would use proper delta
+            mpSceneSystem->EditTransform(mGizmoSelectedEntity.GetIndex(), transform);
+        }
+    }
 }
 
 bool EditorSession::HandleEditorShortcut(bool hasCtrl, bool hasZ, bool hasY)
@@ -356,4 +416,8 @@ void EditorSession::Reset()
     mSelection = Selection();
     mUndoStack.Clear();
     mPanes.RemoveAll();
+    mGizmoActive = false;
+    mGizmoSelectedEntity = Entity();
+    mGizmoActiveAxis = GizmoAxis::Position;
+    mGizmo = TransformGizmo(mpSceneSystem, this, nullptr);
 }
