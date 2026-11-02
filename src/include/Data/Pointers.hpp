@@ -198,13 +198,39 @@ class PtrInfo
     // 最後一份 strong 釋放 → 立即銷毀物件(即使還有 weak);再釋放 phantom weak。
     void DecrementSharedCounter()
     {
-        if (sharedCount.fetch_sub(1, std::memory_order_acq_rel) != 1)
-            return;
+        // 1→0 必須和 TryLock 的「檢查 + 遞增」原子地分出勝負。若先 fetch_sub 到 0
+        // 再鎖 mutex,TryLock 可在中間看到舊值並把計數復活(0→1)→ 兩個執行緒都
+        // 以為自己是最後一份,phantom weak 被釋放兩次 → PtrInfo 提前 delete
+        // (WeakPtr UAF / heap corruption)。CAS 讓兩邊只有一方能贏:
+        //   * CAS 1→0 成功 → 之後 TryLock 只會看到 0,不得復活。
+        //   * TryLock 先遞增 → CAS 失敗,重載後當成普通釋放。
+        size_t cur = sharedCount.load(std::memory_order_relaxed);
+        for (;;)
         {
-            std::lock_guard<std::mutex> lock(mutex);
-            deleter(ptr);
-            ptr = nullptr;
-            objectDestroyed.store(true, std::memory_order_release);
+            if (cur == 0)
+                return; // 防呆:已釋放過的計數不再遞減
+            if (cur > 1)
+            {
+                if (sharedCount.compare_exchange_weak(cur, cur - 1, std::memory_order_acq_rel,
+                                                      std::memory_order_relaxed))
+                    return;
+                continue;
+            }
+            // cur == 1:唯一一份 strong,和 TryLock 在同一把 mutex 上分出勝負。
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                size_t expected = 1;
+                if (sharedCount.compare_exchange_strong(expected, 0, std::memory_order_acq_rel,
+                                                        std::memory_order_relaxed))
+                {
+                    deleter(ptr);
+                    ptr = nullptr;
+                    objectDestroyed.store(true, std::memory_order_release);
+                    break;
+                }
+            }
+            // 期間被 TryLock 升回 >1:重載後重新走一般釋放。
+            cur = sharedCount.load(std::memory_order_relaxed);
         }
         // phantom weak:shared 歸零代表 strong 擁有群結束,把初始那 1 個額外 weak 還掉。
         if (weakCount.fetch_sub(1, std::memory_order_acq_rel) == 1)
