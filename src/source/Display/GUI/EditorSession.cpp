@@ -218,6 +218,14 @@ uint32_t EditorSession::InstantiatePrefab(const String &path, Entity parent)
     return LoadPrefab(path, parent);
 }
 
+bool EditorSession::LoadSceneFile(const String &path)
+{
+    if (!mpSceneSystem)
+        return false;
+    const Str<char> utf8 = path.ToUTF8();
+    return mpSceneSystem->LoadScene(utf8.CStr());
+}
+
 bool EditorSession::IsPlaying() const
 {
     return mpSimRecorder != nullptr && !mpSimRecorder->IsReplaying() &&

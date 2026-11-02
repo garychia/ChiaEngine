@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <string>
 #include <string_view>
+#include <sstream>
 
 namespace scenesystem_detail
 {
@@ -382,16 +383,79 @@ class SceneSystem : public IModule
         CreateNode(childA);
     }
 
+    // ---- 場景堆疊(A1.1:多場景加載/卸載)----
+    // 場景以序列化字串形式壓入/彈出堆疊;Pop 時從字串恢復 World 狀態。
+    // 失敗回 false,不清動現有場景。
+    struct SceneStackEntry
+    {
+        std::string name;
+        std::string serialized; // 場景 v1 格式的 ASCII 字串
+    };
+
+    // 取得目前活躍場景名稱。
+    const std::string &GetActiveScene() const { return mSceneName; }
+
+    // 取得場景堆疊深度(不含目前場景)。
+    uint32_t GetSceneStackDepth() const
+    {
+        return static_cast<uint32_t>(mSceneStack.GetNElements());
+    }
+
+    // 將目前場景壓入堆疊,切換到新場景(name)。
+    bool PushScene(const char *name)
+    {
+        if (name == nullptr)
+            return false;
+        // 序列化目前場景
+        std::ostringstream oss;
+        if (!SaveSceneToStream(oss))
+            return false;
+        // 壓入堆疊
+        SceneStackEntry entry;
+        entry.name = mSceneName;
+        entry.serialized = oss.str();
+        mSceneStack.Append(entry);
+        // 清空目前世界
+        ClearCurrentWorld();
+        mSceneName = name;
+        return true;
+    }
+
+    // 彈出場景堆疊,恢復之前場景。堆疊空則回 false。
+    bool PopScene()
+    {
+        if (mSceneStack.IsEmpty())
+            return false;
+        SceneStackEntry entry = mSceneStack.GetLast();
+        mSceneStack.RemoveLast();
+        // 清空目前世界
+        ClearCurrentWorld();
+        // 從序列化字串恢復
+        bool ok = LoadSceneFromString(entry.serialized.c_str());
+        if (ok)
+            mSceneName = entry.name;
+        return ok;
+    }
+
+  private:
+    // 銷毀目前世界下所有根節點及其子孄。
+    void ClearCurrentWorld()
+    {
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); ++i)
+            DestroyNode(roots[i]);
+    }
+
+    // 場景堆疊(各場景以序列化字串儲存,避免 World 複製問題)
+    DynamicArray<SceneStackEntry> mSceneStack;
+    std::string mSceneName = "Default";
+
+  public:
     // ---- 場景檔 Save/Load(#164)----
     // 格式:ASCII、一行一節點,見 SceneNode 格式;失敗回 false,不清動現有場景。
-    bool SaveScene(const char *path) const
+    // 核心序列化:寫入 ostream (支援檔案或記憶體串流)。
+    bool SaveSceneToStream(std::ostream &out) const
     {
-        if (path == nullptr)
-            return false;
-        std::ofstream out(path, std::ios::out | std::ios::trunc);
-        if (!out.is_open())
-            return false;
-
         out << "scene v1\n";
         out << std::dec << std::setprecision(17);
 
@@ -426,14 +490,19 @@ class SceneSystem : public IModule
         return out.good();
     }
 
-    bool LoadScene(const char *path)
+    bool SaveScene(const char *path) const
     {
         if (path == nullptr)
             return false;
-        std::ifstream in(path, std::ios::in);
-        if (!in.is_open())
+        std::ofstream out(path, std::ios::out | std::ios::trunc);
+        if (!out.is_open())
             return false;
+        return SaveSceneToStream(out);
+    }
 
+    // 核心反序列化:從 istream 讀取 (支援檔案或記憶體串流)。
+    bool LoadSceneFromStream(std::istream &in)
+    {
         using namespace worldhashrecord_detail;
 
         std::string line;
@@ -468,7 +537,10 @@ class SceneSystem : public IModule
                 bool found = false;
                 for (size_t i = 0; i < indices.GetNElements(); ++i)
                     if (static_cast<uint32_t>(node.parent) == indices[i])
+                    {
                         found = true;
+                        break;
+                    }
                 if (!found)
                     return false;
             }
@@ -511,6 +583,26 @@ class SceneSystem : public IModule
         }
         return true;
     }
+
+    bool LoadScene(const char *path)
+    {
+        if (path == nullptr)
+            return false;
+        std::ifstream in(path, std::ios::in);
+        if (!in.is_open())
+            return false;
+        return LoadSceneFromStream(in);
+    }
+
+    // 從記憶體字串載入場景(供 PopScene 從場景堆疊恢復使用)。
+    bool LoadSceneFromString(const char *data)
+    {
+        if (data == nullptr)
+            return false;
+        std::istringstream in(data);
+        return LoadSceneFromStream(in);
+    }
+
 
     // ---- Prefab 檔 Save/Load(#168 優先級 4)----
     // 格式:ASCII、prefab v1,一行一節點,見 PrefabNode 格式。
