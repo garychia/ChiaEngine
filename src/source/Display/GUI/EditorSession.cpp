@@ -28,11 +28,21 @@ EditorSession::EditorSession(SceneSystem *pSceneSystem, CameraController *pCamer
 
 EditorSession::~EditorSession()
 {
+    if (mpAssetManager)
+        mpAssetManager->LoadedEvent.Unsubscribe(this);
+    mTextureView.Unsubscribe();
     mUndoStack.Clear();
 }
 
 void EditorSession::SetAssetManager(AssetManager *pAssetManager)
 {
+    if (mpAssetManager == pAssetManager)
+        return;
+    if (mpAssetManager)
+    {
+        mpAssetManager->LoadedEvent.Unsubscribe(this);
+        mTextureView.Unsubscribe();
+    }
     mpAssetManager = pAssetManager;
     if (mpAssetManager)
     {
