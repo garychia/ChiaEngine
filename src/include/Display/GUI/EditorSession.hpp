@@ -175,6 +175,10 @@ class EditorSession
     // LoadPrefab 的別名(Instantiate)。
     uint32_t InstantiatePrefab(const String &path, Entity parent = Entity());
 
+    // ---- 場景檔載入(A1.5:多場景)----
+    // 從檔案載入場景(清空目前場景後重建)。回傳 true 成功。
+    bool LoadSceneFile(const String &path);
+
     // ---- Playback Control(ADR-0001 D4,SimRecorder 整合) ----
     // 播放控制(錄製/重播輸入)。EditorSession 只持有 SimRecorder* 指標,
     // 實際執行順序由 EngineContext/Sim 迴圈決定。
