@@ -175,6 +175,23 @@ class EditorSession
     // LoadPrefab 的別名(Instantiate)。
     uint32_t InstantiatePrefab(const String &path, Entity parent = Entity());
 
+    // ---- Playback Control(ADR-0001 D4,SimRecorder 整合) ----
+    // 播放控制(錄製/重播輸入)。EditorSession 只持有 SimRecorder* 指標,
+    // 實際執行順序由 EngineContext/Sim 迴圈決定。
+    // 播放中：Live 模式,每 tick 記錄輸入到 log。暫停後可重播。
+    bool IsPlaying() const;
+    bool IsReplaying() const;
+    size_t GetPlaybackFrame() const;     // 目前 replay 游標(或 log 長度)
+    size_t GetTotalFrames() const;       // log 長度
+    // 開始播放(錄製):進入 Live 模式,清空舊 log,從頭開始記錄。
+    void Play();
+    // 暫停播放:停止記錄,保留 log。
+    void Pause();
+    // 停止播放:清空 log,回到停止狀態。
+    void Stop();
+    // 從頭重播:進入 Replay 模式,游標歸零。
+    void Replay();
+
     // ---- Selection (ADR-0001 D2:single truth source) ----
     Selection &GetSelection() { return mSelection; }
     const Selection &GetSelection() const { return mSelection; }

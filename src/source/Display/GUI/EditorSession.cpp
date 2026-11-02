@@ -208,6 +208,62 @@ uint32_t EditorSession::InstantiatePrefab(const String &path, Entity parent)
     return LoadPrefab(path, parent);
 }
 
+bool EditorSession::IsPlaying() const
+{
+    return mpSimRecorder != nullptr && !mpSimRecorder->IsReplaying() &&
+           mpSimRecorder->GetInputCount() > 0;
+}
+
+bool EditorSession::IsReplaying() const
+{
+    return mpSimRecorder != nullptr && mpSimRecorder->IsReplaying();
+}
+
+size_t EditorSession::GetPlaybackFrame() const
+{
+    if (!mpSimRecorder)
+        return 0;
+    return mpSimRecorder->IsReplaying() ? mpSimRecorder->GetInputCount() : 0;
+}
+
+size_t EditorSession::GetTotalFrames() const
+{
+    if (!mpSimRecorder)
+        return 0;
+    return mpSimRecorder->GetInputCount();
+}
+
+void EditorSession::Play()
+{
+    if (!mpSimRecorder)
+        return;
+    mpSimRecorder->ClearLog();
+    mpSimRecorder->SetReplaying(false);
+    // Live 模式下,FixedUpdate 會自動 Append input 到 log
+}
+
+void EditorSession::Pause()
+{
+    if (!mpSimRecorder)
+        return;
+    mpSimRecorder->SetReplaying(false);
+}
+
+void EditorSession::Stop()
+{
+    if (!mpSimRecorder)
+        return;
+    mpSimRecorder->SetReplaying(false);
+    mpSimRecorder->ClearLog();
+}
+
+void EditorSession::Replay()
+{
+    if (!mpSimRecorder)
+        return;
+    mpSimRecorder->BeginReplay();
+}
+
 void EditorSession::CreateDefaultPanes(const Point2D &windowSize)
 {
     const Border leftBorder(0.f, 0.f, 240.f, windowSize.y);
