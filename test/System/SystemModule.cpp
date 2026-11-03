@@ -15,6 +15,7 @@
 #include "SceneUndoTest.hpp"
 #include "PrefabTest.hpp"
 #include "SceneMultiTest.hpp"
+#include "SceneV2Test.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -59,6 +60,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<sceneundo_test::SceneUndoTest>();
     AddTest<prefab_test::PrefabTest>();
     AddTest<scenemulti_test::SceneMultiTest>();
+    AddTest<scenev2_test::SceneV2Test>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
