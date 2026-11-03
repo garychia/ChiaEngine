@@ -24,6 +24,7 @@
 #include <iomanip>
 #include <string>
 #include <string_view>
+#include <sstream>
 
 namespace scenesystem_detail
 {
@@ -139,6 +140,14 @@ struct PrefabNode
     std::string name;
     uint64_t materialId = 0;
     TransformComponent transform;
+};
+
+// prefab 引用記錄:場景中透過 prefab_ref 實例化的外部 prefab 子樹。
+struct PrefabRef
+{
+    uint32_t entityIndex = 0;
+    std::string prefabPath;
+    uint32_t prefabLocalIndex = 0;
 };
 
 // node <localIndex> <parentLocalIndex> <materialId> <name> <9 floats>
@@ -382,17 +391,88 @@ class SceneSystem : public IModule
         CreateNode(childA);
     }
 
+    // ---- 場景堆疊(A1.1:多場景加載/卸載)----
+    // 場景以序列化字串形式壓入/彈出堆疊;Pop 時從字串恢復 World 狀態。
+    // 失敗回 false,不清動現有場景。
+    struct SceneStackEntry
+    {
+        std::string name;
+        std::string serialized; // 場景 v1 格式的 ASCII 字串
+    };
+
+    // 取得目前活躍場景名稱。
+    const std::string &GetActiveScene() const { return mSceneName; }
+
+    // 取得場景堆疊深度(不含目前場景)。
+    uint32_t GetSceneStackDepth() const
+    {
+        return static_cast<uint32_t>(mSceneStack.GetNElements());
+    }
+
+    // 將目前場景壓入堆疊,切換到新場景(name)。
+    bool PushScene(const char *name)
+    {
+        if (name == nullptr)
+            return false;
+        // 序列化目前場景
+        std::ostringstream oss;
+        if (!SaveSceneToStream(oss))
+            return false;
+        // 壓入堆疊
+        SceneStackEntry entry;
+        entry.name = mSceneName;
+        entry.serialized = oss.str();
+        mSceneStack.Append(entry);
+        // 清空目前世界
+        ClearCurrentWorld();
+        mSceneName = name;
+        return true;
+    }
+
+    // 彈出場景堆疊,恢復之前場景。堆疊空則回 false。
+    bool PopScene()
+    {
+        if (mSceneStack.IsEmpty())
+            return false;
+        SceneStackEntry entry = mSceneStack.GetLast();
+        // 清空目前世界
+        ClearCurrentWorld();
+        // 從序列化字串恢復
+        if (!LoadSceneFromString(entry.serialized.c_str()))
+        {
+            // 恢復失敗：將項目推回堆疊
+            mSceneStack.Append(entry);
+            return false;
+        }
+        mSceneStack.RemoveLast();
+        mSceneName = entry.name;
+        return true;
+    }
+
+  private:
+    // 銷毀目前世界下所有根節點及其子孄。
+    void ClearCurrentWorld()
+    {
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); ++i)
+            DestroyNode(roots[i]);
+    }
+
+    // 場景堆疊(各場景以序列化字串儲存,避免 World 複製問題)
+    DynamicArray<SceneStackEntry> mSceneStack;
+    std::string mSceneName = "Default";
+
+    // prefab_ref 記錄表:場景中透過 prefab_ref 實例化的外部 prefab 引用。
+    DynamicArray<scenesystem_detail::PrefabRef> mPrefabRefs;
+
+  public:
     // ---- 場景檔 Save/Load(#164)----
     // 格式:ASCII、一行一節點,見 SceneNode 格式;失敗回 false,不清動現有場景。
-    bool SaveScene(const char *path) const
+    // 核心序列化:寫入 ostream (支援檔案或記憶體串流)。
+    // 格式:scene v2,一行一節點,末尾接 prefab_ref 行(見 PrefabRef 格式)。
+    bool SaveSceneToStream(std::ostream &out) const
     {
-        if (path == nullptr)
-            return false;
-        std::ofstream out(path, std::ios::out | std::ios::trunc);
-        if (!out.is_open())
-            return false;
-
-        out << "scene v1\n";
+        out << "scene v2\n";
         out << std::dec << std::setprecision(17);
 
         // setprecision(17) 對 float 足以唯一識別每個位元組合(24-bit 尾數需約 7 位小數，
@@ -422,27 +502,41 @@ class SceneSystem : public IModule
             out << pTransform->scale.x << " " << pTransform->scale.y << " " << pTransform->scale.z << "\n";
         }
 
+        // 輸出 prefab_ref 行(場景中透過 prefab_ref 引入的外部 prefab)
+        for (size_t i = 0; i < mPrefabRefs.GetNElements(); ++i)
+        {
+            const scenesystem_detail::PrefabRef &ref = mPrefabRefs[i];
+            out << "prefab_ref " << ref.prefabPath << " " << ref.prefabLocalIndex << "\n";
+        }
+
         out << "end\n";
         return out.good();
     }
 
-    bool LoadScene(const char *path)
+    bool SaveScene(const char *path) const
     {
         if (path == nullptr)
             return false;
-        std::ifstream in(path, std::ios::in);
-        if (!in.is_open())
+        std::ofstream out(path, std::ios::out | std::ios::trunc);
+        if (!out.is_open())
             return false;
+        return SaveSceneToStream(out);
+    }
 
+    // 核心反序列化:從 istream 讀取 (支援檔案或記憶體串流)。
+    // 格式:scene v1 或 scene v2,一行一節點,可選 prefab_ref 行,檔尾 end。
+    bool LoadSceneFromStream(std::istream &in)
+    {
         using namespace worldhashrecord_detail;
 
         std::string line;
-        if (!ReadLine(in, line) || line != "scene v1")
+        if (!ReadLine(in, line) || (line != "scene v1" && line != "scene v2"))
             return false;
 
         // 先完整解析到區域容器;任何錯誤都在動世界之前返回。
         DynamicArray<scenesystem_detail::SceneNode> parsed;
         DynamicArray<uint32_t> indices;
+        DynamicArray<std::pair<std::string, uint32_t>> prefabRefs; // (path, localIndex)
         bool sawEnd = false;
         while (ReadLine(in, line))
         {
@@ -450,6 +544,25 @@ class SceneSystem : public IModule
             {
                 sawEnd = true;
                 break;
+            }
+
+            // prefab_ref 行:prefab_ref <path> <localIndex>
+            if (line.rfind("prefab_ref ", 0) == 0)
+            {
+                std::string_view sv(line);
+                sv.remove_prefix(std::string_view("prefab_ref ").size());
+                size_t pos = 0;
+                std::string_view token;
+                if (!NextToken(sv, pos, token))
+                    return false;
+                std::string prefabPath(token);
+                if (!NextToken(sv, pos, token))
+                    return false;
+                uint32_t localIndex = 0;
+                if (!ParseUInt32(token, localIndex))
+                    return false;
+                prefabRefs.Append(std::make_pair(prefabPath, localIndex));
+                continue;
             }
 
             scenesystem_detail::SceneNode node;
@@ -468,7 +581,10 @@ class SceneSystem : public IModule
                 bool found = false;
                 for (size_t i = 0; i < indices.GetNElements(); ++i)
                     if (static_cast<uint32_t>(node.parent) == indices[i])
+                    {
                         found = true;
+                        break;
+                    }
                 if (!found)
                     return false;
             }
@@ -509,8 +625,44 @@ class SceneSystem : public IModule
                 scenesystem_detail::SetNodeName(*pName, parsed[i].name);
             created.Append(e);
         }
+
+        // 處理 prefab_ref:實例化外部 prefab 子樹到當前場景根下。
+        for (size_t i = 0; i < prefabRefs.GetNElements(); ++i)
+        {
+            const auto &ref = prefabRefs[i];
+            Entity prefabRoot = LoadPrefab(Entity(), ref.first.c_str());
+            if (!world.Alive(prefabRoot))
+                return false;
+            // 記錄 prefab_ref 到場景記錄表
+            scenesystem_detail::PrefabRef entry;
+            entry.entityIndex = prefabRoot.GetIndex();
+            entry.prefabPath = ref.first;
+            entry.prefabLocalIndex = ref.second;
+            mPrefabRefs.Append(entry);
+        }
+
         return true;
     }
+
+    bool LoadScene(const char *path)
+    {
+        if (path == nullptr)
+            return false;
+        std::ifstream in(path, std::ios::in);
+        if (!in.is_open())
+            return false;
+        return LoadSceneFromStream(in);
+    }
+
+    // 從記憶體字串載入場景(供 PopScene 從場景堆疊恢復使用)。
+    bool LoadSceneFromString(const char *data)
+    {
+        if (data == nullptr)
+            return false;
+        std::istringstream in(data);
+        return LoadSceneFromStream(in);
+    }
+
 
     // ---- Prefab 檔 Save/Load(#168 優先級 4)----
     // 格式:ASCII、prefab v1,一行一節點,見 PrefabNode 格式。
@@ -659,6 +811,15 @@ class SceneSystem : public IModule
             if (pMat)
                 pMat->materialId = parsed[i].materialId;
             created.Append(e);
+        }
+        // 記錄根節點為 prefab_ref(場景中透過此 prefab 實例化的外部子樹)
+        if (!created.IsEmpty())
+        {
+            scenesystem_detail::PrefabRef entry;
+            entry.entityIndex = created[0].GetIndex();
+            entry.prefabPath = path;
+            entry.prefabLocalIndex = 0;
+            mPrefabRefs.Append(entry);
         }
         return created.IsEmpty() ? nullEntity : created[0];
     }
