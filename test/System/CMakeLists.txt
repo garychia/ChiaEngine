@@ -9,7 +9,7 @@ set(SYSTEM_TEST_SOURCE_FILES
 )
 # ForwardRenderer 及 ShadowMapper 僅在 OpenGL 後端可編譯(VULKAN/DIRECTX 下無 GL 頭檔與原始碼)
 if(NOT VULKAN_ENABLED AND NOT DIRECTX_ENABLED)
-    list(APPEND SYSTEM_TEST_SOURCE_FILES ForwardRendererContractTest.hpp ShadowMapperTest.hpp)
+    list(APPEND SYSTEM_TEST_SOURCE_FILES ForwardRendererContractTest.hpp ShadowMapperTest.hpp EditorSessionRendererTest.hpp)
 endif()
 add_library(SystemTest STATIC ${SYSTEM_TEST_SOURCE_FILES})
 target_include_directories(SystemTest PUBLIC
