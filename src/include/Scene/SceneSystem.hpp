@@ -10,6 +10,8 @@
 #include "Scene/WorldTransformComponent.hpp"
 #include "Scene/MaterialComponent.hpp"
 #include "Scene/LightComponent.hpp"
+#include "Scene/IComponentLifecycle.hpp"
+#include "Scene/ComponentSystem.hpp"
 #include "System/Module/EngineContext.hpp"
 #include "System/Module/IModule.hpp"
 #include "System/Operation/Event.hpp"
@@ -301,6 +303,9 @@ class SceneSystem : public IModule
 
     // Entity 激活/停用狀態(按 entity index 索引)。CreateNode 預設 active=true。
     DynamicArray<bool> mActive;
+
+    // A3.2:組件生命週期系統
+    ComponentSystem mComponentSystem;
 
     void EnsureActiveCapacity(uint32_t entityIndex)
     {
@@ -1022,11 +1027,20 @@ class SceneSystem : public IModule
         DynamicArray<Entity> roots = GetRoots();
         for (size_t i = 0; i < roots.GetNElements(); i++)
             RecomputeSubtree(roots[i], true, WorldTransformComponent());
+
+        // A3.2:組件生命週期 — FixedUpdate(確定性)
+        mComponentSystem.DoAwake();
+        mComponentSystem.DoStart();
+        mComponentSystem.DoFixedUpdate(static_cast<float>(clock.fixedDeltaSeconds));
     }
 
     void Update(const FrameClock &clock) override
     {
         (void)clock;
+        // A3.2:組件生命週期 — Update/LateUpdate
+        float dt = static_cast<float>(clock.frameDeltaSeconds);
+        mComponentSystem.DoUpdate(dt);
+        mComponentSystem.DoLateUpdate(dt);
     }
 
   private:

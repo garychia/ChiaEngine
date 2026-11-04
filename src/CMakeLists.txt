@@ -21,6 +21,8 @@ set(DISPLAY_SOURCE_FILES
     include/Display/Color.hpp
     source/Display/Color.cpp
     include/Scene/GameObject.hpp
+    include/Scene/IComponentLifecycle.hpp
+    include/Scene/ComponentSystem.hpp
     include/Display/IRenderable.hpp
     source/Display/IRenderable.cpp
     include/Display/IRenderer.hpp
