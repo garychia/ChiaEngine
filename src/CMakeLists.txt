@@ -20,8 +20,6 @@ set(DISPLAY_SOURCE_FILES
     source/Display/Camera.cpp
     include/Display/Color.hpp
     source/Display/Color.cpp
-    include/Display/ForwardRenderer.hpp
-    source/Display/ForwardRenderer.cpp
     include/Display/IRenderable.hpp
     source/Display/IRenderable.cpp
     include/Display/IRenderer.hpp
@@ -107,6 +105,8 @@ else()
         source/Display/OpenGLHelper.cpp
         include/Display/OpenGLRenderer.hpp
         source/Display/OpenGLRenderer.cpp
+        include/Display/ForwardRenderer.hpp
+        source/Display/ForwardRenderer.cpp
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
     )

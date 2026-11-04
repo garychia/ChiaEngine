@@ -16,7 +16,9 @@
 #include "PrefabTest.hpp"
 #include "MaterialPBRTest.hpp"
 #include "LightComponentTest.hpp"
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
 #include "ForwardRendererContractTest.hpp"
+#endif
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -62,7 +64,9 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<prefab_test::PrefabTest>();
     AddTest<materialpbr_test::MaterialPBRTest>();
     AddTest<lightcomponent_test::LightComponentTest>();
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
     AddTest<forwardrenderercontract_test::ForwardRendererContractTest>();
+#endif
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry

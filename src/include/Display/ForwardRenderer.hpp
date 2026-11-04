@@ -3,6 +3,19 @@
 
 #include <cstdint>
 
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+// OpenGL 後端才需要的頭檔與類型
+#include <GL/gl.h>
+#include <GLFW/glfw3.h>
+#include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+using GLHandle = uint32_t;  // GLuint 在 OpenGL 下即 uint32_t
+#else
+// Vulkan/DirectX 後端不編譯 OpenGL 程式碼，用 opaque 類型佔位
+using GLHandle = uint32_t;
+#endif
+
 #include "Display/Camera.hpp"
 #include "Display/IRenderer.hpp"
 #include "Scene/LightComponent.hpp"
