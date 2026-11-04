@@ -107,6 +107,8 @@ else()
         source/Display/OpenGLRenderer.cpp
         include/Display/ForwardRenderer.hpp
         source/Display/ForwardRenderer.cpp
+        include/Display/ShadowMapper.hpp
+        source/Display/ShadowMapper.cpp
         source/Display/GLFW/Window.cpp
         source/Display/GLFW/WindowManager.cpp
     )

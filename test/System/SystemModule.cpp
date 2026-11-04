@@ -18,6 +18,7 @@
 #include "LightComponentTest.hpp"
 #if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
 #include "ForwardRendererContractTest.hpp"
+#include "ShadowMapperTest.hpp"
 #endif
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
@@ -66,6 +67,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<lightcomponent_test::LightComponentTest>();
 #if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
     AddTest<forwardrenderercontract_test::ForwardRendererContractTest>();
+    AddTest<shadowmapper_test::ShadowMapperTest>();
 #endif
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();

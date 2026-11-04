@@ -20,6 +20,7 @@ struct LightComponent
     Point3D color = Point3D(1, 1, 1);
     float intensity = 1.0f;
     float radius = 10.0f;
+    bool castsShadow = false;
 
     LightComponent() = default;
     explicit LightComponent(Type type_) : type(type_) {}

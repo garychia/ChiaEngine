@@ -485,6 +485,39 @@ class SceneSystem : public IModule
         *pL = light;
     }
 
+    // 取得投射陰影的方向光節點(LightComponent.type == Directional && castsShadow == true)。
+    DynamicArray<Entity> GetShadowCasters() const
+    {
+        DynamicArray<Entity> casters;
+        ComponentPool<LightComponent> *pPool = world.GetPool<LightComponent>();
+        if (!pPool)
+            return casters;
+        const uint32_t n = pPool->GetNElements();
+        for (uint32_t i = 0; i < n; i++)
+        {
+            const uint32_t owner = pPool->OwnerAt(i);
+            const LightComponent *pL = pPool->Get(owner);
+            if (!pL || pL->type != LightComponent::Directional || !pL->castsShadow)
+                continue;
+            casters.Append(world.GetEntityByIndex(owner));
+        }
+        // index 升序
+        for (size_t i = 0; i + 1 < casters.GetNElements(); i++)
+        {
+            size_t best = i;
+            for (size_t j = i + 1; j < casters.GetNElements(); j++)
+                if (casters[j].GetIndex() < casters[best].GetIndex())
+                    best = j;
+            if (best != i)
+            {
+                Entity tmp = casters[i];
+                casters[i] = casters[best];
+                casters[best] = tmp;
+            }
+        }
+        return casters;
+    }
+
     // 編輯器增量編輯:設定節點名稱。entity 不存在則 no-op。
     void SetNodeName(uint32_t entityIndex, const String &name)
     {
