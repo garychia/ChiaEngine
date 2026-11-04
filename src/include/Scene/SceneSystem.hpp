@@ -13,9 +13,12 @@
 #include "Scene/LightComponent.hpp"
 #include "Scene/IComponentLifecycle.hpp"
 #include "Scene/ComponentSystem.hpp"
+#include "Scene/AudioSource.hpp"
+#include "Scene/AudioListener.hpp"
 #include "System/Module/EngineContext.hpp"
 #include "System/Module/IModule.hpp"
 #include "System/Operation/Event.hpp"
+#include "System/Audio/IAudioSystem.hpp"
 #include "System/World/Entity.hpp"
 #include "System/World/World.hpp"
 #include "System/World/WorldHashRecord.hpp" // ReadLine/NextToken/ParseUInt32(嚴格單空格 token)
@@ -307,6 +310,9 @@ class SceneSystem : public IModule
 
     // A3.2:組件生命週期系統
     ComponentSystem mComponentSystem;
+
+    // A3.5:音訊運行時
+    IAudioSystem *m_pAudioSystem = nullptr;  // 經 EngineContext 解析,不擁有
 
     // A3.3:場景運行時
     bool mSceneActive = true;                        // 場景整體激活狀態
@@ -1064,6 +1070,7 @@ class SceneSystem : public IModule
     void OnAttach(EngineContext &context) override
     {
         context.RegisterService<SceneSystem>(this);
+        m_pAudioSystem = context.ResolveService<IAudioSystem>();
     }
 
     void OnDetach(EngineContext &context) override
@@ -1092,6 +1099,40 @@ class SceneSystem : public IModule
         float dt = static_cast<float>(clock.frameDeltaSeconds);
         mComponentSystem.DoUpdate(dt);
         mComponentSystem.DoLateUpdate(dt);
+
+        // A3.5:音訊運行時 — 處理 AudioSource 播放狀態
+        if (m_pAudioSystem)
+        {
+            // 遍歷所有 AudioSource 組件
+            auto *pPool = world.GetPool<AudioSource>();
+            if (pPool)
+            {
+                const uint32_t n = pPool->GetNElements();
+                for (uint32_t i = 0; i < n; i++)
+                {
+                    uint32_t owner = pPool->OwnerAt(i);
+                    AudioSource *pSrc = pPool->Get(owner);
+                    if (!pSrc || !world.Alive(world.GetEntityByIndex(owner)))
+                        continue;
+
+                    // playOnAwake:首次 Awake 時自動播放
+                    if (pSrc->playOnAwake && pSrc->soundId == 0 && pSrc->bufferId != 0)
+                    {
+                        pSrc->soundId = m_pAudioSystem->Play(pSrc->bufferId, pSrc->loop);
+                        pSrc->isPlaying = (pSrc->soundId != 0);
+                        pSrc->isPaused = false;
+                        if (pSrc->soundId != 0)
+                            m_pAudioSystem->SetSoundVolume(pSrc->soundId, pSrc->volume);
+                    }
+
+                    // 如果 sound 實例已不存在(被外部 Stop),重置狀態
+                    if (pSrc->soundId != 0 && !pSrc->isPlaying && !pSrc->isPaused)
+                    {
+                        // soundId 保留但標記為未播放(可能已自然結束)
+                    }
+                }
+            }
+        }
     }
 
   private:

@@ -23,6 +23,8 @@ set(DISPLAY_SOURCE_FILES
     include/Scene/GameObject.hpp
     include/Scene/IComponentLifecycle.hpp
     include/Scene/ComponentSystem.hpp
+    include/Scene/AudioSource.hpp
+    include/Scene/AudioListener.hpp
     include/Display/IRenderable.hpp
     source/Display/IRenderable.cpp
     include/Display/IRenderer.hpp
