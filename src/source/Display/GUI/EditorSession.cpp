@@ -193,6 +193,14 @@ void EditorSession::SetSelectedEntityMaterial(uint64_t materialId)
     mUndoStack.Push(new SetMaterialCommand(mpSceneSystem, mSelection.entityIndex, materialId));
 }
 
+void EditorSession::SetSelectedEntityPBR(const Point3D &albedo, float metallic, float roughness)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    mUndoStack.Push(new SetPBRCommand(mpSceneSystem, mSelection.entityIndex, albedo, metallic,
+                                      roughness));
+}
+
 bool EditorSession::SavePrefab(uint32_t entityIndex, const String &path)
 {
     if (!mpSceneSystem)
