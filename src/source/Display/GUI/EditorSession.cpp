@@ -201,6 +201,13 @@ void EditorSession::SetSelectedEntityPBR(const Point3D &albedo, float metallic, 
                                       roughness));
 }
 
+void EditorSession::SetSelectedEntityLight(const LightComponent &light)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    mUndoStack.Push(new SetLightCommand(mpSceneSystem, mSelection.entityIndex, light));
+}
+
 bool EditorSession::SavePrefab(uint32_t entityIndex, const String &path)
 {
     if (!mpSceneSystem)

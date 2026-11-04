@@ -169,6 +169,9 @@ class EditorSession
     // 對選中節點設定 PBR 欄位(albedo/metallic/roughness)。A2.1。
     void SetSelectedEntityPBR(const Point3D &albedo, float metallic, float roughness);
 
+    // 對選中節點設定光源欄位(type/color/intensity/radius)。A2.2。
+    void SetSelectedEntityLight(const LightComponent &light);
+
     // ---- Prefab(ADR-0001 D5,Undo/Redo 友善) ----
     // 將選中節點的子樹儲存為 Prefab 檔。回傳 true 成功。
     bool SavePrefab(uint32_t entityIndex, const String &path);

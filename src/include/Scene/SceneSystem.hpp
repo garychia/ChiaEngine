@@ -9,6 +9,7 @@
 #include "Scene/TransformMath.hpp"
 #include "Scene/WorldTransformComponent.hpp"
 #include "Scene/MaterialComponent.hpp"
+#include "Scene/LightComponent.hpp"
 #include "System/Module/EngineContext.hpp"
 #include "System/Module/IModule.hpp"
 #include "System/Operation/Event.hpp"
@@ -453,6 +454,35 @@ class SceneSystem : public IModule
         pM->albedo = albedo;
         pM->metallic = metallic;
         pM->roughness = roughness;
+    }
+
+    // 讀取節點光源欄位(index + 存活檢查);無光源元件回預設值。
+    bool GetLight(uint32_t entityIndex, LightComponent &outLight) const
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        const LightComponent *pL = world.GetComponent<LightComponent>(e);
+        if (!pL)
+        {
+            outLight = LightComponent(); // 預設值
+            return true;
+        }
+        outLight = *pL;
+        return true;
+    }
+
+    // 編輯器增量編輯:設定節點光源欄位。entity 不存在則 no-op。
+    // 若該節點尚無 LightComponent 元件，會自動建立預設元件。
+    void SetLight(uint32_t entityIndex, const LightComponent &light)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        LightComponent *pL = world.GetComponent<LightComponent>(e);
+        if (!pL)
+            pL = world.AddComponent<LightComponent>(e, LightComponent());
+        *pL = light;
     }
 
     // 編輯器增量編輯:設定節點名稱。entity 不存在則 no-op。
