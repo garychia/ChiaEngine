@@ -21,6 +21,7 @@
 #include "ShadowMapperTest.hpp"
 #include "EditorSessionRendererTest.hpp"
 #endif
+#include "GameObjectRuntimeTest.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -71,6 +72,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<shadowmapper_test::ShadowMapperTest>();
     AddTest<editorsessionrenderer_test::EditorSessionRendererTest>();
 #endif
+    AddTest<gameobjectruntime_test::GameObjectRuntimeTest>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry

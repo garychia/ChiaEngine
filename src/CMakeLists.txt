@@ -20,6 +20,7 @@ set(DISPLAY_SOURCE_FILES
     source/Display/Camera.cpp
     include/Display/Color.hpp
     source/Display/Color.cpp
+    include/Scene/GameObject.hpp
     include/Display/IRenderable.hpp
     source/Display/IRenderable.cpp
     include/Display/IRenderer.hpp

@@ -299,6 +299,15 @@ class SceneSystem : public IModule
     // World 是實作細節 — 模組對外只暴露場景圖與節點 transform 的接縫(#81)。
     World world;
 
+    // Entity 激活/停用狀態(按 entity index 索引)。CreateNode 預設 active=true。
+    DynamicArray<bool> mActive;
+
+    void EnsureActiveCapacity(uint32_t entityIndex)
+    {
+        while (mActive.GetNElements() <= entityIndex)
+            mActive.Append(false);
+    }
+
   public:
     // ---- Entity 生命週期接縫(不暴露 World facade)----
     bool Alive(Entity entity) const
@@ -310,6 +319,40 @@ class SceneSystem : public IModule
     Entity GetEntityByIndex(uint32_t entityIndex) const
     {
         return world.GetEntityByIndex(entityIndex);
+    }
+
+    // ---- Entity 激活/停用接縫(A3.1) ----
+    bool IsActive(Entity entity) const
+    {
+        if (!world.Alive(entity))
+            return false;
+        uint32_t idx = entity.GetIndex();
+        if (idx >= mActive.GetNElements())
+            return false;
+        return mActive[idx];
+    }
+
+    void SetActive(Entity entity, bool active)
+    {
+        if (!world.Alive(entity))
+            return;
+        EnsureActiveCapacity(entity.GetIndex());
+        mActive[entity.GetIndex()] = active;
+    }
+
+    // 取得所有 active 的實體(依 index 升序)。
+    DynamicArray<Entity> GetActiveEntities() const
+    {
+        DynamicArray<Entity> result;
+        const uint32_t n = world.GetEntityCount();
+        for (uint32_t i = 0; i < n; i++)
+        {
+            if (i < mActive.GetNElements() && mActive[i])
+            {
+                result.Append(world.GetEntityByIndex(i));
+            }
+        }
+        return result;
     }
 
     // ---- 節點 transform typed queries ----
@@ -335,6 +378,8 @@ class SceneSystem : public IModule
         scenesystem_detail::SetNodeName(name, "Node");
         world.AddComponent<scenesystem_detail::NodeName>(e, name);
         world.AddComponent<MaterialComponent>(e, MaterialComponent());
+        EnsureActiveCapacity(e.GetIndex());
+        mActive[e.GetIndex()] = true;
         return e;
     }
 
@@ -347,7 +392,7 @@ class SceneSystem : public IModule
             p->parent = parent;
     }
 
-    // 讀取節點的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
+    // 取得實體的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
     Entity GetParent(Entity e) const
     {
         if (!world.Alive(e))
@@ -356,6 +401,17 @@ class SceneSystem : public IModule
         if (!p)
             return Entity();
         return p->parent;
+    }
+
+    // ---- 組件查詢(A3.1) ----
+    template <class T> T *GetComponent(Entity entity)
+    {
+        return world.GetComponent<T>(entity);
+    }
+
+    template <class T> const T *GetComponent(Entity entity) const
+    {
+        return world.GetComponent<T>(entity);
     }
 
     void ClearParent(Entity e)
