@@ -4,6 +4,7 @@
 #include "Data/DynamicArray.hpp"
 #include "Data/Padding.hpp"
 #include "Data/String.hpp"
+#include <cstdio>
 #include "Scene/ParentComponent.hpp"
 #include "Scene/TransformComponent.hpp"
 #include "Scene/TransformMath.hpp"
@@ -307,6 +308,16 @@ class SceneSystem : public IModule
     // A3.2:組件生命週期系統
     ComponentSystem mComponentSystem;
 
+    // A3.3:場景運行時
+    bool mSceneActive = true;                        // 場景整體激活狀態
+    DynamicArray<bool> mDontDestroyOnLoad;           // 按 entity index 索引，跨場景保留
+
+    void EnsureDDOLCapacity(uint32_t entityIndex)
+    {
+        while (mDontDestroyOnLoad.GetNElements() <= entityIndex)
+            mDontDestroyOnLoad.Append(false);
+    }
+
     void EnsureActiveCapacity(uint32_t entityIndex)
     {
         while (mActive.GetNElements() <= entityIndex)
@@ -360,6 +371,42 @@ class SceneSystem : public IModule
         return result;
     }
 
+    // ---- A3.3:場景運行時接縫 ----
+    // 場景整體激活/停用。
+    void SetSceneActive(bool active) { mSceneActive = active; }
+    bool IsSceneActive() const { return mSceneActive; }
+
+    // 標記實體為 DontDestroyOnLoad(跨場景載入時不銷毀)。
+    void SetDontDestroyOnLoad(Entity entity, bool dontDestroy)
+    {
+        if (!world.Alive(entity))
+            return;
+        EnsureDDOLCapacity(entity.GetIndex());
+        mDontDestroyOnLoad[entity.GetIndex()] = dontDestroy;
+    }
+
+    bool IsDontDestroyOnLoad(Entity entity) const
+    {
+        if (!world.Alive(entity))
+            return false;
+        uint32_t idx = entity.GetIndex();
+        if (idx >= mDontDestroyOnLoad.GetNElements())
+            return false;
+        return mDontDestroyOnLoad[idx];
+    }
+
+    // 卸載當前場景：銷毀所有非 DontDestroyOnLoad 的根實體及其子樹。
+    // DontDestroyOnLoad 的實體保留。
+    void UnloadScene()
+    {
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); i++)
+        {
+            if (!IsDontDestroyOnLoad(roots[i]))
+                DestroyNode(roots[i]);
+        }
+    }
+
     // ---- 節點 transform typed queries ----
     TransformComponent *GetLocalTransform(Entity entity)
     {
@@ -385,6 +432,8 @@ class SceneSystem : public IModule
         world.AddComponent<MaterialComponent>(e, MaterialComponent());
         EnsureActiveCapacity(e.GetIndex());
         mActive[e.GetIndex()] = true;
+        EnsureDDOLCapacity(e.GetIndex());
+        mDontDestroyOnLoad[e.GetIndex()] = false;
         return e;
     }
 
@@ -397,7 +446,7 @@ class SceneSystem : public IModule
             p->parent = parent;
     }
 
-    // 取得實體的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
+    // 讀取實體的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
     Entity GetParent(Entity e) const
     {
         if (!world.Alive(e))
@@ -718,9 +767,11 @@ class SceneSystem : public IModule
             return false;
 
         // 解析全成功才清空現有場景,再依檔案順序重建。
+        // DontDestroyOnLoad 物件保留(A3.3)。
         DynamicArray<Entity> roots = GetRoots();
         for (size_t i = 0; i < roots.GetNElements(); ++i)
-            DestroyNode(roots[i]);
+            if (!IsDontDestroyOnLoad(roots[i]))
+                DestroyNode(roots[i]);
 
         DynamicArray<Entity> created;
         for (size_t i = 0; i < parsed.GetNElements(); ++i)
