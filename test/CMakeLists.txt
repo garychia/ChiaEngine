@@ -24,4 +24,7 @@ target_include_directories(TestMain PRIVATE
 )
 target_link_libraries(TestMain PRIVATE
     SystemTest
+    ChiaEngineLib
+    glfw
+    GL
 )
