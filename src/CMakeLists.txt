@@ -72,8 +72,10 @@ set(DISPLAY_SOURCE_FILES
     source/Display/GUI/AssetBrowserPanel.cpp
     include/Display/GUI/PanelPane.hpp
     include/Display/GUI/Selection.hpp
+    include/Display/GUI/TransformGizmo.hpp
     include/Display/GUI/EditorSession.hpp
     source/Display/GUI/EditorSession.cpp
+    source/Display/GUI/TransformGizmo.cpp
     include/Display/Text/GlyphAtlas.hpp
     source/Display/Text/GlyphAtlas.cpp
     include/Display/Text/TextLayout.hpp

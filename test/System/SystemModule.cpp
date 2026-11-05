@@ -27,6 +27,7 @@
 #include "InputRuntimeTest.hpp"
 #include "AudioRuntimeTest.hpp"
 #include "RuntimeContractTest.hpp"
+#include "TransformGizmoTest.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -83,6 +84,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<inputruntime_test::InputRuntimeTest>();
     AddTest<audioruntime_test::AudioRuntimeTest>();
     AddTest<runtimecontract_test::RuntimeContractTest>();
+    AddTest<transformgizmo_test::TransformGizmoTest>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
