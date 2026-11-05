@@ -28,6 +28,9 @@ EditorSession::EditorSession(SceneSystem *pSceneSystem, CameraController *pCamer
 
 EditorSession::~EditorSession()
 {
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+    ShutdownRenderer();
+#endif
     if (mpAssetManager)
         mpAssetManager->LoadedEvent.Unsubscribe(this);
     mTextureView.Unsubscribe();
@@ -191,6 +194,21 @@ void EditorSession::SetSelectedEntityMaterial(uint64_t materialId)
     if (!mpSceneSystem || !mSelection.hasSelection)
         return;
     mUndoStack.Push(new SetMaterialCommand(mpSceneSystem, mSelection.entityIndex, materialId));
+}
+
+void EditorSession::SetSelectedEntityPBR(const Point3D &albedo, float metallic, float roughness)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    mUndoStack.Push(new SetPBRCommand(mpSceneSystem, mSelection.entityIndex, albedo, metallic,
+                                      roughness));
+}
+
+void EditorSession::SetSelectedEntityLight(const LightComponent &light)
+{
+    if (!mpSceneSystem || !mSelection.hasSelection)
+        return;
+    mUndoStack.Push(new SetLightCommand(mpSceneSystem, mSelection.entityIndex, light));
 }
 
 bool EditorSession::SavePrefab(uint32_t entityIndex, const String &path)
@@ -357,3 +375,59 @@ void EditorSession::Reset()
     mUndoStack.Clear();
     mPanes.RemoveAll();
 }
+
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+#include "Display/ForwardRenderer.hpp"
+#include "Display/ShadowMapper.hpp"
+
+bool EditorSession::InitializeRenderer()
+{
+    if (mpRenderer)
+        return mpRenderer->IsInitialized();
+
+    mpRenderer = new ForwardRenderer();
+    mpShadowMapper = new ShadowMapper();
+
+    bool ok = mpRenderer->Initialize();
+    if (ok)
+        ok = mpShadowMapper->Initialize();
+
+    if (!ok)
+    {
+        ShutdownRenderer();
+        return false;
+    }
+    return true;
+}
+
+void EditorSession::RenderFrame()
+{
+    if (!mpRenderer || !mpRenderer->IsInitialized())
+        return;
+
+    mpShadowMapper->BeginShadowPass();
+    mpRenderer->DrawScene(*mpSceneSystem);
+    mpShadowMapper->EndShadowPass();
+}
+
+void EditorSession::ShutdownRenderer()
+{
+    if (mpShadowMapper)
+    {
+        mpShadowMapper->Shutdown();
+        delete mpShadowMapper;
+        mpShadowMapper = nullptr;
+    }
+    if (mpRenderer)
+    {
+        mpRenderer->Shutdown();
+        delete mpRenderer;
+        mpRenderer = nullptr;
+    }
+}
+
+bool EditorSession::IsRendererInitialized() const
+{
+    return mpRenderer != nullptr && mpRenderer->IsInitialized();
+}
+#endif

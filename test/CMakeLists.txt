@@ -24,4 +24,9 @@ target_include_directories(TestMain PRIVATE
 )
 target_link_libraries(TestMain PRIVATE
     SystemTest
+    ChiaEngineLib
 )
+# OpenGL 後端才需額外鏈接 GL(ChiaEngineLib 已透傳 glfw)
+if(NOT VULKAN_ENABLED AND NOT DIRECTX_ENABLED)
+    target_link_libraries(TestMain PRIVATE GL)
+endif()

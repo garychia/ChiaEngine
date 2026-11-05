@@ -23,6 +23,12 @@
 // 因此整顆編輯器可無頭測試(不需 GPU/視窗)。
 // (Display→Sim 方向;Sim 頭檔仍不 include Display — 層規則不變。)
 
+// ForwardRenderer/ShadowMapper 僅在 OpenGL 後端可用(VULKAN/DIRECTX 下不編譯其原始碼)
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+class ForwardRenderer;
+class ShadowMapper;
+#endif
+
 // ===== EditorCommand (simple value-based undo/redo) =====
 
 class EditorCommand
@@ -166,6 +172,28 @@ class EditorSession
     void DestroyNode(Entity entity);
     void SetParent(Entity entity, Entity parent);
     void SetSelectedEntityMaterial(uint64_t materialId); // 對選中節點 push SetMaterialCommand
+    // 對選中節點設定 PBR 欄位(albedo/metallic/roughness)。A2.1。
+    void SetSelectedEntityPBR(const Point3D &albedo, float metallic, float roughness);
+
+    // 對選中節點設定光源欄位(type/color/intensity/radius)。A2.2。
+    void SetSelectedEntityLight(const LightComponent &light);
+
+    // ---- Renderer Pipeline (A2.5) ----
+    // 只有 OpenGL 後端可用；VULKAN/DIRECTX 下這些方法不存在。
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+    // 建立 ForwardRenderer + ShadowMapper 並呼叫 Initialize()。
+    // 需要當前線程有當前 OpenGL 上下文(由 App/Xvfb 提供)。
+    bool InitializeRenderer();
+
+    // 執行一幀渲染:ShadowMapper.BeginShadowPass() → ForwardRenderer.DrawScene() → ShadowMapper.EndShadowPass()。
+    void RenderFrame();
+
+    // 釋放 ForwardRenderer + ShadowMapper OpenGL 資源。
+    void ShutdownRenderer();
+
+    // Renderer 是否已成功初始化。
+    bool IsRendererInitialized() const;
+#endif
 
     // ---- Prefab(ADR-0001 D5,Undo/Redo 友善) ----
     // 將選中節點的子樹儲存為 Prefab 檔。回傳 true 成功。
@@ -234,6 +262,11 @@ class EditorSession
     Selection mSelection;
     UndoStack mUndoStack;
     DynamicArray<SharedPtr<PanelPane>> mPanes;
+
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+    ForwardRenderer *mpRenderer = nullptr;   // A2.5: OpenGL 後端渲染器
+    ShadowMapper *mpShadowMapper = nullptr;  // A2.5: 陰影貼圖渲染器
+#endif
 
     // AssetManager::LoadedEvent 回編:記錄 path → contentHash 映射。
     void OnAssetLoaded(SharedPtr<Asset> asset);

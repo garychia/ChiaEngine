@@ -4,11 +4,15 @@
 #include "Data/DynamicArray.hpp"
 #include "Data/Padding.hpp"
 #include "Data/String.hpp"
+#include <cstdio>
 #include "Scene/ParentComponent.hpp"
 #include "Scene/TransformComponent.hpp"
 #include "Scene/TransformMath.hpp"
 #include "Scene/WorldTransformComponent.hpp"
 #include "Scene/MaterialComponent.hpp"
+#include "Scene/LightComponent.hpp"
+#include "Scene/IComponentLifecycle.hpp"
+#include "Scene/ComponentSystem.hpp"
 #include "System/Module/EngineContext.hpp"
 #include "System/Module/IModule.hpp"
 #include "System/Operation/Event.hpp"
@@ -130,7 +134,7 @@ inline bool ParseNodeLine(std::string_view line, SceneNode &out)
     return true;
 }
 
-// prefab 节点:localIndex + parentLocalIndex + materialId + name + 9 floats
+// prefab 节点 v2 格式:localIndex + parentLocalIndex + materialId + PBR 欄位 + name + 9 floats
 // localIndex 從 0 開始重新編號(Prefab 可實例化到不同場景位置)。
 struct PrefabNode
 {
@@ -138,11 +142,18 @@ struct PrefabNode
     int64_t parentLocalIndex = -1;
     std::string name;
     uint64_t materialId = 0;
+    // PBR 欄位(A2.1)
+    Point3D albedo = Point3D(1, 1, 1);
+    float metallic = 0.0f;
+    float roughness = 1.0f;
+    uint64_t normalMapId = 0;
     TransformComponent transform;
 };
 
-// node <localIndex> <parentLocalIndex> <materialId> <name> <9 floats>
-// name 可含空格 → 最後 9 個 token 固定是 TRS,materialId 在 name 之前。
+// node v2: <localIndex> <parentLocalIndex> <materialId> <albedo.x> <albedo.y> <albedo.z> <metallic> <roughness> <normalMapId> <name> <9 floats>
+// node v1 (向下相容): <localIndex> <parentLocalIndex> <materialId> <name> <9 floats>
+// name 可含空格 → 最後 9 個 token 固定是 TRS。
+// v2: PBR 欄位在 materialId 之後、name 之前;v1:無 PBR 欄位。
 inline bool ParsePrefabNodeLine(std::string_view line, PrefabNode &out)
 {
     using namespace worldhashrecord_detail;
@@ -167,34 +178,108 @@ inline bool ParsePrefabNodeLine(std::string_view line, PrefabNode &out)
         out.materialId = value;
     }
 
+    // 判斷 v1/v2:讀取下一個 token。若是數字(浮點數或整數)，視為 v2 PBR 欄位;
+    // 若是字母開頭，視為 v1 name。
     const std::string_view rest = line.substr(pos);
-    size_t cursor = rest.size();
-    for (int i = 0; i < 9; ++i)
+    size_t cursor = 0;
+    // 跳過前導空格
+    while (cursor < rest.size() && rest[cursor] == ' ')
+        cursor++;
+    bool isV2 = false;
+    if (cursor < rest.size())
     {
-        if (cursor == 0)
-            return false;
-        const size_t space = rest.rfind(' ', cursor - 1);
-        if (space == std::string_view::npos)
-            return false;
-        cursor = space;
+        char c = rest[cursor];
+        isV2 = (c == '-' || c == '+' || (c >= '0' && c <= '9') || c == '.');
     }
-    if (cursor == 0)
-        return false; // 空 name
-    out.name.assign(rest.data(), cursor);
 
-    float values[9];
-    size_t valuePos = cursor + 1;
-    for (int i = 0; i < 9; ++i)
+    if (isV2)
     {
-        if (!NextToken(rest, valuePos, token) || !ParseFloat(token, values[i]))
-            return false;
-    }
-    if (valuePos != rest.size())
-        return false;
+        // v2:讀取 PBR 欄位 albedo(3 floats), metallic, roughness, normalMapId
+        float albedoVals[3];
+        for (int i = 0; i < 3; ++i)
+        {
+            if (!NextToken(rest, cursor, token) || !ParseFloat(token, albedoVals[i]))
+                return false;
+        }
+        out.albedo = Point3D(albedoVals[0], albedoVals[1], albedoVals[2]);
 
-    out.transform.position = Point3D(values[0], values[1], values[2]);
-    out.transform.rotation = Point3D(values[3], values[4], values[5]);
-    out.transform.scale = Point3D(values[6], values[7], values[8]);
+        if (!NextToken(rest, cursor, token) || !ParseFloat(token, out.metallic))
+            return false;
+        if (!NextToken(rest, cursor, token) || !ParseFloat(token, out.roughness))
+            return false;
+        if (!NextToken(rest, cursor, token))
+            return false;
+        {
+            uint64_t value = 0;
+            const std::from_chars_result result =
+                std::from_chars(token.data(), token.data() + token.size(), value);
+            if (result.ec != std::errc() || result.ptr != token.data() + token.size())
+                return false;
+            out.normalMapId = value;
+        }
+
+        // 讀取 name:從 cursor 到最後 9 個 float 之前
+        size_t nameEnd = rest.size();
+        for (int i = 0; i < 9; ++i)
+        {
+            if (nameEnd == 0)
+                return false;
+            const size_t space = rest.rfind(' ', nameEnd - 1);
+            if (space == std::string_view::npos)
+                return false;
+            nameEnd = space;
+        }
+        if (nameEnd == 0)
+            return false; // 空 name
+        out.name.assign(rest.data() + cursor, nameEnd - cursor);
+
+        // 讀取 9 個 TRS floats
+        float values[9];
+        size_t valuePos = nameEnd + 1;
+        for (int i = 0; i < 9; ++i)
+        {
+            if (!NextToken(rest, valuePos, token) || !ParseFloat(token, values[i]))
+                return false;
+        }
+        if (valuePos != rest.size())
+            return false;
+
+        out.transform.position = Point3D(values[0], values[1], values[2]);
+        out.transform.rotation = Point3D(values[3], values[4], values[5]);
+        out.transform.scale = Point3D(values[6], values[7], values[8]);
+    }
+    else
+    {
+        // v1:向下相容,無 PBR 欄位,name 在 materialId 之後
+        const std::string_view restV1 = line.substr(pos);
+        size_t nameEnd = restV1.size();
+        for (int i = 0; i < 9; ++i)
+        {
+            if (nameEnd == 0)
+                return false;
+            const size_t space = restV1.rfind(' ', nameEnd - 1);
+            if (space == std::string_view::npos)
+                return false;
+            nameEnd = space;
+        }
+        if (nameEnd == 0)
+            return false; // 空 name
+        out.name.assign(restV1.data(), nameEnd);
+
+        float values[9];
+        size_t valuePos = nameEnd + 1;
+        for (int i = 0; i < 9; ++i)
+        {
+            if (!NextToken(restV1, valuePos, token) || !ParseFloat(token, values[i]))
+                return false;
+        }
+        if (valuePos != restV1.size())
+            return false;
+
+        out.transform.position = Point3D(values[0], values[1], values[2]);
+        out.transform.rotation = Point3D(values[3], values[4], values[5]);
+        out.transform.scale = Point3D(values[6], values[7], values[8]);
+    }
     return true;
 }
 } // namespace scenesystem_detail
@@ -217,6 +302,28 @@ class SceneSystem : public IModule
     // World 是實作細節 — 模組對外只暴露場景圖與節點 transform 的接縫(#81)。
     World world;
 
+    // Entity 激活/停用狀態(按 entity index 索引)。CreateNode 預設 active=true。
+    DynamicArray<bool> mActive;
+
+    // A3.2:組件生命週期系統
+    ComponentSystem mComponentSystem;
+
+    // A3.3:場景運行時
+    bool mSceneActive = true;                        // 場景整體激活狀態
+    DynamicArray<bool> mDontDestroyOnLoad;           // 按 entity index 索引，跨場景保留
+
+    void EnsureDDOLCapacity(uint32_t entityIndex)
+    {
+        while (mDontDestroyOnLoad.GetNElements() <= entityIndex)
+            mDontDestroyOnLoad.Append(false);
+    }
+
+    void EnsureActiveCapacity(uint32_t entityIndex)
+    {
+        while (mActive.GetNElements() <= entityIndex)
+            mActive.Append(false);
+    }
+
   public:
     // ---- Entity 生命週期接縫(不暴露 World facade)----
     bool Alive(Entity entity) const
@@ -228,6 +335,76 @@ class SceneSystem : public IModule
     Entity GetEntityByIndex(uint32_t entityIndex) const
     {
         return world.GetEntityByIndex(entityIndex);
+    }
+
+    // ---- Entity 激活/停用接縫(A3.1) ----
+    bool IsActive(Entity entity) const
+    {
+        if (!world.Alive(entity))
+            return false;
+        uint32_t idx = entity.GetIndex();
+        if (idx >= mActive.GetNElements())
+            return false;
+        return mActive[idx];
+    }
+
+    void SetActive(Entity entity, bool active)
+    {
+        if (!world.Alive(entity))
+            return;
+        EnsureActiveCapacity(entity.GetIndex());
+        mActive[entity.GetIndex()] = active;
+    }
+
+    // 取得所有 active 的實體(依 index 升序)。
+    DynamicArray<Entity> GetActiveEntities() const
+    {
+        DynamicArray<Entity> result;
+        const uint32_t n = world.GetEntityCount();
+        for (uint32_t i = 0; i < n; i++)
+        {
+            if (i < mActive.GetNElements() && mActive[i])
+            {
+                result.Append(world.GetEntityByIndex(i));
+            }
+        }
+        return result;
+    }
+
+    // ---- A3.3:場景運行時接縫 ----
+    // 場景整體激活/停用。
+    void SetSceneActive(bool active) { mSceneActive = active; }
+    bool IsSceneActive() const { return mSceneActive; }
+
+    // 標記實體為 DontDestroyOnLoad(跨場景載入時不銷毀)。
+    void SetDontDestroyOnLoad(Entity entity, bool dontDestroy)
+    {
+        if (!world.Alive(entity))
+            return;
+        EnsureDDOLCapacity(entity.GetIndex());
+        mDontDestroyOnLoad[entity.GetIndex()] = dontDestroy;
+    }
+
+    bool IsDontDestroyOnLoad(Entity entity) const
+    {
+        if (!world.Alive(entity))
+            return false;
+        uint32_t idx = entity.GetIndex();
+        if (idx >= mDontDestroyOnLoad.GetNElements())
+            return false;
+        return mDontDestroyOnLoad[idx];
+    }
+
+    // 卸載當前場景：銷毀所有非 DontDestroyOnLoad 的根實體及其子樹。
+    // DontDestroyOnLoad 的實體保留。
+    void UnloadScene()
+    {
+        DynamicArray<Entity> roots = GetRoots();
+        for (size_t i = 0; i < roots.GetNElements(); i++)
+        {
+            if (!IsDontDestroyOnLoad(roots[i]))
+                DestroyNode(roots[i]);
+        }
     }
 
     // ---- 節點 transform typed queries ----
@@ -253,6 +430,10 @@ class SceneSystem : public IModule
         scenesystem_detail::SetNodeName(name, "Node");
         world.AddComponent<scenesystem_detail::NodeName>(e, name);
         world.AddComponent<MaterialComponent>(e, MaterialComponent());
+        EnsureActiveCapacity(e.GetIndex());
+        mActive[e.GetIndex()] = true;
+        EnsureDDOLCapacity(e.GetIndex());
+        mDontDestroyOnLoad[e.GetIndex()] = false;
         return e;
     }
 
@@ -265,7 +446,7 @@ class SceneSystem : public IModule
             p->parent = parent;
     }
 
-    // 讀取節點的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
+    // 讀取實體的 parent entity(存活檢查;無 parent/無效回 Entity() = null)。
     Entity GetParent(Entity e) const
     {
         if (!world.Alive(e))
@@ -274,6 +455,17 @@ class SceneSystem : public IModule
         if (!p)
             return Entity();
         return p->parent;
+    }
+
+    // ---- 組件查詢(A3.1) ----
+    template <class T> T *GetComponent(Entity entity)
+    {
+        return world.GetComponent<T>(entity);
+    }
+
+    template <class T> const T *GetComponent(Entity entity) const
+    {
+        return world.GetComponent<T>(entity);
     }
 
     void ClearParent(Entity e)
@@ -341,6 +533,99 @@ class SceneSystem : public IModule
         if (!pM)
             return;
         pM->materialId = materialId;
+    }
+
+    // 讀取節點 PBR 欄位(index + 存活檢查);未綁定回預設值(albedo=1, metallic=0, roughness=1)。
+    bool GetPBR(uint32_t entityIndex, Point3D &outAlbedo, float &outMetallic,
+                float &outRoughness) const
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        const MaterialComponent *pM = world.GetComponent<MaterialComponent>(e);
+        if (!pM)
+            return false;
+        outAlbedo = pM->albedo;
+        outMetallic = pM->metallic;
+        outRoughness = pM->roughness;
+        return true;
+    }
+
+    // 編輯器增量編輯:設定節點 PBR 欄位。entity 不存在則 no-op。
+    void SetPBR(uint32_t entityIndex, const Point3D &albedo, float metallic,
+                float roughness)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        MaterialComponent *pM = world.GetComponent<MaterialComponent>(e);
+        if (!pM)
+            return;
+        pM->albedo = albedo;
+        pM->metallic = metallic;
+        pM->roughness = roughness;
+    }
+
+    // 讀取節點光源欄位(index + 存活檢查);無光源元件回預設值。
+    bool GetLight(uint32_t entityIndex, LightComponent &outLight) const
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return false;
+        const LightComponent *pL = world.GetComponent<LightComponent>(e);
+        if (!pL)
+        {
+            outLight = LightComponent(); // 預設值
+            return true;
+        }
+        outLight = *pL;
+        return true;
+    }
+
+    // 編輯器增量編輯:設定節點光源欄位。entity 不存在則 no-op。
+    // 若該節點尚無 LightComponent 元件，會自動建立預設元件。
+    void SetLight(uint32_t entityIndex, const LightComponent &light)
+    {
+        Entity e = world.GetEntityByIndex(entityIndex);
+        if (!world.Alive(e))
+            return;
+        LightComponent *pL = world.GetComponent<LightComponent>(e);
+        if (!pL)
+            pL = world.AddComponent<LightComponent>(e, LightComponent());
+        *pL = light;
+    }
+
+    // 取得投射陰影的方向光節點(LightComponent.type == Directional && castsShadow == true)。
+    DynamicArray<Entity> GetShadowCasters() const
+    {
+        DynamicArray<Entity> casters;
+        ComponentPool<LightComponent> *pPool = world.GetPool<LightComponent>();
+        if (!pPool)
+            return casters;
+        const uint32_t n = pPool->GetNElements();
+        for (uint32_t i = 0; i < n; i++)
+        {
+            const uint32_t owner = pPool->OwnerAt(i);
+            const LightComponent *pL = pPool->Get(owner);
+            if (!pL || pL->type != LightComponent::Directional || !pL->castsShadow)
+                continue;
+            casters.Append(world.GetEntityByIndex(owner));
+        }
+        // index 升序
+        for (size_t i = 0; i + 1 < casters.GetNElements(); i++)
+        {
+            size_t best = i;
+            for (size_t j = i + 1; j < casters.GetNElements(); j++)
+                if (casters[j].GetIndex() < casters[best].GetIndex())
+                    best = j;
+            if (best != i)
+            {
+                Entity tmp = casters[i];
+                casters[i] = casters[best];
+                casters[best] = tmp;
+            }
+        }
+        return casters;
     }
 
     // 編輯器增量編輯:設定節點名稱。entity 不存在則 no-op。
@@ -482,9 +767,11 @@ class SceneSystem : public IModule
             return false;
 
         // 解析全成功才清空現有場景,再依檔案順序重建。
+        // DontDestroyOnLoad 物件保留(A3.3)。
         DynamicArray<Entity> roots = GetRoots();
         for (size_t i = 0; i < roots.GetNElements(); ++i)
-            DestroyNode(roots[i]);
+            if (!IsDontDestroyOnLoad(roots[i]))
+                DestroyNode(roots[i]);
 
         DynamicArray<Entity> created;
         for (size_t i = 0; i < parsed.GetNElements(); ++i)
@@ -523,7 +810,7 @@ class SceneSystem : public IModule
         std::ofstream out(path, std::ios::out | std::ios::trunc);
         if (!out.is_open())
             return false;
-        out << "prefab v1\n";
+        out << "prefab v2\n";
         out << std::dec << std::setprecision(17);
 
         // DFS pre-order 收集子樹所有節點。
@@ -562,8 +849,15 @@ class SceneSystem : public IModule
             if (pMat)
                 matId = pMat->materialId;
 
-            out << "node " << i << " " << parentLocalIndex << " " << matId << " " << nodeName
-                << " ";
+            const Point3D albedo = pMat ? pMat->albedo : Point3D(1, 1, 1);
+            const float metallic = pMat ? pMat->metallic : 0.0f;
+            const float roughness = pMat ? pMat->roughness : 1.0f;
+            const uint64_t normalMapId = pMat ? pMat->normalMapId : 0;
+
+            out << "node " << i << " " << parentLocalIndex << " " << matId << " "
+                << albedo.x << " " << albedo.y << " " << albedo.z << " "
+                << metallic << " " << roughness << " " << normalMapId << " "
+                << nodeName << " ";
             out << pTransform->position.x << " " << pTransform->position.y << " "
                 << pTransform->position.z << " ";
             out << pTransform->rotation.x << " " << pTransform->rotation.y << " "
@@ -589,7 +883,7 @@ class SceneSystem : public IModule
         using namespace worldhashrecord_detail;
 
         std::string line;
-        if (!ReadLine(in, line) || line != "prefab v1")
+        if (!ReadLine(in, line) || (line != "prefab v1" && line != "prefab v2"))
             return nullEntity;
 
         // 先完整解析到區域容器;任何錯誤都在動世界之前返回。
@@ -657,7 +951,13 @@ class SceneSystem : public IModule
                 scenesystem_detail::SetNodeName(*pName, parsed[i].name);
             MaterialComponent *pMat = world.GetComponent<MaterialComponent>(e);
             if (pMat)
+            {
                 pMat->materialId = parsed[i].materialId;
+                pMat->albedo = parsed[i].albedo;
+                pMat->metallic = parsed[i].metallic;
+                pMat->roughness = parsed[i].roughness;
+                pMat->normalMapId = parsed[i].normalMapId;
+            }
             created.Append(e);
         }
         return created.IsEmpty() ? nullEntity : created[0];
@@ -778,11 +1078,20 @@ class SceneSystem : public IModule
         DynamicArray<Entity> roots = GetRoots();
         for (size_t i = 0; i < roots.GetNElements(); i++)
             RecomputeSubtree(roots[i], true, WorldTransformComponent());
+
+        // A3.2:組件生命週期 — FixedUpdate(確定性)
+        mComponentSystem.DoAwake();
+        mComponentSystem.DoStart();
+        mComponentSystem.DoFixedUpdate(static_cast<float>(clock.fixedDeltaSeconds));
     }
 
     void Update(const FrameClock &clock) override
     {
         (void)clock;
+        // A3.2:組件生命週期 — Update/LateUpdate
+        float dt = static_cast<float>(clock.frameDeltaSeconds);
+        mComponentSystem.DoUpdate(dt);
+        mComponentSystem.DoLateUpdate(dt);
     }
 
   private:

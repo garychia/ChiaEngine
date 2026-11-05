@@ -181,4 +181,95 @@ class SetMaterialCommand : public EditorCommand
     bool mCaptured;
 };
 
+// ===== SetPBRCommand ====
+// Apply: SceneSystem::SetPBR(entityIndex, newAlbedo, newMetallic, newRoughness)
+// Revert: SceneSystem::SetPBR(entityIndex, oldAlbedo, oldMetallic, oldRoughness)
+// 首次 Apply 時捕捉當前 PBR 欄位作為 old 值。
+class SetPBRCommand : public EditorCommand
+{
+  public:
+    SetPBRCommand(SceneSystem *pScene, uint32_t entityIndex, const Point3D &newAlbedo,
+                  float newMetallic, float newRoughness)
+        : mpScene(pScene), mEntityIndex(entityIndex), mNewAlbedo(newAlbedo),
+          mNewMetallic(newMetallic), mNewRoughness(newRoughness),
+          mOldAlbedo(Point3D(1, 1, 1)), mOldMetallic(0.0f), mOldRoughness(1.0f),
+          mCaptured(false)
+    {
+    }
+
+    void Apply() override
+    {
+        if (!mpScene)
+            return;
+        if (!mCaptured)
+        {
+            mpScene->GetPBR(mEntityIndex, mOldAlbedo, mOldMetallic, mOldRoughness);
+            mCaptured = true;
+        }
+        mpScene->SetPBR(mEntityIndex, mNewAlbedo, mNewMetallic, mNewRoughness);
+    }
+
+    void Revert() override
+    {
+        if (!mpScene)
+            return;
+        mpScene->SetPBR(mEntityIndex, mOldAlbedo, mOldMetallic, mOldRoughness);
+    }
+
+    String Description() const override { return String(u"SetPBR"); }
+
+  private:
+    SceneSystem *mpScene;
+    uint32_t mEntityIndex;
+    Point3D mNewAlbedo;
+    float mNewMetallic;
+    float mNewRoughness;
+    Point3D mOldAlbedo;
+    float mOldMetallic;
+    float mOldRoughness;
+    bool mCaptured;
+};
+
+// ===== SetLightCommand ====
+// Apply: SceneSystem::SetLight(entityIndex, newLight)
+// Revert: SceneSystem::SetLight(entityIndex, oldLight)
+// 首次 Apply 時捕捉當前光源欄位作為 old 值。
+class SetLightCommand : public EditorCommand
+{
+  public:
+    SetLightCommand(SceneSystem *pScene, uint32_t entityIndex, const LightComponent &newLight)
+        : mpScene(pScene), mEntityIndex(entityIndex), mNewLight(newLight),
+          mOldLight(LightComponent(LightComponent::Directional)), mCaptured(false)
+    {
+    }
+
+    void Apply() override
+    {
+        if (!mpScene)
+            return;
+        if (!mCaptured)
+        {
+            mpScene->GetLight(mEntityIndex, mOldLight);
+            mCaptured = true;
+        }
+        mpScene->SetLight(mEntityIndex, mNewLight);
+    }
+
+    void Revert() override
+    {
+        if (!mpScene)
+            return;
+        mpScene->SetLight(mEntityIndex, mOldLight);
+    }
+
+    String Description() const override { return String(u"SetLight"); }
+
+  private:
+    SceneSystem *mpScene;
+    uint32_t mEntityIndex;
+    LightComponent mNewLight;
+    LightComponent mOldLight;
+    bool mCaptured;
+};
+
 #endif // SCENE_EDIT_COMMAND_HPP

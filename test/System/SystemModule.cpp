@@ -14,6 +14,16 @@
 #include "AssetBrowserTest.hpp"
 #include "SceneUndoTest.hpp"
 #include "PrefabTest.hpp"
+#include "MaterialPBRTest.hpp"
+#include "LightComponentTest.hpp"
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+#include "ForwardRendererContractTest.hpp"
+#include "ShadowMapperTest.hpp"
+#include "EditorSessionRendererTest.hpp"
+#endif
+#include "GameObjectRuntimeTest.hpp"
+#include "ComponentLifecycleTest.hpp"
+#include "SceneRuntimeTest.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -57,6 +67,16 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<assetbrowser_test::AssetBrowserTest>();
     AddTest<sceneundo_test::SceneUndoTest>();
     AddTest<prefab_test::PrefabTest>();
+    AddTest<materialpbr_test::MaterialPBRTest>();
+    AddTest<lightcomponent_test::LightComponentTest>();
+#if !defined(VULKAN_ENABLED) && !defined(DIRECTX_ENABLED)
+    AddTest<forwardrenderercontract_test::ForwardRendererContractTest>();
+    AddTest<shadowmapper_test::ShadowMapperTest>();
+    AddTest<editorsessionrenderer_test::EditorSessionRendererTest>();
+#endif
+    AddTest<gameobjectruntime_test::GameObjectRuntimeTest>();
+    AddTest<componentlifecycle_test::ComponentLifecycleTest>();
+    AddTest<sceneruntime_test::SceneRuntimeTest>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
