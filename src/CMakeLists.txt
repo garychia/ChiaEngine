@@ -139,6 +139,9 @@ set(SYSTEM_SOURCE_FILES
     source/System/Input/InputHandleLayer.cpp
     include/System/Input/InputHandler.hpp
     source/System/Input/InputHandler.cpp
+    include/System/Input/InputAction.hpp
+    include/System/Input/InputRuntime.hpp
+    source/System/Input/InputRuntime.cpp
     include/System/Input/KeyboardHandler.hpp
     source/System/Input/KeyboardHandler.cpp
     include/System/Input/KeyCodes.hpp

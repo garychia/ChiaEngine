@@ -24,6 +24,7 @@
 #include "GameObjectRuntimeTest.hpp"
 #include "ComponentLifecycleTest.hpp"
 #include "SceneRuntimeTest.hpp"
+#include "InputRuntimeTest.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -77,6 +78,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<gameobjectruntime_test::GameObjectRuntimeTest>();
     AddTest<componentlifecycle_test::ComponentLifecycleTest>();
     AddTest<sceneruntime_test::SceneRuntimeTest>();
+    AddTest<inputruntime_test::InputRuntimeTest>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
