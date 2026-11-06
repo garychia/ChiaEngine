@@ -156,6 +156,9 @@ set(SYSTEM_SOURCE_FILES
     include/System/Asteroid/AsteroidTypes.hpp
     include/System/Asteroid/AsteroidSystem.hpp
     include/System/Asteroid/AsteroidHud.hpp
+    include/System/Platformer/PlatformerTypes.hpp
+    include/System/Platformer/PlatformerSystem.hpp
+    include/System/Platformer/PlatformerHud.hpp
     include/System/Input/MouseInfo.hpp
     source/System/Input/MouseInfo.cpp
     include/System/Input/MouseInput.hpp
