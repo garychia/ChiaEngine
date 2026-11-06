@@ -153,6 +153,9 @@ set(SYSTEM_SOURCE_FILES
     include/System/Breakout/BreakoutTypes.hpp
     include/System/Breakout/BreakoutSystem.hpp
     include/System/Breakout/BreakoutHud.hpp
+    include/System/Asteroid/AsteroidTypes.hpp
+    include/System/Asteroid/AsteroidSystem.hpp
+    include/System/Asteroid/AsteroidHud.hpp
     include/System/Input/MouseInfo.hpp
     source/System/Input/MouseInfo.cpp
     include/System/Input/MouseInput.hpp
