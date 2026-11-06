@@ -44,6 +44,8 @@ bool View<Components...>::Iterator::Valid() const
 template <class... Components>
 void View<Components...>::Iterator::SkipInvalid()
 {
+    if (!pView->pDriver)
+        return;
     while (position < pView->pDriver->GetNElements() && !Valid())
         position++;
 }

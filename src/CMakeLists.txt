@@ -149,8 +149,10 @@ set(SYSTEM_SOURCE_FILES
     include/System/Input/KeyboardHandler.hpp
     source/System/Input/KeyboardHandler.cpp
     include/System/Input/KeyCodes.hpp
-    include/System/Input/KeyCombination.hpp
     source/System/Input/KeyCombination.cpp
+    include/System/Breakout/BreakoutTypes.hpp
+    include/System/Breakout/BreakoutSystem.hpp
+    include/System/Breakout/BreakoutHud.hpp
     include/System/Input/MouseInfo.hpp
     source/System/Input/MouseInfo.cpp
     include/System/Input/MouseInput.hpp
