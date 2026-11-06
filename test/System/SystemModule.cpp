@@ -30,6 +30,7 @@
 #include "TransformGizmoTest.hpp"
 #include "BreakoutTest.hpp"
 #include "AsteroidTest.hpp"
+#include "PlatformerTest.hpp"
 #include "PlaybackTest.hpp"
 #include "PanelRegionsTest.hpp"
 #include "DockRegistryTest.hpp" // #87 ADR-0001 D3:named docks + PanelPane registry
@@ -89,6 +90,7 @@ SystemModule::SystemModule(const String &ioTestPath)
     AddTest<transformgizmo_test::TransformGizmoTest>();
     AddTest<breakout_test::BreakoutTest>();
     AddTest<asteroid_test::AsteroidTest>();
+    AddTest<platformer_test::PlatformerTest>();
     AddTest<playback_test::PlaybackTest>();
     AddTest<panelregionstest::PanelRegionsTest>();
     AddTest<dockregistrytest::DockRegistryTest>(); // #87 ADR-0001 D3:named docks + pane registry
